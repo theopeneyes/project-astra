@@ -10,6 +10,7 @@ import models as md
 import pandas as pd 
 
 import os 
+import uvicorn
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -41,3 +42,10 @@ app = FastAPI(debug=True, title="project-astra")
 @app.post("/get_classification")
 def get_classification(hashcode: str) -> pd.DataFrame: 
     pass  
+
+if __name__ == '__main__': 
+    # add event listeners here 
+    
+    # launch server 
+    uvicorn.run(port=4000)
+    
