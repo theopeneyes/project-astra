@@ -1,7 +1,7 @@
 # This file contains the event listener addition class
-
+import google.generativeai as genai
 #TODO: Implement event listener to logs things into a db 
-# for help read this link: https://stackoverflow.com/questions/70982565/how-do-i-make-an-event-listener-with-decorators-in-python/74679391#74679391
+# for help read this link: https://stackoverflow.com/questionsquestions/70982565/how-do-i-make-an-event-listener-with-decorators-in-python/74679391#74679391
 
 class Event:
     def __init__(self):
