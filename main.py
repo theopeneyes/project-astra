@@ -19,6 +19,7 @@ load_dotenv()
 # the value won't be updated until you restart the server 
 PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
 
 genai.configure(api_key=GEMINI_API_KEY)
 
