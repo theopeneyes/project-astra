@@ -5,7 +5,6 @@
 previous_clause_prompt: str = " and if one doesn't exist then use '{}' as the title"
 
 clause_prompt: str = "If one doesn't exist then use '{}' as the title. "
-
 # main prompts
 prompt: str = """
 You are a HTML converter bot. Your TASK is to convert text and image as text from a given image
