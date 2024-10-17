@@ -131,7 +131,6 @@ You will be penalized if you fail to conver the document effectively
 
 
 # MODULE CODE 
-
 messages: List[Dict] = [
     {
       "role": "user",
@@ -406,7 +405,8 @@ if uploaded_pdf is not None:
             print(json_outputs)
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
         
-        st.text("Data Loader output")
+        st.write("Data Loader output")
         st.dataframe(df)
 
+        st.write("Data Classifier output")
         st.dataframe(json_df)
