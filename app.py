@@ -13,10 +13,7 @@ import re
 import json 
 import requests 
 
-import re
-import os 
 import PIL 
-import streamlit 
 
 import base64
 import pdf2image as p2i 
@@ -151,7 +148,7 @@ messages: List[Dict] = [
 
 
 # loader to get json from the loaded dataframe 
-def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]] | str: 
+def get_json(book_json: Dict[str, str|int|None], hf_token: str) -> Dict[str, List[str]] | str: 
 
     API_URL: str = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers: Dict[str, str] = {
@@ -159,6 +156,8 @@ def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]] | str:
         "Content-Type": "application/json",
         "x-wait-for-model": "true"
     }
+
+    book_text: str = book_json["text"]
 
     # chapter, definition, example 
     response = requests.post(
@@ -179,6 +178,7 @@ def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]] | str:
     try:
         # Step 4: Parse and pretty print the cleaned JSON string
         data = json.loads(cleaned_response)
+        data = {**data, **book_json}
     except json.JSONDecodeError as e:
         #TODO: For JK: Fix the issue of decoding 
         # Some json produced by LLMs do not produce decodeable jsons. Need to fix this issue. 
@@ -187,7 +187,7 @@ def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]] | str:
 
     return data
 
-def structure_html(output: List[str]) -> pd.DataFrame:
+def structure_html(output: List[str]) -> List[Dict[str, str|int|None]]:  
     """
     output: List[str] 
     A list of html documents converted from a pdf page using the
@@ -201,7 +201,6 @@ def structure_html(output: List[str]) -> pd.DataFrame:
     title: str| None = None
     heading: str | None  = None
     sub_heading: str | None = None
-    text: List[str] = []
     table_on: bool = False
     table_content: List[str]
     df_json : List[Dict[str, str]] = []
@@ -266,7 +265,7 @@ def structure_html(output: List[str]) -> pd.DataFrame:
                 "text": text[3],
             })
 
-    return pd.DataFrame(df_json)
+    return df_json
 
 
 def encode_image(image: PIL.Image): 
@@ -274,7 +273,7 @@ def encode_image(image: PIL.Image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-def parse_pdf(models: List, config, st: streamlit,  
+def parse_pdf(config, st: st,  
               pdf_path: str, prompt: str,
               clause_prompt: str,
               name_of_pdf: str,
@@ -290,9 +289,6 @@ def parse_pdf(models: List, config, st: streamlit,
             pdf_path,
             dpi=200,
         )
-
-     
-    gemini, gpt4o = models 
 
     for i, image in enumerate(images):
         with st.spinner(f"Sending Image {i+1} to Gemini..."): 
@@ -317,7 +313,7 @@ def parse_pdf(models: List, config, st: streamlit,
             if re.findall(r"<title>(.*?)</title>", output[-1])[0] != title:
                 title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
 
-        except Exception as e:
+        except Exception as _:
             with st.spinner("Error occured in Gemini, sending it now to GPT4oMini..."): 
                 messages[0]["content"][0]["text"] = new_prompt 
                 messages[0]["content"][1]["image_url"]["url"] = (
@@ -333,7 +329,7 @@ def parse_pdf(models: List, config, st: streamlit,
                 if re.findall(r"<title>(.*?)</title>", output[-1])[0] != title:
                     title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
                     
-            except Exception as E: 
+            except Exception as _: 
                 with st.spinner(f"Couldn't parse Image {i+1}, saving the image for inspection..."): 
                     plt.imshow(image)
                     plt.savefig(os.path.join(error_dir, f"{name_of_pdf}_page_{i}.jpg"))
@@ -380,33 +376,27 @@ if uploaded_pdf is not None:
         
         with st.spinner("Parsing the file..."): 
             html_pages: List[str] = parse_pdf(
-                models, config, st, 
+                config, st, 
                 file_path, prompt, clause_prompt, 
                 uploaded_pdf.name, ERROR_DIR, messages)
         
         
         with st.spinner("Converting HTML to Table..."): 
-            df: pd.DataFrame = structure_html(html_pages)
+            text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
 
         # Data classifier part 
-        texts: List[str] = df["text"].tolist()
-
         with st.spinner("Sending each text to the classifier..."): 
             json_outputs: List[Dict] = []
         
-        
-        for idx, text in enumerate(texts): 
-            with st.spinner(f"Converting HTML for Page {idx+1} to json..."):
-                op = get_json(text, HF_TOKEN)
-                if op != "":    
-                    json_outputs.append(op) 
+            for idx, text_json in enumerate(text_metadata): 
+                with st.spinner(f"Converting HTML for Page {idx+1} to json..."):
+                    op = get_json(text_json, HF_TOKEN)
+                    if op != "":    
+                        json_outputs.append(op) 
 
         with st.spinner("Generating json..."): 
             print(json_outputs)
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
         
-        st.write("Data Loader output")
-        st.dataframe(df)
-
         st.write("Data Classifier output")
         st.dataframe(json_df)

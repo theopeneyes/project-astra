@@ -22,7 +22,6 @@ from data_loader.prompts import prompt, clause_prompt
 from data_loader.opeanai_formatters import messages 
 
 import os 
-import uvicorn
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -88,9 +87,4 @@ async def data_loader(pdf_file: UploadFile) -> List[Dict[str, str| int| None]]:
     strucuted_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     return strucuted_json    
 
-if __name__ == '__main__': 
-    # add event listeners here 
-    
-    # launch server 
-    uvicorn.run()
     
