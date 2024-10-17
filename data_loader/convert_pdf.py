@@ -17,7 +17,7 @@ def encode_image(image: PIL.Image):
     image.save(buffered, format="JPEG")
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-def parse_pdf(models: List, config, st: streamlit,  
+def parse_pdf(models: List, config,   
               pdf_path: str, prompt: str,
               clause_prompt: str,
               name_of_pdf: str,
@@ -28,18 +28,15 @@ def parse_pdf(models: List, config, st: streamlit,
     new_prompt: str
     output: List[str] = []
 
-    st.spinner("Converting the pdf pages to images...")
     images: List[PIL.Image] = p2i.convert_from_path(
         pdf_path,
         dpi=200,
     )
 
-    st.spinner("PDF converted to Image successfully!")
      
     gemini, gpt4o = models 
 
     for i, image in enumerate(images):
-        st.spinner(f"Sending Image {i+1} to Gemini...")
 
         if title:
             new_prompt = prompt.format(clause_prompt.format(title, "title"), "", "")
@@ -63,7 +60,6 @@ def parse_pdf(models: List, config, st: streamlit,
                 title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
 
         except Exception as e:
-            st.spinner("Error occured in Gemini, sending it now to GPT4oMini...")
             messages[0]["content"][0]["text"] = new_prompt 
             messages[0]["content"][1]["image_url"]["url"] = (
                 f"data:image/jpeg;base64,{encode_image(image)}") 
@@ -79,12 +75,9 @@ def parse_pdf(models: List, config, st: streamlit,
                     title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
                     
             except Exception as E: 
-                st.spinner(f"Couldn't parse Image {i+1}, saving the image for inspection...")
                 plt.imshow(image)
                 plt.savefig(os.path.join(error_dir, f"{name_of_pdf}_page_{i}.jpg"))
-        
-        st.spinner("Moving on to the next page...")
-    
+
     return output
 
 

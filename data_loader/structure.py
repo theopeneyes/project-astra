@@ -2,11 +2,11 @@ import pandas as pd
 from typing import List, Dict 
 
 
-def structure_html(output: List[str]) -> pd.DataFrame:
+def structure_html(output: List[str]) ->List[Dict[str, str|int]]: 
     """
     output: List[str] 
     A list of html documents converted from a pdf page using the
-    Gemini API.  
+    Gemini API or GPT4o-mini API.  
 
     returns: pd.DataFrame 
     Structures the output as a DataFrame to send to the 
@@ -81,5 +81,5 @@ def structure_html(output: List[str]) -> pd.DataFrame:
                 "text": text[3],
             })
 
-    return pd.DataFrame(df_json)
+    return df_json
 
