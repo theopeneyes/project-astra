@@ -30,7 +30,15 @@ jobs:
         make install 
     - name: Lint with Pylint
       run: |
-        pylint --disable=R,C *.py || true  
+        pylint --disable=R,C *.py || true 
+    - name: Create .env file 
+      run: |
+        touch .env 
+        echo OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} >> .env
+        echo GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }} >> .env 
+        echo HF_TOKEN=${{ secrets.HF_TOKEN }} >> .env 
+        echo FILE_ID=${{ secrets.FILE_ID }} >> .env 
+        cat .env
     - name: Intialize the Server 
       run: |
         uvicorn main:app --reload & sleep 5
