@@ -30,10 +30,10 @@ jobs:
         make install 
     - name: Lint with Pylint
       run: |
-        make lint 
+        pylint --disable=R,C *.py 
     - name: Intialize the Server 
       run: |
-        make serve 
+        uvicorn main:app --reload & sleep 5
     - name: Test with pytest
       run: |
-        make test 
+        pytest test.py 
