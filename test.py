@@ -143,9 +143,9 @@ def test_generate() -> None:
         json=json, 
         headers=headers, 
     )
-
+    
     assert isinstance(response.json()["output"], str)  
 
 
 if __name__ == '__main__': 
-    test_data_classifer()
+    test_generate()

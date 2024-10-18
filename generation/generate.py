@@ -31,7 +31,7 @@ def generate_response(
         API_URL + llms[model], 
         headers=headers,
         json=json_input, 
-    )
+    ).json()
 
     return (
         response[0]

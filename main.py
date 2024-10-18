@@ -117,6 +117,7 @@ async def generate(context: GenerationContext) -> Dict[str, str]:
        context=context.context, 
        hf_token=HF_TOKEN, 
        model="mistral",  
+       topics=context.topics, 
     )
     
     return {"output": qna}
