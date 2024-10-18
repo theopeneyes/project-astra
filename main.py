@@ -4,6 +4,7 @@
 from fastapi import FastAPI 
 from fastapi import UploadFile 
 from fastapi import HTTPException 
+from models import GenerationContext
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from prompt_design import prompts_csv # to get the collection of prompts  
@@ -16,11 +17,16 @@ import tempfile
 from google import generativeai as genai
 from openai import OpenAI 
 
+# generation model 
+from generation.generate import generate_response
+from generation.prompts import short_question_answer_prompt
+
 from data_loader.convert_pdf import parse_pdf
 from data_loader.structure import structure_html 
 from data_loader.prompts import prompt, clause_prompt 
 from data_loader.opeanai_formatters import messages 
 
+from data_classifier.classification_pipeline import get_json
 import os 
 
 # loads the variables in the .env file 
@@ -32,6 +38,7 @@ load_dotenv()
 PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
+HF_TOKEN: str = os.getenv("HF_TOKEN", None)
 ERROR_DIR: str = "error_dir"
 
 genai.configure(api_key=GEMINI_API_KEY)
@@ -60,6 +67,8 @@ def logger(response: Dict[str, str] | Exception):
     pass 
 
 #Endpoints 
+
+# the data loading endpoint 
 @app.post("/data_loader")
 async def data_loader(pdf_file: UploadFile) -> List[Dict[str, str| int| None]]: 
     if pdf_file.content_type != "application/pdf": 
@@ -87,4 +96,28 @@ async def data_loader(pdf_file: UploadFile) -> List[Dict[str, str| int| None]]:
     strucuted_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     return strucuted_json    
 
+# data classifier endpoint  
+@app.post("/data_classifier")
+async def data_classifier(text_json: List[Dict[str, str|int|None]]
+                          ) -> List[Dict[str, Dict|str|None|int|List[str]] | str]: 
     
+    output_json: List = []
+    for t_json in text_json: 
+        op: Dict[str, Dict|str|None|int|List[str]]|str = get_json(t_json, HF_TOKEN) 
+        # if llm output is not faulty 
+        if op != "": 
+            output_json.append(op)
+
+    return output_json
+
+@app.post("/generate")
+async def generate(context: GenerationContext) -> Dict[str, str]:
+    qna: str = generate_response(
+       prompt=short_question_answer_prompt, 
+       context=context.context, 
+       hf_token=HF_TOKEN, 
+       model="mistral",  
+    )
+    
+    return {"output": qna}
+     

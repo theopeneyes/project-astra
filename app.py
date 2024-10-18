@@ -6,6 +6,8 @@ from openai import OpenAI
 import pandas as pd 
 from typing import List, Dict 
 
+import random 
+
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from matplotlib import pyplot as plt 
 
@@ -65,6 +67,41 @@ You will be penalized if you fail to follow instructions or guidance
 ####Instructions####:
 Your output must be unambiguous. DO NOT EXPLAIN.
 Extracted JSON:
+"""
+
+short_question_answer_prompt: str = """
+You are a Short Question Answer Generator Bot. Your goal is to generate Short 
+Question Answers based on the following instructions.  
+
+Definition: Short answer questions are typically composed of a brief prompt that demands a written answer that varies in length from one or two words to a few sentences.
+
+###TASK###: You MUST create Short Answer Question based on the provided text and the topic to which they fall under. 
+
+### OUTPUT FORMAT: 
+Your output MUST be in the following format: 
+<b>Q: [Your question]</b> 
+<p>A: [Your answer]</p> 
+
+### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Specific problem and direct questions
+
+###Incentives###
+You will receive a tip of $$$ for correct description. 
+You will be penalized if you fail to follow instructions or examples
+
+###Additional Guidance###
+You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+You MUST generate the content in a professional tone and educational exam question style.
+You MUST not mention intended audience of the activity in the description.
+You MUST also provide the correct answer along with the reasons.
+
+##TOPICS: {}
+
+## TEXT: 
+{}
+
+### Question Answers: 
 """
 
 clause_prompt: str = "If one doesn't exist then use '{}' as the title. "
@@ -146,6 +183,47 @@ messages: List[Dict] = [
     }
 ]
 
+llms: Dict[str, str] = { 
+    "mistral":"mistralai/Mistral-7B-Instruct-v0.3",
+    "llama":"meta-llama/Llama-3.1-8B",
+    "gemma":"google/gemma-2-2b-it",
+} 
+
+def generate_response(
+    prompt: str, 
+    topics: List[str], 
+    context: List[str], 
+    hf_token: str, 
+    model: str) -> str: 
+
+    API_URL: str = "https://api-inference.huggingface.co/models/"
+
+    headers: Dict[str, str] = {
+        "Authorization": "Bearer {}".format(hf_token), 
+        "X-use-cache": "true", 
+        "Content-Type": "application/json",
+        "X-wait-for-model": "true", 
+    }
+
+    json_input : Dict[str, str] = {
+        "inputs": prompt.format(
+            str(topics),
+            "\n".join(context),  
+        ), 
+        "parameters": {"max_new_tokens": 1000, "temperature":0.1}
+    }
+
+    response = requests.post(
+        API_URL + llms[model], 
+        headers=headers,
+        json=json_input, 
+    )
+
+    return (
+        response.json()[0]
+        ["generated_text"]
+        .split("### Question Answers:")[1]
+    )
 
 # loader to get json from the loaded dataframe 
 def get_json(book_json: Dict[str, str|int|None], hf_token: str) -> Dict[str, List[str]] | str: 
@@ -339,6 +417,8 @@ def parse_pdf(config, st: st,
 #loading environment variables 
 load_dotenv()
 
+
+# Application code starts here. We can also replace the above code with endpoints once they are deployed. 
 PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
@@ -356,6 +436,7 @@ config = genai.GenerationConfig(
 
 gemini = genai.GenerativeModel(model_name="gemini-1.5-flash")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
+
 
 #models we will be using 
 models: List = [gemini, gpt4o]
@@ -395,8 +476,37 @@ if uploaded_pdf is not None:
                         json_outputs.append(op) 
 
         with st.spinner("Generating json..."): 
-            print(json_outputs)
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
+
+        st.write("<b>JSON Output of Data Loader</b>", unsafe_allow_html=True)
+        st.json(text_metadata)
         
         st.write("Data Classifier output")
-        st.dataframe(json_df)
+
+        # gets all unique sub-domains and then chooses three from it 
+        # essentially a for loop to sum a list of lists and then get unique sub_domains 
+        # out of it. Out of which we pick three at random. This code may be changed later.  
+        sub_domains: List[str] = random.choices(
+            list(set(sum(json_df["sub_domains"].to_list(), []))), k = 3)   
+        
+        # if any one of the sub-domains exist, then select  
+        filtered_df: pd.DataFrame = json_df[json_df["sub_domains"].apply(
+            lambda x: any([ sub_domain in x for sub_domain in sub_domains])
+        )]
+
+        st.dataframe(filtered_df)
+
+        # getting the prompt for qna generation 
+        # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
+        # print(short_answer_prompt)
+
+        texts: List[str] = filtered_df["text"].to_list()
+        content: str = generate_response(
+            short_question_answer_prompt, 
+            topics=sub_domains, 
+            context=texts, 
+            hf_token=HF_TOKEN, 
+            model="mistral", 
+        )
+
+        st.write(content, unsafe_allow_html=True)

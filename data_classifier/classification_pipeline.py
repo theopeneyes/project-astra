@@ -1,16 +1,16 @@
 import requests
 from typing import Dict, List 
 
-from prompts import (
+from .prompts import (
     json_example, json_extractor_prompt, 
-    definitions
-) 
+    definitions, 
+)
 
 import re 
 import json 
 
 # loader to get json from the loaded dataframe 
-def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]]: 
+def get_json(book_json: Dict[str, str|int|None], hf_token: str) -> Dict[str, Dict|str|None|int|List[str]] | str: 
 
     API_URL: str = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers: Dict[str, str] = {
@@ -18,6 +18,8 @@ def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]]:
         "Content-Type": "application/json",
         "x-wait-for-model": "true"
     }
+
+    book_text: str = book_json["text"]
 
     # chapter, definition, example 
     response = requests.post(
@@ -38,11 +40,14 @@ def get_json(book_text: str, hf_token: str) -> Dict[str, List[str]]:
     try:
         # Step 4: Parse and pretty print the cleaned JSON string
         data = json.loads(cleaned_response)
+        data = {**data, **book_json}
     except json.JSONDecodeError as e:
+        #TODO: For JK: Fix the issue of decoding 
+        # Some json produced by LLMs do not produce decodeable jsons. Need to fix this issue. 
         print(f"Error decoding JSON: {e}")
+        return ""
 
-    return json.dumps(data)
-
+    return data
     
 # if __name__ == '__main__': 
 #     book_text: str = '''
