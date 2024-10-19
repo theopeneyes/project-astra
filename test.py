@@ -143,8 +143,8 @@ def test_generate() -> None:
         json=json, 
         headers=headers, 
     )
-    
-    # assert isinstance(response.json()["output"], str)  
+    print(response.content)     
+    assert isinstance(response.json()["output"], str)  
 
 
 if __name__ == '__main__': 
