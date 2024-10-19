@@ -53,10 +53,6 @@ config = genai.GenerationConfig(
 gemini = genai.GenerativeModel(model_name="gemini-1.5-flash")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 
-
-# prompt_design csv: 
-PROMPT_DESIGN: pd.DataFrame = prompts_csv(PROMPT_FILE_ID) 
-
 # testing phase therefore `debug=True`
 app = FastAPI(debug=True, title="project-astra")
 
