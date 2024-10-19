@@ -41,7 +41,7 @@ jobs:
         cat .env
     - name: Intialize the Server 
       run: |
-        uvicorn main:app --reload & sleep 5
+        fastapi run main.py & sleep 5
     - name: Test with pytest
       run: |
         pytest test.py 
