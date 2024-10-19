@@ -31,6 +31,9 @@ jobs:
     - name: Lint with Pylint
       run: |
         pylint --disable=R,C *.py || true 
+    - name: Checking the status of the output
+      run: |
+        python test.py 
     - name: Create .env file 
       run: |
         touch .env 

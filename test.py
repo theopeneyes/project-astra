@@ -89,11 +89,13 @@ def test_data_loader() -> None:
         }
 
         response = requests.post(API_URL + "/data_loader", files=files)
+        print(response.content)
         assert isinstance(response.json(), list)
     
     files = {
         "pdf_file": (pdf_filename, b'', "image/jpeg")
     }
+
 
     # test if the http error occurs correctly 
     response = requests.post(API_URL + "/data_loader", files=files, timeout=300 )
@@ -109,6 +111,8 @@ def test_data_classifer() -> None:
         headers=headers, 
         timeout=300, 
     )
+
+    print(response.content)
 
     output_json: List[Dict] = response.json()
 
@@ -148,4 +152,6 @@ def test_generate() -> None:
 
 
 if __name__ == '__main__': 
+    test_data_classifer()
+    test_data_loader()
     test_generate()
