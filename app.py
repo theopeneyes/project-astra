@@ -367,24 +367,25 @@ def parse_pdf(config, st: st,
             pdf_path,
             dpi=200,
         )
+    
+    progress_bar = st.progress(0, text="Sending Images to LLMs for analysis...")
 
     for i, image in enumerate(images):
-        with st.spinner(f"Sending Image {i+1} to Gemini..."): 
-            if title:
-                new_prompt = prompt.format(clause_prompt.format(title, "title"), "", "")
-            else:
-                new_prompt = prompt.format("", "", "")
+        if title:
+            new_prompt = prompt.format(clause_prompt.format(title, "title"), "", "")
+        else:
+            new_prompt = prompt.format("", "", "")
 
-            response = gemini.generate_content(
-                [ new_prompt, image],
-                safety_settings={
-                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
-                },
-                generation_config = config,
-            )
+        response = gemini.generate_content(
+            [ new_prompt, image],
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
+            },
+            generation_config = config,
+        )
 
         try:
             output.append(response.text)
@@ -411,6 +412,13 @@ def parse_pdf(config, st: st,
                 with st.spinner(f"Couldn't parse Image {i+1}, saving the image for inspection..."): 
                     plt.imshow(image)
                     plt.savefig(os.path.join(error_dir, f"{name_of_pdf}_page_{i}.jpg"))
+        if i == len(images) - 1: 
+            msg = "Finished sending Images to LLMs for analysis"
+        else: 
+            msg = "Sending Images to LLMs for analysis..."  
+        progress_bar.progress((i+1)/len(images), 
+                              text=msg)
+    
     
     return output
 
@@ -468,12 +476,17 @@ if uploaded_pdf is not None:
         # Data classifier part 
         with st.spinner("Sending each text to the classifier..."): 
             json_outputs: List[Dict] = []
+            msg: str = "Sending HTMLs to be converted to JSON..."
+
+            progress_bar = st.progress(0, text=msg)
         
             for idx, text_json in enumerate(text_metadata): 
-                with st.spinner(f"Converting HTML for Page {idx+1} to json..."):
-                    op = get_json(text_json, HF_TOKEN)
-                    if op != "":    
-                        json_outputs.append(op) 
+                if idx == len(text_metadata) - 1: 
+                    msg = "Finished converting HTML documents to JSON"
+                progress_bar.progress((idx+1) / len(text_metadata), text=msg)
+                op = get_json(text_json, HF_TOKEN)
+                if op != "":    
+                    json_outputs.append(op) 
 
         with st.spinner("Generating json..."): 
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)

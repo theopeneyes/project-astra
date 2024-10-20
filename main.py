@@ -7,11 +7,9 @@ from fastapi import HTTPException
 from models import GenerationContext
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
-from prompt_design import prompts_csv # to get the collection of prompts  
 
 from typing import Dict, List 
 
-import pandas as pd 
 import tempfile 
 
 from google import generativeai as genai
