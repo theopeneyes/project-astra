@@ -148,7 +148,6 @@ def test_generate() -> None:
         headers=headers, 
     )
 
-    print(response.content)     
     assert isinstance(response.json()["output"], str)  
 
 

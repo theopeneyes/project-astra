@@ -422,15 +422,28 @@ def parse_pdf(config, st: st,
     
     return output
 
-#loading environment variables 
-load_dotenv()
+def download_secrets(file_id: str) -> Dict[str, str] : 
+    URL: str  = f"https://drive.google.com/uc?id={file_id}" 
 
+    # get the string content 
+    content = requests.get(url=URL).content.decode("utf-8")
+    secrets: Dict[str, str] = {}
+    for items in content.split("\n"): 
+        if "=" in items: 
+            key_name, secret = items.split("=")
+            secrets[key_name] = secret 
+
+    return secrets 
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 
-PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
-OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
-HF_TOKEN: str = os.getenv("HF_TOKEN", None) # huggingface token 
+file_id: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT' # remote file id to download secrets from 
+
+secrets: Dict[str, str] = download_secrets(file_id)
+
+PROMPT_FILE_ID: str =  secrets["FILE_ID"] # file_id to fetch remote prompt design sheet
+GEMINI_API_KEY: str = secrets["GEMINI_API_KEY"] # gemini api key 
+OPENAI_API_KEY: str = secrets["OPENAI_API_KEY"] # openai api key 
+HF_TOKEN: str = secrets["HF_TOKEN"] # huggingface token 
 
 ERROR_DIR: str = "data_loader/image_error"
 
@@ -481,8 +494,8 @@ if uploaded_pdf is not None:
             progress_bar = st.progress(0, text=msg)
         
             for idx, text_json in enumerate(text_metadata): 
-                if idx == len(text_metadata) - 1: 
-                    msg = "Finished converting HTML documents to JSON"
+                if idx == len(text_metadata): 
+                    msg = "Processing JSON from HTML has finished!"
                 progress_bar.progress((idx+1) / len(text_metadata), text=msg)
                 op = get_json(text_json, HF_TOKEN)
                 if op != "":    
