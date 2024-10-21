@@ -77,7 +77,7 @@ data_classifier_json: List[Dict[str, int|str|None]] = [
     }
 ]
 
-def test_data_loader() -> None: 
+def test_convert_pdf() -> None: 
     if not os.listdir(PDF_BASE_PATH): return 
     for pdf_filename in os.listdir(PDF_BASE_PATH): 
         with open(os.path.join(PDF_BASE_PATH, pdf_filename), "rb") as f: 
@@ -88,31 +88,28 @@ def test_data_loader() -> None:
             "pdf_file": (pdf_filename, byte_content, "application/pdf"), 
         }
 
-        response = requests.post(API_URL + "/data_loader", files=files)
-        print(response.content)
-        assert isinstance(response.json(), list)
+        response = requests.post(API_URL + "/convert_pdf", files=files)
     
     files = {
-        "pdf_file": (pdf_filename, b'', "image/jpeg")
+        "pdf_file": (pdf_filename, byte_content, "image/jpeg")
     }
-
 
     # test if the http error occurs correctly 
-    response = requests.post(API_URL + "/data_loader", files=files, timeout=300 )
+    response = requests.post(API_URL + "/convert_pdf", files=files, timeout=300 )
     assert response.status_code == 400  
    
-def test_data_classifer() -> None: 
-    headers: Dict[str, str] = {
-        "Content-Type": "application/json"
-    }
-    response = requests.post(
-        API_URL + "/data_classifier", 
-        json=data_classifier_json, 
-        headers=headers, 
-        timeout=300, 
-    )
+def test_data_classifer(response=None) -> None: 
+    if not response: 
+        headers: Dict[str, str] = {
+            "Content-Type": "application/json"
+        }
 
-    print(response.content)
+        response = requests.post(
+            API_URL + "/data_classifier", 
+            json=data_classifier_json, 
+            headers=headers, 
+            timeout=300, 
+        )
 
     output_json: List[Dict] = response.json()
 
@@ -150,8 +147,44 @@ def test_generate() -> None:
 
     assert isinstance(response.json()["output"], str)  
 
+def test_all() -> None:
+    if not os.listdir(PDF_BASE_PATH): return 
+    for pdf_filename in os.listdir(PDF_BASE_PATH): 
+        with open(os.path.join(PDF_BASE_PATH, pdf_filename), "rb") as f: 
+            byte_content = f.read() # reading the content in bytes 
 
+        # test if the files are working 
+        files = {
+            "pdf_file": (pdf_filename, byte_content, "application/pdf"), 
+        }
+
+        # sending the pdf to the converter 
+        encoded_image_list: List[str] = requests.post(API_URL + "/convert_pdf", files=files)
+
+        print("Converting pdf to jpeg is done!")
+
+        # posting it to data_loader
+        loader_output :List[Dict[str, str| int| None]] = requests.post(
+            API_URL + '/data_loader',
+            json=encoded_image_list.json()
+        )
+
+        print("Text extracted and parsed into a JSON")
+
+        # posting it to the classifier 
+        classifier_json: List[Dict[str, Dict|str|None|int|List[str]] | str] = requests.post(
+            API_URL + "/data_classifier", 
+            json=loader_output.json()
+        )
+
+        print("Text is classified")
+
+        # test for classifier json 
+        test_data_classifer(classifier_json)
+
+        print("all tests done")
+    
 if __name__ == '__main__': 
-    test_data_classifer()
-    test_data_loader()
-    test_generate()
+    # test_data_classifer()
+    test_all()
+    # test_generate()

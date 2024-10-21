@@ -1,42 +1,26 @@
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from matplotlib import pyplot as plt 
+from image_utils.encoder  import encode_image
+from image_utils.decoder import decode_image
 
 from typing import List
+import PIL 
 
 import re
-import os 
-import PIL 
-import streamlit 
 
-import base64
-import pdf2image as p2i 
-from io import BytesIO
-
-def encode_image(image: PIL.Image): 
-    buffered = BytesIO()
-    image.save(buffered, format="JPEG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-def parse_pdf(models: List, config,   
-              pdf_path: str, prompt: str,
+def parse_images(models: List, config,   
+              images: List[str], prompt: str,
               clause_prompt: str,
-              name_of_pdf: str,
-              error_dir: str, 
               messages: List) -> List[str]:
 
     title: str | None = None
     new_prompt: str
     output: List[str] = []
-
-    images: List[PIL.Image] = p2i.convert_from_path(
-        pdf_path,
-        dpi=200,
-    )
-
      
     gemini, gpt4o = models 
 
-    for i, image in enumerate(images):
+    for _, image_encoded in enumerate(images):
+        image: PIL.Image = decode_image(image_encoded) 
 
         if title:
             new_prompt = prompt.format(clause_prompt.format(title, "title"), "", "")
@@ -76,7 +60,6 @@ def parse_pdf(models: List, config,
                     
             except Exception as E: 
                 plt.imshow(image)
-                plt.savefig(os.path.join(error_dir, f"{name_of_pdf}_page_{i}.jpg"))
 
     return output
 

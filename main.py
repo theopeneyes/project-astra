@@ -5,27 +5,30 @@ from fastapi import FastAPI
 from fastapi import UploadFile 
 from fastapi import HTTPException 
 from models import GenerationContext
+from models import EncodedImages
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
-
 from typing import Dict, List 
 
 import tempfile 
+import PIL 
+import os 
+import pdf2image as p2i 
 
 from google import generativeai as genai
 from openai import OpenAI 
-
 # generation model 
 from generation.generate import generate_response
 from generation.prompts import short_question_answer_prompt
 
-from data_loader.convert_pdf import parse_pdf
+from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
 from data_loader.prompts import prompt, clause_prompt 
 from data_loader.opeanai_formatters import messages 
 
 from data_classifier.classification_pipeline import get_json
-import os 
+
+from image_utils.encoder import encode_image 
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -48,12 +51,11 @@ config = genai.GenerationConfig(
 )
 
 # initializing the model clients 
-gemini = genai.GenerativeModel(model_name="gemini-1.5-flash")
+gemini = genai.GenerativeModel(model_name="gemini-1.5-flash-001")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 
 # testing phase therefore `debug=True`
 app = FastAPI(debug=True, title="project-astra")
-
 
 # logger 
 def logger(response: Dict[str, str] | Exception):
@@ -61,10 +63,8 @@ def logger(response: Dict[str, str] | Exception):
     pass 
 
 #Endpoints 
-
-# the data loading endpoint 
-@app.post("/data_loader")
-async def data_loader(pdf_file: UploadFile) -> List[Dict[str, str| int| None]]: 
+@app.post("/convert_pdf")
+async def convert_pdf(pdf_file: UploadFile) -> EncodedImages: 
     if pdf_file.content_type != "application/pdf": 
         raise HTTPException(status_code=400, detail="Please upload a pdf file!")
 
@@ -75,17 +75,28 @@ async def data_loader(pdf_file: UploadFile) -> List[Dict[str, str| int| None]]:
             # storing the pdf in a temporary file 
             f.write(await pdf_file.read())
         
-        # sending the pdf through pdf parser  
-        html_pages: List[str] = parse_pdf(
-            models=[gemini, gpt4o], 
-            config=config, 
-            pdf_path=temp_path, 
-            prompt=prompt, 
-            clause_prompt=clause_prompt, 
-            error_dir=ERROR_DIR, 
-            name_of_pdf=pdf_file.filename, 
-            messages=messages,  
+        images: List[PIL.Image] = p2i.convert_from_path(
+            temp_path, 
+            dpi=200, 
+            fmt="jpg", 
         )
+    
+    images = [encode_image(img) for img in images]
+    return EncodedImages(images=images) 
+        
+
+# the data loading endpoint 
+@app.post("/data_loader")
+async def data_loader(encoded_images: EncodedImages) -> List[Dict[str, str| int| None]]: 
+    # sending images to the images function 
+    html_pages: List[str] = parse_images(
+        models=[gemini, gpt4o], 
+        config=config, 
+        images=encoded_images.images, 
+        prompt=prompt, 
+        clause_prompt=clause_prompt, 
+        messages=messages,  
+    )
 
     strucuted_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     return strucuted_json    
