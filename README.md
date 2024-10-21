@@ -8,7 +8,7 @@ Output: A JSON with a list of images:
 
 Example: 
 
-```
+```json
 {
     "images":[
         "encoding_one", 
@@ -35,7 +35,7 @@ Output: List of Dictionaries as JSON `List[Dict[str, str| int| None]]`
 
 Example: 
 
-```
+```json
 [
     {
         "heading_identifier":"Carburetor",
@@ -71,7 +71,7 @@ Output: `List[Dict[str, str| int| None]]` Similar output. A list of dicitonaries
 
 Example: 
 
-```
+```json
 [
     {
         "root_concept": "Carburetor",
@@ -201,7 +201,7 @@ Input: Previous Input from JSON `List[Dict[str, str| int| None]]`
 Output: For now it's a string but eventually it has to be a `List[Dict[str, str]]`
 
 Example: 
-```
+```json
 [
     {
         "question": "Sample Question", 
