@@ -29,6 +29,7 @@ from data_loader.opeanai_formatters import messages
 from data_classifier.classification_pipeline import get_json
 
 from image_utils.encoder import encode_image 
+from secret_downloader import download_secrets, FILE_ID 
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -36,10 +37,18 @@ load_dotenv()
 # environment variables: configured in .env file
 # these variables will be instantiated once the server starts and 
 # the value won't be updated until you restart the server 
-PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
-GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
-OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
-HF_TOKEN: str = os.getenv("HF_TOKEN", None)
+secrets: Dict[str, str] = download_secrets(FILE_ID)
+# PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
+# GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
+# OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
+# HF_TOKEN: str = os.getenv("HF_TOKEN", None) # Huggingface token 
+
+PROMPT_FILE_ID: str = secrets.get("FILE_ID")
+GEMINI_API_KEY: str = secrets.get("GEMINI_API_KEY") 
+OPENAI_API_KEY: str = secrets.get("OPENAI_API_KEY")
+HF_TOKEN: str = secrets.get("HF_TOKEN")
+
+# error directory 
 ERROR_DIR: str = "error_dir"
 
 genai.configure(api_key=GEMINI_API_KEY)
