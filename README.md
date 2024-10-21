@@ -21,7 +21,7 @@ Example:
 }
 ```
 
-Here the List contains `base64` encoded strings.
+Here the List contains `base64` encoded strings of Images. 
 
 This list of encoded strings next go to the data loader endpoint 
 
