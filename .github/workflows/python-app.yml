@@ -33,7 +33,7 @@ jobs:
     - name: Intialize the Server 
       run: |
         fastapi run main.py & sleep 5
-      env: 
+      # env: 
         # OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
         # GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
         # HF_TOKEN=${{ secrets.HF_TOKEN }}
