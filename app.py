@@ -506,10 +506,8 @@ if uploaded_pdf is not None:
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
 
         st.write("<b>JSON Output of Data Loader</b>", unsafe_allow_html=True)
-        st.json(text_metadata)
         
-        st.write("Data Classifier output")
-
+        st.write("</b>Data Classifier output</b>", unsafe_allow_html=True)
         # gets all unique sub-domains and then chooses three from it 
         # essentially a for loop to sum a list of lists and then get unique sub_domains 
         # out of it. Out of which we pick three at random. This code may be changed later.  
