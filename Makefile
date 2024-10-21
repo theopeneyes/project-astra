@@ -5,7 +5,7 @@ lint:
 	pylint --disable=R,C *.py || true  
 
 serve: 
-	uvicorn main:app & sleep 4
+	fastapi run main.py & sleep 10
 
 test: 
 	python -m pytest -vv test.py 

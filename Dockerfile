@@ -7,8 +7,7 @@ RUN apt-get install -y poppler-utils
 
 RUN make install 
 RUN make lint
-RUN make serve 
-RUN make test 
+RUN make serve && make test 
 
 CMD ["streamlit", "run"]
 ENTRYPOINT [ "app.py" ]
