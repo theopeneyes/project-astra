@@ -2,6 +2,7 @@ import requests
 from typing import Dict 
 
 FILE_ID: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT'
+# downloads secrets from the web ig
 def download_secrets(file_id : str) -> Dict[str, str] : 
     URL: str  = f"https://drive.google.com/uc?id={file_id}" 
 
