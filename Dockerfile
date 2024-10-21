@@ -10,5 +10,5 @@ RUN make lint
 RUN make serve && make test 
 
 CMD ["streamlit", "run"]
-ENTRYPOINT [ "app.py" ]
-EXPOSE 8501
+ENTRYPOINT [ "/app.py"]
+EXPOSE 8080

@@ -26,8 +26,9 @@ from dotenv import load_dotenv
 import google.generativeai as genai 
 import pandas as pd 
 
-# Prompts
+load_dotenv()
 
+# Prompts
 json_example: str = """{
     "root_concept": str,
     "major_domains": List[str],
