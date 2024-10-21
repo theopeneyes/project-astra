@@ -164,7 +164,7 @@ You will be penalized if you fail to conver the document effectively
 """
 
 
-# MODULE CODE 
+# MODULE CODES 
 messages: List[Dict] = [
     {
       "role": "user",
@@ -183,6 +183,7 @@ messages: List[Dict] = [
     }
 ]
 
+# LLMs for application 
 llms: Dict[str, str] = { 
     "mistral":"mistralai/Mistral-7B-Instruct-v0.3",
     "llama":"meta-llama/Llama-3.1-8B",
