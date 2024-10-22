@@ -14,9 +14,11 @@ import tempfile
 import PIL 
 import os 
 import pdf2image as p2i 
+import subprocess 
 
 from google import generativeai as genai
 from openai import OpenAI 
+
 # generation model 
 from generation.generate import generate_response
 from generation.prompts import short_question_answer_prompt

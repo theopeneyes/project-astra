@@ -15,5 +15,6 @@ def download_secrets(file_id : str) -> Dict[str, str] :
             secrets[key_name] = secret 
 
     return secrets 
-    
+
+print(download_secrets(file_id=FILE_ID) )
 
