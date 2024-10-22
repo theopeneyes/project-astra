@@ -535,6 +535,7 @@ if uploaded_pdf is not None:
         with tempfile.TemporaryDirectory() as temp_dir: 
             file_path = os.path.join(temp_dir, uploaded_pdf.name)
 
+            #TODO: Change this into a request sent to a server 
             with open(file_path, "wb") as f:
                 f.write(uploaded_pdf.getbuffer())
             
