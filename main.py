@@ -74,6 +74,10 @@ def logger(response: Dict[str, str] | Exception):
     pass 
 
 #Endpoints 
+@app.get("/")
+async def home() -> Dict[str, str]: 
+    return {"home": "page"}
+    
 @app.post("/convert_pdf")
 async def convert_pdf(pdf_file: UploadFile) -> EncodedImages: 
     if pdf_file.content_type != "application/pdf": 

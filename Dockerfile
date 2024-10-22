@@ -7,5 +7,5 @@ RUN apt-get -y update && apt-get -y install curl
 RUN apt-get install -y poppler-utils 
 
 RUN pip install -r requirements.txt 
-EXPOSE 8000 
-CMD ["uvicorn", "main:app", "--port", "8000"]
+EXPOSE 8080 
+CMD ["uvicorn", "main:app", "--port", "8080"]

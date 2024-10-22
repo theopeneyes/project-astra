@@ -485,6 +485,7 @@ def generate_qna(json_df: pd.DataFrame):
 
             texts: List[str] = filtered_df["text"].to_list()
 
+            print(f"The content is ... {texts}")
             content: str = generate_response(
                 short_question_answer_prompt, 
                 topics=sub_domains, 
@@ -493,6 +494,8 @@ def generate_qna(json_df: pd.DataFrame):
                 model="mistral", 
             )
 
+            print(f"The content in response here: {content}")
+
         st.write(content, unsafe_allow_html=True)
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 
@@ -500,10 +503,10 @@ file_id: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT' # remote file id to download 
 
 secrets: Dict[str, str] = download_secrets(file_id)
 
-PROMPT_FILE_ID: str =  secrets["FILE_ID"] # file_id to fetch remote prompt design sheet
-GEMINI_API_KEY: str = secrets["GEMINI_API_KEY"] # gemini api key 
-OPENAI_API_KEY: str = secrets["OPENAI_API_KEY"] # openai api key 
-HF_TOKEN: str = secrets["HF_TOKEN"] # huggingface token 
+PROMPT_FILE_ID: str =  os.environ["FILE_ID"] # file_id to fetch remote prompt design sheet
+GEMINI_API_KEY: str = os.environ["GEMINI_API_KEY"] # gemini api key 
+OPENAI_API_KEY: str = os.environ["OPENAI_API_KEY"] # openai api key 
+HF_TOKEN: str = os.environ["HF_TOKEN"] # huggingface token 
 
 ERROR_DIR: str = "data_loader/image_error"
 
