@@ -11,4 +11,4 @@ RUN make serve && make test
 
 CMD ["streamlit", "run"]
 ENTRYPOINT [ "/app.py"]
-EXPOSE 8080
+EXPOSE 8501
