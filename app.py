@@ -15,7 +15,6 @@ from sklearn.cluster import KMeans
 import re 
 import json 
 import requests 
-import datamapplot
 
 import PIL 
 
@@ -471,7 +470,7 @@ def download_secrets(file_id: str) -> Dict[str, str] :
     return secrets 
 
 @st.fragment
-def generate_qna(): 
+def generate_qna(json_df: pd.DataFrame): 
     selected_topics = st.multiselect("Topics", options=topics)
     topic_clicked = st.button("Filter")
     # getting the prompt for qna generation 
@@ -485,6 +484,7 @@ def generate_qna():
                             for topic in selected_topics]), axis=1)]
 
             texts: List[str] = filtered_df["text"].to_list()
+
             content: str = generate_response(
                 short_question_answer_prompt, 
                 topics=sub_domains, 
@@ -492,7 +492,7 @@ def generate_qna():
                 hf_token=HF_TOKEN, 
                 model="mistral", 
             )
-        print("The content is this" + content)
+
         st.write(content, unsafe_allow_html=True)
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 
@@ -595,7 +595,7 @@ if uploaded_pdf is not None:
             )
 
             st.plotly_chart(figure)
-            generate_qna()
+            generate_qna(json_df)
 
             
             
