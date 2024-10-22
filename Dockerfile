@@ -1,13 +1,11 @@
 FROM python:3.11.9-slim-bookworm
-ADD . /
+WORKDIR /app
+COPY requirements.txt ./
 
 RUN apt-get update --fix-missing && apt-get install -y --fix-missing build-essential
 RUN apt-get -y update && apt-get -y install curl
 RUN apt-get install -y poppler-utils 
 
-RUN make install 
-RUN make lint
-RUN make serve && make test 
-
-CMD ["streamlit", "run"]
-ENTRYPOINT [ "app.py"]
+RUN pip install -r requirements.txt 
+EXPOSE 8080 
+CMD ["streamlit", "run", "app.py", "--server.port", "8080"]
