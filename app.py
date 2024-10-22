@@ -492,7 +492,7 @@ def generate_qna():
                 hf_token=HF_TOKEN, 
                 model="mistral", 
             )
-
+        print("The content is this" + content)
         st.write(content, unsafe_allow_html=True)
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 

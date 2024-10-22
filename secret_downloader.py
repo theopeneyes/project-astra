@@ -16,5 +16,4 @@ def download_secrets(file_id : str) -> Dict[str, str] :
 
     return secrets 
 
-print(download_secrets(file_id=FILE_ID) )
 
