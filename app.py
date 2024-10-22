@@ -512,20 +512,25 @@ if uploaded_pdf is not None:
         # gets all unique sub-domains and then chooses three from it 
         # essentially a for loop to sum a list of lists and then get unique sub_domains 
         # out of it. Out of which we pick three at random. This code may be changed later.  
-        sub_domains: List[str] = random.choices(
-            list(set(sum(json_df["sub_domains"].to_list(), []))), k = 3)   
         
-        # if any one of the sub-domains exist, then select  
-        filtered_df: pd.DataFrame = json_df[json_df["sub_domains"].apply(
-            lambda x: any([ sub_domain in x for sub_domain in sub_domains])
-        )]
+        # let's also include major domains and concepts as well  
+
+        sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
+        major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
+        concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
+
+        topics: List[str] = sub_domains + major_domains + concepts 
+
+        # Using the sub domains obtained above to filter the dataframe  
+        filtered_df: pd.DataFrame = json_df[json_df.apply(
+            lambda x: any([ topic in x["major_domains"] + x["concepts"] + x["sub_domains"]
+                           for topic in topics]), axis=1)]
 
         st.dataframe(filtered_df)
 
         # getting the prompt for qna generation 
         # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
         # print(short_answer_prompt)
-
         texts: List[str] = filtered_df["text"].to_list()
         content: str = generate_response(
             short_question_answer_prompt, 
