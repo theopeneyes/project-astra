@@ -1,6 +1,11 @@
 name: "project-astra"
 services: 
-  app:
-    build: .
+  streamlit:
+    build: ./frontend
     ports:
       - 8080:8080
+  
+  fastapi:
+    build: ./backend
+    ports:
+      - 8000:8000

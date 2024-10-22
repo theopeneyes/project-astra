@@ -4,8 +4,8 @@
 from fastapi import FastAPI 
 from fastapi import UploadFile 
 from fastapi import HTTPException 
-from models import GenerationContext
-from models import EncodedImages
+from backend.models import GenerationContext
+from backend.models import EncodedImages
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -14,7 +14,6 @@ import tempfile
 import PIL 
 import os 
 import pdf2image as p2i 
-import subprocess 
 
 from google import generativeai as genai
 from openai import OpenAI 
@@ -31,7 +30,7 @@ from data_loader.opeanai_formatters import messages
 from data_classifier.classification_pipeline import get_json
 
 from image_utils.encoder import encode_image 
-from secret_downloader import download_secrets, FILE_ID 
+from backend.secret_downloader import download_secrets, FILE_ID 
 
 # loads the variables in the .env file 
 load_dotenv()

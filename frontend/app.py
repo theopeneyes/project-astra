@@ -471,7 +471,7 @@ def download_secrets(file_id: str) -> Dict[str, str] :
     return secrets 
 
 @st.fragment
-def generate_qna(): 
+def generate_qna(json_df: pd.DataFrame): 
     selected_topics = st.multiselect("Topics", options=topics)
     topic_clicked = st.button("Filter")
     # getting the prompt for qna generation 

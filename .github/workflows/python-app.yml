@@ -32,25 +32,16 @@ jobs:
         pylint --disable=R,C *.py || true 
     - name: Intialize the Server 
       run: |
-        fastapi run main.py & sleep 5
+        fastapi run ./backend/main.py & sleep 5
       # env: 
       #   OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
       #   GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
       #   HF_TOKEN=${{ secrets.HF_TOKEN }}
       #   FILE_ID=${{ secrets.FILE_ID }}
 
-    - name: Checking the status of the output
-      run: |
-        python test.py 
-
-      # env: 
-      #   OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-      #   GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
-      #   HF_TOKEN=${{ secrets.HF_TOKEN }}
-      #   FILE_ID=${{ secrets.FILE_ID }}
     - name: Test with pytest
       run: |
-        pytest test.py 
+        pytest ./backend/test.py 
       # env: 
       #   OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
       #   GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
