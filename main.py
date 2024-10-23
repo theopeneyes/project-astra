@@ -14,14 +14,13 @@ import tempfile
 import PIL 
 import os 
 import pdf2image as p2i 
-import subprocess 
 
 from google import generativeai as genai
 from openai import OpenAI 
 
 # generation model 
 from generation.generate import generate_response
-from generation.prompts import short_question_answer_prompt
+from generation.generate import prompts 
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -39,16 +38,15 @@ load_dotenv()
 # environment variables: configured in .env file
 # these variables will be instantiated once the server starts and 
 # the value won't be updated until you restart the server 
-secrets: Dict[str, str] = download_secrets(FILE_ID)
 # PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
 # GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
 # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
 # HF_TOKEN: str = os.getenv("HF_TOKEN", None) # Huggingface token 
 
-PROMPT_FILE_ID: str = secrets.get("FILE_ID")
-GEMINI_API_KEY: str = secrets.get("GEMINI_API_KEY") 
-OPENAI_API_KEY: str = secrets.get("OPENAI_API_KEY")
-HF_TOKEN: str = secrets.get("HF_TOKEN")
+PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
+GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY") 
+OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY")
+HF_TOKEN: str = os.environ.get("HF_TOKEN")
 
 # error directory 
 ERROR_DIR: str = "error_dir"
@@ -132,8 +130,9 @@ async def data_classifier(text_json: List[Dict[str, str|int|None]]
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:
+    qna_prompt: str = prompts[context.question_type]
     qna: str = generate_response(
-       prompt=short_question_answer_prompt, 
+       prompt=qna_prompt, 
        context=context.context, 
        hf_token=HF_TOKEN, 
        model="mistral",  

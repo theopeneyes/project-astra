@@ -5,7 +5,7 @@ from typing import Dict, List
 
 # reading a test pdfs from the endpoint  
 PDF_BASE_PATH: str = "pdfs" 
-API_URL: str = "http://127.0.0.1:8000"
+API_URL: str = "https://project-astra-1086049785812.us-central1.run.app"
 
 topics: str = ["computer science", "Data structres", "Arrays", "Linked List"]
 
@@ -132,7 +132,8 @@ def test_data_classifer(response=None) -> None:
 def test_generate() -> None: 
     json: Dict[str, str|List[str]] = {
         "context": book_text, 
-        "topics": topics
+        "topics": topics, 
+        "question_type": "Short Question Answer"
     }
 
     headers: Dict[str, str] = {

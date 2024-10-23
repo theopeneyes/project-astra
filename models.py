@@ -6,6 +6,7 @@ from typing import List
 class GenerationContext(BaseModel): 
     topics: List[str]
     context: str
+    question_type: str
 
 # encoded images list 
 class EncodedImages(BaseModel): 
