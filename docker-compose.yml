@@ -1,6 +1,6 @@
 name: "project-astra"
 services: 
-  app:
+  api:
     build: .
     ports:
       - 8080:8080
