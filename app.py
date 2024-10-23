@@ -26,7 +26,8 @@ import plotly.express as px
 load_dotenv()
 
 # LLMs for application 
-URL: str = ""
+URL: str = "https://project-astra-1086049785812.us-central1.run.app"
+
 def visualizer(items: List[str]) -> pd.DataFrame: 
     # this function converts a list of topics to semantic vectors 
     tokenized_list = [item.split() for item in items]
