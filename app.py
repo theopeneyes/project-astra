@@ -244,7 +244,7 @@ def generate_response(
             str(topics),
             "\n".join(context),  
         ), 
-        "parameters": {"max_new_tokens": 1000, "temperature":0.1}
+        "parameters": {"max_new_tokens": 10000, "temperature":0.1}
     }
 
     response = requests.post(
@@ -252,6 +252,8 @@ def generate_response(
         headers=headers,
         json=json_input, 
     )
+
+    print(response.json()[0]["generated_text"])
 
     return (
         response.json()[0]
@@ -473,6 +475,13 @@ def download_secrets(file_id: str) -> Dict[str, str] :
 def generate_qna(json_df: pd.DataFrame): 
     selected_topics = st.multiselect("Topics", options=topics)
     topic_clicked = st.button("Filter")
+
+    qna_type: str = st.selectbox(
+        "QNA Type", 
+        options = [
+            
+        ]
+    )
     # getting the prompt for qna generation 
     # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
     # print(short_answer_prompt)
@@ -591,11 +600,6 @@ if uploaded_pdf is not None:
             figure = px.scatter(
                 embeds_2d, x='x', y='y', 
                 color='cluster_label', hover_data=['labels'], 
-                color_discrete_map={
-                    0: "red", 
-                    1: "green", 
-                    2:"cyan"
-                }
             )
 
             st.plotly_chart(figure)
