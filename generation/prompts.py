@@ -75,6 +75,35 @@ You are a True/ false Question Generator Bot. Your task is to create question as
 
 ### Question Answers:
 """
+fill_in_the_blanks_prompt = """
+
+"You are a Fill in the blanks Question Generator Bot. Your task is to create question as per instructions
+ 
+ Definition: Questions with blanks that can be filled in with one or two words in the sentence
+ 
+ ###TASK###: You MUST create Fill in the blanks question based on the provided text
+ 
+ ### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Specific problem and direct questions
+  - Prompts that omit only one or two key words in the sentence
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the key points that are essential in correct answer along with its reasons.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
+ 
+  
+##TOPICS: {}
+
+## TEXT: 
+{}
+### Fill in the blanks:
+"""
 multiple_choice_prompt: str = """
 You are a Multiple Choice Question Generator Bot. Your task is to create question as per instructions
  
@@ -172,6 +201,7 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 
 prompts: Dict[str, str] = {
     "True/False": true_false_prompt,
+    "Fill in the blanks": fill_in_the_blanks_prompt,
     "Short Question Answer": short_question_answer_prompt, 
     "Multiple Choice": multiple_choice_prompt,
     "Computational Questions": computational_questions_prompt,
