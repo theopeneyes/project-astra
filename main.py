@@ -20,7 +20,7 @@ from openai import OpenAI
 
 # generation model 
 from generation.generate import generate_response
-from generation.generate import prompts 
+from generation.prompts import prompts 
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -30,7 +30,6 @@ from data_loader.opeanai_formatters import messages
 from data_classifier.classification_pipeline import get_json
 
 from image_utils.encoder import encode_image 
-from secret_downloader import download_secrets, FILE_ID 
 
 # loads the variables in the .env file 
 load_dotenv()
