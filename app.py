@@ -1,31 +1,39 @@
 import tempfile 
 import os
-
 import pandas as pd 
-from typing import List
 
+from typing import List 
 from gensim.models import Word2Vec
 from io import BytesIO
 from sklearn.decomposition import PCA 
 from sklearn.cluster import KMeans 
 
 import requests 
-
 import PIL 
-
 import base64
-
-from dotenv import load_dotenv
 
 import pandas as pd 
 import streamlit as st
 import numpy as np 
 import plotly.express as px 
+import pyrebase
+import json 
 
+
+from google.cloud import storage
+from dotenv import load_dotenv
 
 load_dotenv()
 
-# LLMs for application 
+# GCP_BUCKET_CONFIG: str = os.getenv("GCP_BUCKET")
+# gcs_client = storage.Client.from_service_account_json(".secrets/intrepid-abacus-384710-df03a4dd7acc.json")
+# gcs_client = storage.Client.from_service_account_info(GCP_BUCKET_CONFIG)
+
+# Define a static bucket name
+# BUCKET_NAME = "upload-file-ps"  # Replace with your actual bucket name
+# bucket = gcs_client.bucket(BUCKET_NAME)
+
+# LLMs for our application 
 URL: str = "https://project-astra-1086049785812.us-central1.run.app"
 
 def visualizer(items: List[str]) -> pd.DataFrame: 
@@ -67,8 +75,8 @@ def generate_response(
     prompt: str, 
     topics: List[str], 
     context: List[str], 
-    hf_token: str, 
-    model: str) -> str: 
+    hf_token: str
+) -> str: 
 
     API_URL: str = "https://api-inference.huggingface.co/models/"
 
@@ -100,6 +108,9 @@ def generate_response(
     )
 
 from typing import Dict 
+from streamlit_cookies_controller import CookieController
+
+cookies = CookieController()
 # prompts for generation for different types of outputs 
 
 short_question_answer_prompt: str = """
@@ -176,7 +187,6 @@ You are a True/ false Question Generator Bot. Your task is to create question as
 
 ### Question Answers:
 """
-
 fill_in_the_blanks_prompt = """
 
 "You are a Fill in the blanks Question Generator Bot. Your task is to create question as per instructions
@@ -238,7 +248,6 @@ You are a Multiple Choice Question Generator Bot. Your task is to create questio
 
 ### Multiple Choice Questions And Answers:
 """
-
 computational_questions_prompt: str = """
 You are a Computational Question Generator Bot. Your task is to create question as per instructions
  
@@ -267,7 +276,6 @@ You are a Computational Question Generator Bot. Your task is to create question 
 
 ### Computational Code Questions And Answers:
 """
-
 software_code_questions_prompt: str ="""
 You are a Software writing Question Generator Bot. Your task is to create question as per instructions
  
@@ -299,7 +307,6 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 
 ### Software code questions and Answers:
 """
-
 prompts: Dict[str, str] = {
     "True/False": true_false_prompt,
     "Fill in the blanks": fill_in_the_blanks_prompt,
@@ -310,27 +317,39 @@ prompts: Dict[str, str] = {
 }
 
 
-FILE_ID: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT'
 # downloads secrets from the web ig
-def download_secrets(file_id : str) -> Dict[str, str] : 
-    URL: str  = f"https://drive.google.com/uc?id={file_id}" 
+# def download_secrets(file_id : str) -> Dict[str, str] : 
+#     URL: str  = f"https://drive.google.com/uc?id={file_id}" 
 
-    # get the string content 
-    content = requests.get(url=URL).content.decode("utf-8")
-    secrets: Dict[str, str] = {}
-    for items in content.split("\n"): 
-        if "=" in items: 
-            key_name, secret = items.split("=")
-            secrets[key_name] = secret 
+#     # get the string content 
+#     content = requests.get(url=URL).content.decode("utf-8")
+#     secrets: Dict[str, str] = {}
+#     for items in content.split("\n"): 
+#         if "=" in items: 
+#             key_name, secret = items.split("=")
+#             secrets[key_name] = secret 
 
-    return secrets 
+#     return secrets 
 
 
-secrets: str = download_secrets(FILE_ID)
-HF_TOKEN: str = secrets.get("HF_TOKEN")
+# secret tokens
+HF_TOKEN: str = os.getenv("HF_TOKEN") 
+
+FIREBASE_CONFIG: Dict[str, str] = json.loads(os.getenv("FIREBASE_CLIENT")) 
+
+BUCKET_NAME: str = os.getenv("BUCKET_NAME")
+
+# initializing the bucket for data   
+gcs_client = storage.Client.from_service_account_json('.secrets/gcp_bucket.json')
+bucket = gcs_client.bucket(BUCKET_NAME)
+
+# firebase config 
+firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
+auth = firebase.auth()
+
 
 @st.fragment
-def generate_qna(json_df: pd.DataFrame): 
+def generate_qna(json_df: pd.DataFrame, topics: List[str]): 
     selected_topics = st.multiselect("Topics", options=topics)
 
     qna_type: str = st.selectbox(
@@ -352,13 +371,11 @@ def generate_qna(json_df: pd.DataFrame):
 
             texts: List[str] = filtered_df["text"].to_list()
 
-            print(f"The content is ... {texts}")
             content: str = generate_response(
                 prompts[qna_type], 
-                topics=sub_domains, 
+                topics=topics, 
                 context=texts, 
                 hf_token=HF_TOKEN, 
-                model="mistral", 
             )
 
             # content = requests.post(
@@ -370,94 +387,260 @@ def generate_qna(json_df: pd.DataFrame):
             #     }
             # ).json()
 
-            print(f"The content in response here: {content}")
-
         st.write(content, unsafe_allow_html=True)
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 
 
 # Streamlit UI
-st.title("Project Astra Demo")
+def create_user_folders(email: str):
+    """Create the necessary folders for the user in the GCS bucket."""
+    user_folder = email  # Use the user's email as the folder name
 
-# File uploader component
-uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"])
+    # Define subfolder names
+    subfolders = [
+        "uploaded_document",
+        "processed_image",
+        "text_extract",
+        "json_data",
+        "graph_data"
+    ]
+    for subfolder in subfolders:
+        blob = bucket.blob(f"{user_folder}/{subfolder}/")  # Append a trailing slash to create a folder
+        blob.upload_from_string('')
 
 # If a file is uploaded
-if uploaded_pdf is not None:
-    button : bool = st.button("Process PDF")
-    if button: 
-        with tempfile.TemporaryDirectory() as temp_dir: 
-            file_path = os.path.join(temp_dir, uploaded_pdf.name)
+# @st.fragment
+# def register() -> bool | None:
+#     email = st.text_input("Email ID")
+#     password = st.text_input("Password")
+#     register_btn = st.button("Register!")
 
-            #TODO: Change this into a request sent to a server 
-            with open(file_path, "wb") as f:
-                f.write(uploaded_pdf.getbuffer())
+#     if register_btn: 
+#         try: 
+#             auth.create_user(email=email, password=password)
+#             create_user_folders(email=email)
+
+#             st.success("Congratulations! Now you're a Proud Project-Austrian!")
+#             st.markdown("Please go to the login page and Authenticate yourself")
+                
+#         except Exception as e: 
+#             st.write(":red[There was some issue registering you...]")
+#             print(e)
+#             return False 
+        
+        
+#         if st.button("Go To Login"): 
+#             return True 
+
+# @st.fragment
+# def login() -> bool | None :
+#     email = st.text_input("Email ID") 
+#     password = st.text_input("Password")
+#     login_btn = st.button("Login!")
+#     if login_btn: 
+#         try: 
+#             user = auth.get_user_by_email(email)
+#             st.session_state[user.uid] = user.email 
+#             cookies.set("session_id", user.uid)
+#             return True  
             
-            with st.spinner("Parsing the file..."): 
-                # html_pages: List[str] = parse_pdf(
-                #     config, st, 
-                #     file_path, prompt, clause_prompt, 
-                #     uploaded_pdf.name, ERROR_DIR, messages)
+#         except Exception as _: 
 
-                pdf2images = requests.post(
-                    URL + "/convert_pdf", 
-                    files = {
-                        "pdf_file": (uploaded_pdf.name, uploaded_pdf.getbuffer(), "application/pdf"), 
-                    }
+#             st.write(":red[User does not exist!] Register down below!")
+#             reg = st.button("Register")
+#             if reg: 
+#                 return False  
+#             else: 
+#                 return None 
+
+@st.fragment
+def objective(): 
+    st.title("Project Astra Demo")
+
+    # File uploader component
+    uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"])
+    if uploaded_pdf is not None:
+        button : bool = st.button("Process PDF")
+        if button: 
+            with tempfile.TemporaryDirectory() as temp_dir: 
+                file_path = os.path.join(temp_dir, uploaded_pdf.name)
+
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_pdf.getbuffer())
+                
+                with st.spinner("Parsing the file..."): 
+                    # html_pages: List[str] = parse_pdf(
+                    #     config, st, 
+                    #     file_path, prompt, clause_prompt, 
+                    #     uploaded_pdf.name, ERROR_DIR, messages)
+
+                    pdf2images = requests.post(
+                        URL + "/convert_pdf", 
+                        files = {
+                            "pdf_file": (uploaded_pdf.name, uploaded_pdf.getbuffer(), "application/pdf"), 
+                        }
+                    )
+                
+                
+                with st.spinner("Converting HTML to Table..."): 
+                    # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
+                    text_metadata = requests.post(
+                        URL + "/data_loader", 
+                        json=pdf2images.json()
+                    )
+
+                # Data classifier part 
+                with st.spinner("Sending each text to the classifier..."): 
+                    # json_outputs: List[Dict] = []
+                    # msg: str = "Sending HTMLs to be converted to JSON..."
+
+                    # progress_bar = st.progress(0, text=msg)
+                
+                    # for idx, text_json in enumerate(text_metadata): 
+                    #     if idx == len(text_metadata): 
+                    #         msg = "Processing JSON from HTML has finished!"
+                    #     progress_bar.progress((idx+1) / len(text_metadata), text=msg)
+                    #     op = get_json(text_json, HF_TOKEN)
+                    #     if op != "":    
+                    #         json_outputs.append(op) 
+                    json_outputs = requests.post(
+                        URL + "/data_classifier", 
+                        json=text_metadata.json()
+                    )
+
+                with st.spinner("Generating json..."): 
+                    json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
+
+                # gets all unique sub-domains and then chooses three from it 
+                # essentially a for loop to sum a list of lists and then get unique sub_domains 
+                # out of it. Out of which we pick three at random. This code may be changed later.  
+                
+                # let's also include major domains and concepts as well  
+
+                sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
+                major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
+                concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
+
+                topics: List[str] = sub_domains + major_domains + concepts 
+
+                
+                # Converting into embeddings  
+                embeds_2d: pd.DataFrame = visualizer(topics)
+                figure = px.scatter(
+                    embeds_2d, x='x', y='y', 
+                    color='cluster_label', hover_data=['labels'], 
                 )
+
+                st.plotly_chart(figure)
+                generate_qna(json_df, topics)
+
+@st.fragment
+def intro():  
+    st.title("Welcome to :blue[Project Astra]!")
+    st.write("<b>A Knowledge Graph Generation Project!</b>", unsafe_allow_html=True)
+    st.markdown("""
+    **Project Astra** is a groundbreaking initiative in **Knowledge Graph Generation**! 
+
+    Our mission is to turn unstructured data into meaningful, interconnected knowledge, unlocking insights for smarter applications, intelligent analysis, and future-ready solutions.
+
+    Whether you're a developer, researcher, or tech enthusiast, Project Astra brings the power of knowledge graphs closer to you. 
+
+    Explore this new frontier and discover how structured data can transform the way we understand and interact with information.
+
+    Let's turn data into wisdom, one node at a time.
+    """)
+
+@st.fragment
+def password_reset():
+    if st.session_state.email: 
+        email = st.session_state.email
+    else: 
+        st.write(":red[You have not entered any email information for us...]")
+
+    st.success(f"Verification Email Sent to ```{email}```.")
+    st.markdown(f'''
+
+    We have successfully sent a verification email to **{email}**.
+
+    Please check your inbox and follow the instructions in the email to verify your account. If you don’t see the email in your inbox, check your spam or junk folder.
+
+    > **Next Steps:**  
+    > - Open the email sent to **{email}**.
+    > - Click the verification link provided.
+    > - Follow any further instructions to complete the verification process.
+
+    Thank you for your patience!
+    ''') 
+    
+page_to_func: Dict[str, str]  = {
+    "Intro": intro, 
+    "objective": objective, 
+    "password_reset": password_reset, 
+}
+
+page: str = "Intro"
+with st.sidebar: 
+    choice = st.selectbox("Login/Register", options={
+        "Login", 
+        "Register"
+    })
+
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    st.session_state.email = email
+
+    if choice == "Login": 
+        forgot_password = st.button("Forgot your password?")
+        login_btn = st.button("Login!")
+
+        if login_btn: 
+            try: 
+                user = auth.sign_in_with_email_and_password(email, password)
+                page = "objective"
+            except Exception as _: 
+                st.write(":red[User does not exist!] Register yourself by changing the page!")
+        elif forgot_password: 
+            try: 
+                auth.send_password_reset_email(email)
+                page = "password_reset"
+            except Exception as _:
+                st.write(":red[You may want to go to the register page and register first...]")
+
+    elif choice == "Register": 
+        register_btn = st.button("register")
+        
+        if register_btn: 
+            try: 
+                auth.create_user_with_email_and_password(email=email, password=password)
+                create_user_folders(email) 
             
-            
-            with st.spinner("Converting HTML to Table..."): 
-                # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
-                text_metadata = requests.post(
-                    URL + "/data_loader", 
-                    json=pdf2images.json()
-                )
+                st.success("Congratulations! Now you're a Proud Project-Austrian!")
+                st.markdown("Please go to the login page and Authenticate yourself")
+                st.balloons()
+                page = "Intro"
 
-            # Data classifier part 
-            with st.spinner("Sending each text to the classifier..."): 
-                # json_outputs: List[Dict] = []
-                # msg: str = "Sending HTMLs to be converted to JSON..."
+            except Exception as E: 
 
-                # progress_bar = st.progress(0, text=msg)
-            
-                # for idx, text_json in enumerate(text_metadata): 
-                #     if idx == len(text_metadata): 
-                #         msg = "Processing JSON from HTML has finished!"
-                #     progress_bar.progress((idx+1) / len(text_metadata), text=msg)
-                #     op = get_json(text_json, HF_TOKEN)
-                #     if op != "":    
-                #         json_outputs.append(op) 
-                json_outputs = requests.post(
-                    URL + "/data_classifier", 
-                    json=text_metadata.json()
-                )
+                st.write(":red[There was some issue registering you... Maybe you are already registered? Try the login page]")
+                print(E)
 
-            with st.spinner("Generating json..."): 
-                json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
+                
+page_to_func[page]()
+# writing the code for login and redirection             
 
-            # gets all unique sub-domains and then chooses three from it 
-            # essentially a for loop to sum a list of lists and then get unique sub_domains 
-            # out of it. Out of which we pick three at random. This code may be changed later.  
-            
-            # let's also include major domains and concepts as well  
+# choice = st.selectbox("Login/Register", options=["Login", "Register"])
+# if choice == "Login": 
+#     status = login() # true, false or None 
+#     # if it is true, the user is authenticated and should be sent to the project-astra page
 
-            sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
-            major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
-            concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
+#     if status:
+#         objective()
 
-            topics: List[str] = sub_domains + major_domains + concepts 
-
-            
-            # Converting into embeddings  
-            embeds_2d: pd.DataFrame = visualizer(topics)
-            figure = px.scatter(
-                embeds_2d, x='x', y='y', 
-                color='cluster_label', hover_data=['labels'], 
-            )
-
-            st.plotly_chart(figure)
-            generate_qna(json_df)
-
-            
-            
+#     # the user has clicked the register button 
+#     elif isinstance(status, bool): 
+#         if register(): 
+#             login()
+# else: 
+#     if register(): 
+#         login()
+# print(dict(cookies)) 

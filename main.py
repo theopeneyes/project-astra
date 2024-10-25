@@ -66,9 +66,9 @@ gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 app = FastAPI(debug=True, title="project-astra")
 
 # logger 
-def logger(response: Dict[str, str] | Exception):
-    # posts this response or exception to a database that is meant to store logs 
-    pass 
+# def logger(response: Dict[str, str] | Exception):
+#     # posts this response or exception to a database that is meant to store logs 
+#     pass 
 
 #Endpoints 
 @app.get("/")
