@@ -20,6 +20,7 @@ def parse_images(models: List, config,
     gemini, gpt4o = models 
 
     for _, image_encoded in enumerate(images):
+        image_encoded = images["img_b64"]
         image: PIL.Image = decode_image(image_encoded) 
 
         if title:

@@ -462,77 +462,84 @@ def objective():
     if uploaded_pdf is not None:
         button : bool = st.button("Process PDF")
         if button: 
-            with tempfile.TemporaryDirectory() as temp_dir: 
-                file_path = os.path.join(temp_dir, uploaded_pdf.name)
 
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_pdf.getbuffer())
-                
-                with st.spinner("Parsing the file..."): 
-                    # html_pages: List[str] = parse_pdf(
-                    #     config, st, 
-                    #     file_path, prompt, clause_prompt, 
-                    #     uploaded_pdf.name, ERROR_DIR, messages)
+            # pushing the pdf to gcp
+            pdf_blob_path: str = f"{st.session_state.email}/uploaded_document/{uploaded_pdf.name}"
+            pdf_blob = bucket.blob(pdf_blob_path)
+            with pdf_blob.open("w") as pdf: 
+                pdf.write(uploaded_pdf.getbuffer())
+            
+            with st.spinner("Parsing the file..."): 
+                # takes the data loader model as an input 
+                pdf2images = requests.post(
+                    URL + "/convert_pdf", 
+                    json={
+                        "email_id": st.session_state.email, 
+                        "uri": pdf_blob_path, 
+                        "filename": uploaded_pdf.name 
+                    }
+                )
+            
+            
+            with st.spinner("Converting HTML to Table..."): 
+                # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
+                text_metadata = requests.post(
+                    URL + "/data_loader", 
+                    json=pdf2images.json()
+                ).json()
 
-                    pdf2images = requests.post(
-                        URL + "/convert_pdf", 
-                        files = {
-                            "pdf_file": (uploaded_pdf.name, uploaded_pdf.getbuffer(), "application/pdf"), 
+            # Data classifier part 
+            with st.spinner("Sending each text to the classifier..."): 
+                json_outputs: List[Dict] = []
+                msg: str = "Sending HTMLs to be converted to JSON..."
+
+                progress_bar = st.progress(0, text=msg)
+            
+                for idx in range(text_metadata["page_count"]): 
+                    text_op = requests.post(
+                        URL + "/data_classifier", 
+                        json={
+                            "filename": uploaded_pdf.filename, 
+                            "email_id": st.session_state.email, 
+                            "page_number": idx
                         }
                     )
-                
-                
-                with st.spinner("Converting HTML to Table..."): 
-                    # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
-                    text_metadata = requests.post(
-                        URL + "/data_loader", 
-                        json=pdf2images.json()
-                    )
 
-                # Data classifier part 
-                with st.spinner("Sending each text to the classifier..."): 
-                    # json_outputs: List[Dict] = []
-                    # msg: str = "Sending HTMLs to be converted to JSON..."
+                    if idx == len(text_metadata): 
+                        msg = "Processing JSON from HTML has finished!"
 
-                    # progress_bar = st.progress(0, text=msg)
-                
-                    # for idx, text_json in enumerate(text_metadata): 
-                    #     if idx == len(text_metadata): 
-                    #         msg = "Processing JSON from HTML has finished!"
-                    #     progress_bar.progress((idx+1) / len(text_metadata), text=msg)
-                    #     op = get_json(text_json, HF_TOKEN)
-                    #     if op != "":    
-                    #         json_outputs.append(op) 
-                    json_outputs = requests.post(
-                        URL + "/data_classifier", 
-                        json=text_metadata.json()
-                    )
+                    progress_bar.progress((idx+1) / len(text_metadata), text=msg)
 
-                with st.spinner("Generating json..."): 
-                    json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
+                # json_outputs = requests.post(
+                #     URL + "/data_classifier", 
+                #     json=text_metadata.json()
+                # )
 
-                # gets all unique sub-domains and then chooses three from it 
-                # essentially a for loop to sum a list of lists and then get unique sub_domains 
-                # out of it. Out of which we pick three at random. This code may be changed later.  
-                
-                # let's also include major domains and concepts as well  
+            with st.spinner("Generating json..."): 
+                json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
 
-                sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
-                major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
-                concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
+            # gets all unique sub-domains and then chooses three from it 
+            # essentially a for loop to sum a list of lists and then get unique sub_domains 
+            # out of it. Out of which we pick three at random. This code may be changed later.  
+            
+            # let's also include major domains and concepts as well  
 
-                topics: List[str] = sub_domains + major_domains + concepts 
+            sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
+            major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
+            concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
 
-                
-                # Converting into embeddings  
-                embeds_2d: pd.DataFrame = visualizer(topics)
-                figure = px.scatter(
-                    embeds_2d, x='x', y='y', 
-                    color='cluster_label', hover_data=['labels'], 
-                )
+            topics: List[str] = sub_domains + major_domains + concepts 
 
-                st.plotly_chart(figure)
-                generate_qna(json_df, topics)
+            
+            # Converting into embeddings  
+            embeds_2d: pd.DataFrame = visualizer(topics)
+            figure = px.scatter(
+                embeds_2d, x='x', y='y', 
+                color='cluster_label', hover_data=['labels'], 
+            )
+
+            st.plotly_chart(figure)
+            generate_qna(json_df, topics)
 
 @st.fragment
 def intro():  
