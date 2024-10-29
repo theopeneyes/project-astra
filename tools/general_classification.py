@@ -4,20 +4,20 @@ from prompts import general_classification_prompt
 ## change this json_input once PRs's endpoint is ready. this is NOT FINAL. 
 json_input = [
     {
-        "heading_identifier":"Carburetor",
-        "heading_text":"Introduction",
+        "heading_identifier":"carburetor",
+        "heading_text":"introduction",
         "sub_heading_text":'null',
         "text_type":"text",
         "paragraph_number":1,
-        "text":"Sample text about carburetor"
+        "text":"sample text about carburetor"
     }, 
     {
-        "heading_identifier":"Dinosaurs",
-        "heading_text":"Jurassic Era",
-        "sub_heading_text": "Trannosaurous Rex",
+        "heading_identifier":"dinosaurs",
+        "heading_text":"jurassic era",
+        "sub_heading_text": "trannosaurous rex",
         "text_type":"text",
         "paragraph_number":9,
-        "text":"Sample text about Dinosaurs"
+        "text":"sample text about dinosaurs"
     },
 ]
 
