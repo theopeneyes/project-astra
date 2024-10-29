@@ -1,4 +1,8 @@
 import pandas as pd
+from dotenv import load_dotenv
+import os 
+
+load_dotenv()
 
 # fetches the excel sheet located at : 
 # https://docs.google.com/spreadsheets/d/1Kqrn5zw9MfDIYKqDUGnjAUYo2EVEjMlZ/edit?usp=sharing&ouid=101868315277228549653&rtpof=true&sd=true
@@ -16,3 +20,5 @@ def prompts_csv(file_id: str) -> pd.DataFrame:
     return pd.read_excel(
         URL, header=1, index_col=0
     )
+
+FILE_ID: str = os.environ.get("FILE_ID")

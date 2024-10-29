@@ -1,33 +1,28 @@
 import streamlit as st
 import tempfile 
 import os
-from openai import OpenAI
-
 import pandas as pd 
-from typing import List, Dict 
 
-import random 
-
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-from matplotlib import pyplot as plt 
-
-import re 
-import json 
-import requests 
-
-import PIL 
-
-import base64
-import pdf2image as p2i 
-import gensim 
-
+from typing import List 
+from gensim.models import Word2Vec
 from io import BytesIO
+from sklearn.decomposition import PCA 
+from sklearn.cluster import KMeans 
 
+import requests 
+import PIL 
+import base64
 
-from dotenv import load_dotenv
-import google.generativeai as genai 
 import pandas as pd 
+import streamlit as st
+import numpy as np 
+import plotly.express as px 
+import pyrebase
+import json 
 
+
+from google.cloud import storage
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -187,19 +182,58 @@ messages: List[Dict] = [
     }
 ]
 
-# LLMs for application 
-llms: Dict[str, str] = { 
-    "mistral":"mistralai/Mistral-7B-Instruct-v0.3",
-    "llama":"meta-llama/Llama-3.1-8B",
-    "gemma":"google/gemma-2-2b-it",
-} 
+# GCP_BUCKET_CONFIG: str = os.getenv("GCP_BUCKET")
+# gcs_client = storage.Client.from_service_account_json(".secrets/intrepid-abacus-384710-df03a4dd7acc.json")
+# gcs_client = storage.Client.from_service_account_info(GCP_BUCKET_CONFIG)
+
+# Define a static bucket name
+# BUCKET_NAME = "upload-file-ps"  # Replace with your actual bucket name
+# bucket = gcs_client.bucket(BUCKET_NAME)
+
+# LLMs for our application 
+URL: str = "https://project-astra-1086049785812.us-central1.run.app"
+
+def visualizer(items: List[str]) -> pd.DataFrame: 
+    # this function converts a list of topics to semantic vectors 
+    tokenized_list = [item.split() for item in items]
+    model = Word2Vec(sentences=tokenized_list, vector_size=100, window=5, min_count=1, workers=4)
+    
+    word_vectors = []
+    for word in items: 
+        sentence_vector = np.zeros((100,)) 
+        for token in word.split(" "): 
+            sentence_vector += model.wv[token] 
+        word_vectors.append(sentence_vector)
+
+    # returns a dataframe to plot as a scatter plot 
+    pca = PCA(n_components=2)
+
+    #vectors 
+    vectors = np.vstack(word_vectors)
+
+    # Cluster labels
+    cluster = KMeans(n_clusters=3)
+    
+     
+    embeds = pca.fit_transform(vectors) 
+    cluster_labels = cluster.fit_predict(embeds).astype(np.int8)
+
+    df: pd.DataFrame = pd.DataFrame(embeds, columns=["x", "y"])
+    df["labels"] = items 
+    df["cluster_label"] = cluster_labels  
+    return df  
+
+def encode_image(image: PIL.Image): 
+    buffered = BytesIO()
+    image.save(buffered, format="JPEG")
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 def generate_response(
     prompt: str, 
     topics: List[str], 
     context: List[str], 
-    hf_token: str, 
-    model: str) -> str: 
+    hf_token: str
+) -> str: 
 
     API_URL: str = "https://api-inference.huggingface.co/models/"
 
@@ -215,230 +249,302 @@ def generate_response(
             str(topics),
             "\n".join(context),  
         ), 
-        "parameters": {"max_new_tokens": 1000, "temperature":0.1}
+        "parameters": {"max_new_tokens": 3000, "temperature":0.1}
     }
 
     response = requests.post(
-        API_URL + llms[model], 
+        API_URL + "mistralai/Mistral-7B-Instruct-v0.2", 
         headers=headers,
         json=json_input, 
-    )
+    ).json()
 
     return (
-        response.json()[0]
+        response[0]
         ["generated_text"]
-        .split("### Question Answers:")[1]
+        .split("Answers:")[1]
     )
 
-# loader to get json from the loaded dataframe 
-def get_json(book_json: Dict[str, str|int|None], hf_token: str) -> Dict[str, List[str]] | str: 
+from typing import Dict 
+from streamlit_cookies_controller import CookieController
 
-    API_URL: str = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
-    headers: Dict[str, str] = {
-        "Authorization": f"Bearer {hf_token}",
-        "Content-Type": "application/json",
-        "x-wait-for-model": "true"
-    }
+cookies = CookieController()
+# prompts for generation for different types of outputs 
 
-    book_text: str = book_json["text"]
+short_question_answer_prompt: str = """
+You are a Short Question Answer Generator Bot. Your goal is to generate Short 
+Question Answers based on the following instructions.  
 
-    # chapter, definition, example 
-    response = requests.post(
-        API_URL, 
-        headers=headers, 
-        json = {
-            "inputs": json_extractor_prompt.format(
-               book_text, definitions, json_example,  
-            ),  
-            "parameters": {"max_new_tokens": 600, "temperature":0.1}
-        }
-    ).json() 
+Definition: Short answer questions are typically composed of a brief prompt that demands a written answer that varies in length from one or two words to a few sentences.
 
-    extracted_json = response[0]["generated_text"].split("Extracted JSON:")[1].split("###")[0].strip()
-    cleaned_response = re.sub(r'\s+', ' ', extracted_json)
-    cleaned_response = cleaned_response.replace("'", '"')
-    
-    try:
-        # Step 4: Parse and pretty print the cleaned JSON string
-        data = json.loads(cleaned_response)
-        data = {**data, **book_json}
-    except json.JSONDecodeError as e:
-        #TODO: For JK: Fix the issue of decoding 
-        # Some json produced by LLMs do not produce decodeable jsons. Need to fix this issue. 
-        print(f"Error decoding JSON: {e}")
-        return ""
+###TASK###: You MUST create Short Answer Question based on the provided text and the topic to which they fall under. 
 
-    return data
+### OUTPUT FORMAT: 
+Your output MUST be in the following format: 
+<b>Q: [Your question]</b>
+<p>A: [Your answer]</p> 
 
-def structure_html(output: List[str]) -> List[Dict[str, str|int|None]]:  
-    """
-    output: List[str] 
-    A list of html documents converted from a pdf page using the
-    Gemini API.  
+### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Specific problem and direct questions
 
-    returns: pd.DataFrame 
-    Structures the output as a DataFrame to send to the 
-    Data Tagger and Organizer 
-    """
+###Incentives###
+You will receive a tip of $$$ for correct description. 
+You will be penalized if you fail to follow instructions or examples
 
-    title: str| None = None
-    heading: str | None  = None
-    sub_heading: str | None = None
-    table_on: bool = False
-    table_content: List[str]
-    df_json : List[Dict[str, str]] = []
+###Additional Guidance###
+You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+You MUST generate the content in a professional tone and educational exam question style.
+You MUST not mention intended audience of the activity in the description.
+You MUST also provide the correct answer along with the reasons.
 
-    for html_page in output:
-        paragraph_count: int = 0
-        for html_tag in html_page.split("\n"):
-            if html_tag.startswith('```'): continue
-            elif html_tag.startswith("<table"):
+##TOPICS: {}
 
-                table_on = True
-                table_content = []
-                continue
+## TEXT: 
+{}
 
-            elif table_on and html_tag.startswith("</table>"):
-                table_on = False
-                table_content = "\n".join(table_content)
-                text = ['table', heading, sub_heading, table_content]
+### Question Answers:
+"""
+true_false_prompt: str = """
+You are a True/ false Question Generator Bot. Your task is to create question as per instructions
+ 
+ Definition: True/false questions are only composed of a statement. Students respond to the questions by indicating whether the statement is true or false. For example: True/false questions have only two possible answers (Answer: True).
+ 
+ ###TASK###: You MUST create True/ False Question based on the provided text
+ ### Instructions###: 
+ Your task is to describe the details in the provided image. Describe the content in the foreground and the background. Foreground content may include pop-up, notification, alert or information box or button. Focus on details of the foreground content.The aspects to consider while describing foreground shall include the following: 
+ Describe the layout . 
+ Describe about placement of elements, such as headers, navigation menus, and content sections.
+ Reflect on the design principles, such as the use of grids, alignment, and spacing.
+ Describe the readability of the text, including font choice, size, color, and contrast against the background.
+ Describe the typography across different sections and elements.
+ Describe the overall color scheme for visual appeal and appropriateness for the target audience.
+ Describe the visual hierarchy, with important elements standing out effectively.
+ Describe images and icons including their size, quality, and relevant to the content.
+ Describe the buttons including visibility, size, clarity and colour of buttons and interactive elements. Mention whether these buttons are distinguishable
+ Describe the existence of navigation panes. Express how many navigation panes exist and describe each of them.
+ Illustratively describe what is the proportion of onscreen content to the proportion of the content in the page based on the navigation pane
+ 
+ ### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - One central idea in each question
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the correct answer along with the reasons.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
+ 
+##TOPICS: {}
 
-            elif table_on:
-                table_content.append(html_tag)
-                continue
+## TEXT: 
+{}
 
-            elif ( html_tag.startswith('<title>') and
-                  html_tag.split(">")[1].split("<")[0] != title) :
+### Question Answers:
+"""
+fill_in_the_blanks_prompt = """
 
-                title = html_tag.split(">")[1].split("<")[0]
-                continue
+"You are a Fill in the blanks Question Generator Bot. Your task is to create question as per instructions
+ 
+ Definition: Questions with blanks that can be filled in with one or two words in the sentence
+ 
+ ###TASK###: You MUST create Fill in the blanks question based on the provided text
+ 
+ ### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Specific problem and direct questions
+  - Prompts that omit only one or two key words in the sentence
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the key points that are essential in correct answer along with its reasons.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
+ 
+  
+##TOPICS: {}
 
-            elif ( html_tag.startswith("<h1>") and
-                  html_tag.split(">")[1].split("<")[0] != heading):
+## TEXT: 
+{}
+### Questions And Answers:
+"""
+multiple_choice_prompt: str = """
+You are a Multiple Choice Question Generator Bot. Your task is to create question as per instructions
+ 
+ Definition: Multiple choice questions are composed of one question (stem) with multiple possible answers (choices), including the correct answer and several incorrect answers (distractors). Typically, students select the correct answer by circling the associated number or letter, or filling in the associated circle on the machine-readable response sheet.
+ 
+ ###TASK###: You MUST create Multiple Choice Question based on the provided text
+ 
+ ### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Single, clearly formulated problems
+  - Statements based on common student misconceptions
+  - True statements that do not answer the questions
+  - Short options – and all same length
+  - Correct options evenly distributed over A, B, C, etc.
+  - At least 4 or 5 options for the user to select from
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the correct answer along with the reasons.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
+ 
+##TOPICS: {}
 
-                heading = html_tag.split(">")[1].split("<")[0]
-                continue
+## TEXT: 
+{}
 
-            elif (html_tag.startswith("<h2>") and
-                  html_tag.split(">")[1].split("<")[0] != sub_heading):
+### Multiple Choice Questions And Answers:
+"""
+computational_questions_prompt: str = """
+You are a Computational Question Generator Bot. Your task is to create question as per instructions
+ 
+ Definition: Computational questions require that students perform calculations in order to solve for an answer. Computational questions can be used to assess student’s memory of solution techniques and their ability to apply those techniques to solve both questions they have attempted before and questions that stretch their abilities by requiring that they combine and use solution techniques in novel ways.
+ 
+ ###TASK###: You MUST create Computational questions based on the provided text
+ 
+ ### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Be solvable using knowledge of the key concepts and techniques from the course. Before the exam solve them yourself or get a teaching assistant to attempt the questions.
+  - Indicate the mark breakdown to reinforce the expectations developed in in-class examples for the amount of detail, etc. required for the solution.
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the correct answer along with the steps and workings.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
 
-                sub_heading = html_tag.split(">")[1].split("<")[0]
-                continue
+##TOPICS: {}
 
-            elif html_tag.startswith("<p>") :
-                text = ['text', heading, sub_heading, html_tag.split(">")[1].split("<")[0]]
-                paragraph_count += 1
+## TEXT: 
+{}
 
-            elif html_tag.startswith("<diagram>"):
-                text = ['diagram', heading, sub_heading, html_tag.split(">")[1].split("<")[0]]
-                paragraph_count += 1
+### Computational Code Questions And Answers:
+"""
+software_code_questions_prompt: str ="""
+You are a Software writing Question Generator Bot. Your task is to create question as per instructions
+ 
+Definition: Software writing questions"" refers to a set of inquiries designed to assess a person's understanding of the process of creating software, including aspects like coding, algorithms, data structures, software design principles, and problem-solving techniques, often used in technical interviews for software development roles.
+ 
+###TASK###: You MUST create Software writing question based on the provided text
+ 
+### Instructions###: 
+  - Your own words – not statements straight out of the textbook
+  - Focus on problem-solving: These questions usually present a real-world scenario that requires the candidate to design and implement a software solution, demonstrating their ability to break down complex problems into manageable steps.
+  - Coding skills evaluation: Many software writing questions involve writing actual code snippets in a specific programming language to solve the given problem, assessing the candidate's syntax proficiency and coding style.
+  - Algorithmic thinking: Questions might ask candidates to analyze the time and space complexity of different algorithms to choose the most efficient solution for a problem.
+  - Design principles: Some questions might focus on software design patterns and best practices, asking candidates to explain how they would structure a complex system or handle specific scenarios.
+  - Examples of software writing questions: ""Write a function to reverse a string."": (Assesses basic coding skills and understanding of string manipulation) or ""Design a data structure to store and efficiently retrieve the top 10 most frequently used words in a text file."": (Tests knowledge of data structures like hash tables and priority queues)
+ ###Additional Guidance###
+ You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+ You MUST generate the content in a professional tone and educational exam question style.
+ You MUST not mention intended audience of the activity in the description.
+ You MUST also provide the correct answer along with the step by step code along with notes for the code.
+  
+ ###Incentives###
+ You will receive a tip of $$$ for correct description. 
+ You will be penalized if you fail to follow instructions or examples
+ 
+##TOPICS: {}
 
-            elif html_tag.startswith("<chart>"):
-                text = ['chart', heading, sub_heading, html_tag.split(">")[1].split("<")[0]]
-                paragraph_count += 1
-            else:
-                continue
+## TEXT: 
+{}
 
-            df_json.append({
-                "heading_identifier": title,
-                "heading_text": text[1],
-                "sub_heading_text": text[2],
-                "text_type": text[0],
-                "paragraph_number": paragraph_count,
-                "text": text[3],
-            })
-
-    return df_json
+### Software code questions and Answers:
+"""
+prompts: Dict[str, str] = {
+    "True/False": true_false_prompt,
+    "Fill in the blanks": fill_in_the_blanks_prompt,
+    "Short Question Answer": short_question_answer_prompt, 
+    "Multiple Choice": multiple_choice_prompt,
+    "Computational Questions": computational_questions_prompt,
+    "Software Code Questions": software_code_questions_prompt 
+}
 
 
-def encode_image(image: PIL.Image): 
-    buffered = BytesIO()
-    image.save(buffered, format="JPEG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+# downloads secrets from the web ig
+# def download_secrets(file_id : str) -> Dict[str, str] : 
+#     URL: str  = f"https://drive.google.com/uc?id={file_id}" 
 
-def parse_pdf(config, st: st,  
-              pdf_path: str, prompt: str,
-              clause_prompt: str,
-              name_of_pdf: str,
-              error_dir: str, 
-              messages: List) -> List[str]:
+#     # get the string content 
+#     content = requests.get(url=URL).content.decode("utf-8")
+#     secrets: Dict[str, str] = {}
+#     for items in content.split("\n"): 
+#         if "=" in items: 
+#             key_name, secret = items.split("=")
+#             secrets[key_name] = secret 
 
-    title: str | None = None
-    new_prompt: str
-    output: List[str] = []
+#     return secrets 
 
-    with st.spinner("Converting the pdf pages to images..."): 
-        images: List[PIL.Image] = p2i.convert_from_path(
-            pdf_path,
-            dpi=200,
-        )
-    
-    progress_bar = st.progress(0, text="Sending Images to LLMs for analysis...")
 
-    for i, image in enumerate(images):
-        if title:
-            new_prompt = prompt.format(clause_prompt.format(title, "title"), "", "")
-        else:
-            new_prompt = prompt.format("", "", "")
+# secret tokens
+HF_TOKEN: str = os.getenv("HF_TOKEN") 
 
-        response = gemini.generate_content(
-            [ new_prompt, image],
-            safety_settings={
-                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE
-            },
-            generation_config = config,
-        )
+FIREBASE_CONFIG: Dict[str, str] = json.loads(os.getenv("FIREBASE_CLIENT")) 
 
-        try:
-            output.append(response.text)
-            if re.findall(r"<title>(.*?)</title>", output[-1])[0] != title:
-                title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
+BUCKET_NAME: str = os.getenv("BUCKET_NAME")
 
-        except Exception as _:
-            with st.spinner("Error occured in Gemini, sending it now to GPT4oMini..."): 
-                messages[0]["content"][0]["text"] = new_prompt 
-                messages[0]["content"][1]["image_url"]["url"] = (
-                    f"data:image/jpeg;base64,{encode_image(image)}") 
+# initializing the bucket for data   
+gcs_client = storage.Client.from_service_account_json('.secrets/gcp_bucket.json')
+bucket = gcs_client.bucket(BUCKET_NAME)
 
-                response = gpt4o.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=messages,
-                )
+# firebase config 
+firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
+auth = firebase.auth()
 
-            try: 
-                output.append(response.choices[0].message.content)
-                if re.findall(r"<title>(.*?)</title>", output[-1])[0] != title:
-                    title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
-                    
-            except Exception as _: 
-                with st.spinner(f"Couldn't parse Image {i+1}, saving the image for inspection..."): 
-                    plt.imshow(image)
-                    plt.savefig(os.path.join(error_dir, f"{name_of_pdf}_page_{i}.jpg"))
-        if i == len(images) - 1: 
-            msg = "Finished sending Images to LLMs for analysis"
-        else: 
-            msg = "Sending Images to LLMs for analysis..."  
-        progress_bar.progress((i+1)/len(images), 
-                              text=msg)
-    
-    
-    return output
 
-def download_secrets(file_id: str) -> Dict[str, str] : 
-    URL: str  = f"https://drive.google.com/uc?id={file_id}" 
+@st.fragment
+def generate_qna(json_df: pd.DataFrame, topics: List[str]): 
+    selected_topics = st.multiselect("Topics", options=topics)
 
-    # get the string content 
-    content = requests.get(url=URL).content.decode("utf-8")
-    secrets: Dict[str, str] = {}
-    for items in content.split("\n"): 
-        if "=" in items: 
-            key_name, secret = items.split("=")
-            secrets[key_name] = secret 
+    qna_type: str = st.selectbox(
+        "QNA Type", 
+        options = list(prompts.keys()), 
+    )
 
-    return secrets 
+    topic_clicked = st.button("Filter and Generate")
+
+    # getting the prompt for qna generation 
+    # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
+    # print(short_answer_prompt)
+    if topic_clicked: 
+        with st.spinner("Generating Question Answers..."): 
+        # Using the sub domains obtained above to filter the dataframe  
+            filtered_df: pd.DataFrame = json_df[json_df.apply(
+                lambda x: any([ topic in x["major_domains"] + x["concepts"] + x["sub_domains"]
+                            for topic in selected_topics]), axis=1)]
+
+            texts: List[str] = filtered_df["text"].to_list()
+
+            content: str = generate_response(
+                prompts[qna_type], 
+                topics=topics, 
+                context=texts, 
+                hf_token=HF_TOKEN, 
+            )
+
+            # content = requests.post(
+            #     URL + "/generate", 
+            #     json = {
+            #         "context": " ".join(texts), 
+            #         "topics": topics, 
+            #         "question_type": qna_type, 
+            #     }
+            # ).json()
+
+        st.write(content, unsafe_allow_html=True)
 
 # Application code starts here. We can also replace the above code with endpoints once they are deployed. 
 file_id: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT' # remote file id to download secrets from 
@@ -468,74 +574,262 @@ gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 models: List = [gemini, gpt4o]
 
 # Streamlit UI
-st.title("Project Astra Demo")
+def create_user_folders(email: str):
+    """Create the necessary folders for the user in the GCS bucket."""
+    user_folder = email  # Use the user's email as the folder name
 
-# File uploader component
-uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"])
+    # Define subfolder names
+    subfolders = [
+        "uploaded_document",
+        "processed_image",
+        "text_extract",
+        "json_data",
+        "graph_data"
+    ]
+    for subfolder in subfolders:
+        blob = bucket.blob(f"{user_folder}/{subfolder}/")  # Append a trailing slash to create a folder
+        blob.upload_from_string('')
 
 # If a file is uploaded
-if uploaded_pdf is not None:
-    with tempfile.TemporaryDirectory() as temp_dir: 
-        file_path = os.path.join(temp_dir, uploaded_pdf.name)
+# @st.fragment
+# def register() -> bool | None:
+#     email = st.text_input("Email ID")
+#     password = st.text_input("Password")
+#     register_btn = st.button("Register!")
 
-        with open(file_path, "wb") as f:
-            f.write(uploaded_pdf.getbuffer())
+#     if register_btn: 
+#         try: 
+#             auth.create_user(email=email, password=password)
+#             create_user_folders(email=email)
+
+#             st.success("Congratulations! Now you're a Proud Project-Austrian!")
+#             st.markdown("Please go to the login page and Authenticate yourself")
+                
+#         except Exception as e: 
+#             st.write(":red[There was some issue registering you...]")
+#             print(e)
+#             return False 
         
-        with st.spinner("Parsing the file..."): 
-            html_pages: List[str] = parse_pdf(
-                config, st, 
-                file_path, prompt, clause_prompt, 
-                uploaded_pdf.name, ERROR_DIR, messages)
         
+#         if st.button("Go To Login"): 
+#             return True 
+
+# @st.fragment
+# def login() -> bool | None :
+#     email = st.text_input("Email ID") 
+#     password = st.text_input("Password")
+#     login_btn = st.button("Login!")
+#     if login_btn: 
+#         try: 
+#             user = auth.get_user_by_email(email)
+#             st.session_state[user.uid] = user.email 
+#             cookies.set("session_id", user.uid)
+#             return True  
+            
+#         except Exception as _: 
+
+#             st.write(":red[User does not exist!] Register down below!")
+#             reg = st.button("Register")
+#             if reg: 
+#                 return False  
+#             else: 
+#                 return None 
+
+@st.fragment
+def objective(): 
+    st.title("Project Astra Demo")
+
+    # File uploader component
+    uploaded_pdf = st.file_uploader("Upload a PDF file", type=["pdf"])
+    if uploaded_pdf is not None:
+        button : bool = st.button("Process PDF")
+        if button: 
+
+            # pushing the pdf to gcp
+            pdf_blob_path: str = f"{st.session_state.email}/uploaded_document/{uploaded_pdf.name}"
+            pdf_blob = bucket.blob(pdf_blob_path)
+            with pdf_blob.open("w") as pdf: 
+                pdf.write(uploaded_pdf.getbuffer())
+            
+            with st.spinner("Parsing the file..."): 
+                # takes the data loader model as an input 
+                pdf2images = requests.post(
+                    URL + "/convert_pdf", 
+                    json={
+                        "email_id": st.session_state.email, 
+                        "uri": pdf_blob_path, 
+                        "filename": uploaded_pdf.name 
+                    }
+                )
+            
+            
+            with st.spinner("Converting HTML to Table..."): 
+                # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
+                text_metadata = requests.post(
+                    URL + "/data_loader", 
+                    json=pdf2images.json()
+                ).json()
+
+            # Data classifier part 
+            with st.spinner("Sending each text to the classifier..."): 
+                json_outputs: List[Dict] = []
+                msg: str = "Sending HTMLs to be converted to JSON..."
+
+                progress_bar = st.progress(0, text=msg)
+            
+                for idx in range(text_metadata["page_count"]): 
+                    text_op = requests.post(
+                        URL + "/data_classifier", 
+                        json={
+                            "filename": uploaded_pdf.filename, 
+                            "email_id": st.session_state.email, 
+                            "page_number": idx
+                        }
+                    )
+
+                    if idx == len(text_metadata): 
+                        msg = "Processing JSON from HTML has finished!"
+
+                    progress_bar.progress((idx+1) / len(text_metadata), text=msg)
+
+                # json_outputs = requests.post(
+                #     URL + "/data_classifier", 
+                #     json=text_metadata.json()
+                # )
+
+            with st.spinner("Generating json..."): 
+                json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
+
+            # gets all unique sub-domains and then chooses three from it 
+            # essentially a for loop to sum a list of lists and then get unique sub_domains 
+            # out of it. Out of which we pick three at random. This code may be changed later.  
+            
+            # let's also include major domains and concepts as well  
+
+            sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
+            major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
+            concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
+
+            topics: List[str] = sub_domains + major_domains + concepts 
+
+            
+            # Converting into embeddings  
+            embeds_2d: pd.DataFrame = visualizer(topics)
+            figure = px.scatter(
+                embeds_2d, x='x', y='y', 
+                color='cluster_label', hover_data=['labels'], 
+            )
+
+            st.plotly_chart(figure)
+            generate_qna(json_df, topics)
+
+@st.fragment
+def intro():  
+    st.title("Welcome to :blue[Project Astra]!")
+    st.write("<b>A Knowledge Graph Generation Project!</b>", unsafe_allow_html=True)
+    st.markdown("""
+    **Project Astra** is a groundbreaking initiative in **Knowledge Graph Generation**! 
+
+    Our mission is to turn unstructured data into meaningful, interconnected knowledge, unlocking insights for smarter applications, intelligent analysis, and future-ready solutions.
+
+    Whether you're a developer, researcher, or tech enthusiast, Project Astra brings the power of knowledge graphs closer to you. 
+
+    Explore this new frontier and discover how structured data can transform the way we understand and interact with information.
+
+    Let's turn data into wisdom, one node at a time.
+    """)
+
+@st.fragment
+def password_reset():
+    if st.session_state.email: 
+        email = st.session_state.email
+    else: 
+        st.write(":red[You have not entered any email information for us...]")
+
+    st.success(f"Verification Email Sent to ```{email}```.")
+    st.markdown(f'''
+
+    We have successfully sent a verification email to **{email}**.
+
+    Please check your inbox and follow the instructions in the email to verify your account. If you don’t see the email in your inbox, check your spam or junk folder.
+
+    > **Next Steps:**  
+    > - Open the email sent to **{email}**.
+    > - Click the verification link provided.
+    > - Follow any further instructions to complete the verification process.
+
+    Thank you for your patience!
+    ''') 
+    
+page_to_func: Dict[str, str]  = {
+    "Intro": intro, 
+    "objective": objective, 
+    "password_reset": password_reset, 
+}
+
+page: str = "Intro"
+with st.sidebar: 
+    choice = st.selectbox("Login/Register", options={
+        "Login", 
+        "Register"
+    })
+
+    email = st.text_input("Email")
+    password = st.text_input("Password", type="password")
+    st.session_state.email = email
+
+    if choice == "Login": 
+        forgot_password = st.button("Forgot your password?")
+        login_btn = st.button("Login!")
+
+        if login_btn: 
+            try: 
+                user = auth.sign_in_with_email_and_password(email, password)
+                page = "objective"
+            except Exception as _: 
+                st.write(":red[User does not exist!] Register yourself by changing the page!")
+        elif forgot_password: 
+            try: 
+                auth.send_password_reset_email(email)
+                page = "password_reset"
+            except Exception as _:
+                st.write(":red[You may want to go to the register page and register first...]")
+
+    elif choice == "Register": 
+        register_btn = st.button("register")
         
-        with st.spinner("Converting HTML to Table..."): 
-            text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
+        if register_btn: 
+            try: 
+                auth.create_user_with_email_and_password(email=email, password=password)
+                create_user_folders(email) 
+            
+                st.success("Congratulations! Now you're a Proud Project-Austrian!")
+                st.markdown("Please go to the login page and Authenticate yourself")
+                st.balloons()
+                page = "Intro"
 
-        # Data classifier part 
-        with st.spinner("Sending each text to the classifier..."): 
-            json_outputs: List[Dict] = []
-            msg: str = "Sending HTMLs to be converted to JSON..."
+            except Exception as E: 
 
-            progress_bar = st.progress(0, text=msg)
-        
-            for idx, text_json in enumerate(text_metadata): 
-                if idx == len(text_metadata): 
-                    msg = "Processing JSON from HTML has finished!"
-                progress_bar.progress((idx+1) / len(text_metadata), text=msg)
-                op = get_json(text_json, HF_TOKEN)
-                if op != "":    
-                    json_outputs.append(op) 
+                st.write(":red[There was some issue registering you... Maybe you are already registered? Try the login page]")
+                print(E)
 
-        with st.spinner("Generating json..."): 
-            json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
+                
+page_to_func[page]()
+# writing the code for login and redirection             
 
-        st.write("<b>JSON Output of Data Loader</b>", unsafe_allow_html=True)
-        
-        st.write("</b>Data Classifier output</b>", unsafe_allow_html=True)
-        # gets all unique sub-domains and then chooses three from it 
-        # essentially a for loop to sum a list of lists and then get unique sub_domains 
-        # out of it. Out of which we pick three at random. This code may be changed later.  
-        sub_domains: List[str] = random.choices(
-            list(set(sum(json_df["sub_domains"].to_list(), []))), k = 3)   
-        
-        # if any one of the sub-domains exist, then select  
-        filtered_df: pd.DataFrame = json_df[json_df["sub_domains"].apply(
-            lambda x: any([ sub_domain in x for sub_domain in sub_domains])
-        )]
+# choice = st.selectbox("Login/Register", options=["Login", "Register"])
+# if choice == "Login": 
+#     status = login() # true, false or None 
+#     # if it is true, the user is authenticated and should be sent to the project-astra page
 
-        st.dataframe(filtered_df)
+#     if status:
+#         objective()
 
-        # getting the prompt for qna generation 
-        # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
-        # print(short_answer_prompt)
-
-        texts: List[str] = filtered_df["text"].to_list()
-        content: str = generate_response(
-            short_question_answer_prompt, 
-            topics=sub_domains, 
-            context=texts, 
-            hf_token=HF_TOKEN, 
-            model="mistral", 
-        )
-
-        st.write(content, unsafe_allow_html=True)
+#     # the user has clicked the register button 
+#     elif isinstance(status, bool): 
+#         if register(): 
+#             login()
+# else: 
+#     if register(): 
+#         login()
+# print(dict(cookies)) 
