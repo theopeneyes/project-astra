@@ -1,13 +1,12 @@
 import streamlit as st
-import tempfile 
 import os
 import pandas as pd 
-
-from typing import List 
+from typing import List, Dict
 from gensim.models import Word2Vec
 from io import BytesIO
 from sklearn.decomposition import PCA 
 from sklearn.cluster import KMeans 
+from openai import OpenAI
 
 import requests 
 import PIL 
@@ -23,6 +22,8 @@ import json
 
 from google.cloud import storage
 from dotenv import load_dotenv
+from secret_downloader import download_secrets
+import google.generativeai as genai 
 
 load_dotenv()
 

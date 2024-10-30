@@ -1,27 +1,26 @@
-json_input = [
-    {
-        "heading_identifier":"carburetor",
-        "heading_text":"introduction",
-        "sub_heading_text":'null',
-        "text_type":"text",
-        "paragraph_number":1,
-        "text":"sample text about carburetor"
-    }, 
-    {
-        "heading_identifier":"dinosaurs",
-        "heading_text":"jurassic era",
-        "sub_heading_text": "trannosaurous rex",
-        "text_type":"text",
-        "paragraph_number":9,
-        "text":"sample text about dinosaurs"
-    },
-]
+# json_input = [
+#     {
+#         "heading_identifier":"carburetor",
+#         "heading_text":"introduction",
+#         "sub_heading_text":'null',
+#         "text_type":"text",
+#         "paragraph_number":1,
+#         "text":"sample text about carburetor"
+#     }, 
+#     {
+#         "heading_identifier":"dinosaurs",
+#         "heading_text":"jurassic era",
+#         "sub_heading_text": "trannosaurous rex",
+#         "text_type":"text",
+#         "paragraph_number":9,
+#         "text":"sample text about dinosaurs"
+#     },
+# ]
 
-from prompts import concept_prompt, subconcept_prompt, topic_prompt, subtopic_prompt
 import requests 
 
 ## concept 
-def concept_extractor(concept_prompt, token='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'):
+def concept_extractor(json_input, concept_prompt, token):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
     concept_prompt = concept_prompt.format(json_input)
@@ -33,10 +32,9 @@ def concept_extractor(concept_prompt, token='hf_wtofTqVVNXQXKaYekkxPLsdutTspNKtk
     response = requests.post(API_URL, headers=headers, json=payload)
     concept = response.json()[0]["generated_text"].split("concept:")[1].strip()
     return concept
-concept = concept_extractor(concept_prompt, token='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')
 
 ## subconcept
-def subconcept_extractor(subconcept_prompt, token='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'):
+def subconcept_extractor(json_input, subconcept_prompt, token):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
     subconcept_prompt = subconcept_prompt.format(json_input, )
@@ -50,7 +48,7 @@ def subconcept_extractor(subconcept_prompt, token='hf_wtofTqVVNXQXKaYekkxPLsdutT
     return subconcept
 
 ## Topic 
-def topic_extractor(topic_prompt, token='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'):
+def topic_extractor(topic_prompt, token):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
@@ -61,7 +59,6 @@ def topic_extractor(topic_prompt, token='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')
     topic = response.json()[0]["generated_text"].split("Topic:")[1].split("<topic>")[1].split("</topic>")[0]
     return topic
 
-topic = topic_extractor(topic_prompt, token="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")   
 
 ## subtopic
 def subtopic_extractor(subtopic_prompt, token="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"):
@@ -77,10 +74,10 @@ def subtopic_extractor(subtopic_prompt, token="hf_wtofTqVVNXQXKaYekkxPLsdutTspNK
 
 
 
-next_json = {
+# next_json = {
 
-    'topic': topic,
-    'subtopic': subtopic_extractor(subtopic_prompt),
-    'concept': concept,
-    'subconcept': subconcept_extractor(subconcept_prompt),
-}
+#     'topic': topic,
+#     'subtopic': subtopic_extractor(subtopic_prompt),
+#     'concept': concept,
+#     'subconcept': subconcept_extractor(subconcept_prompt),
+# }

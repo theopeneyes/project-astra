@@ -79,7 +79,6 @@ concept
 """
 
 subconcept_prompt = """
-
 You are an Sub concept extractor bot. Your TASK is to help extract Sub concept from {} in maximum of 4 words . The following is the definition for ease of understanding: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts. You are extracting concepts from educational text books/ chapters.
 
 The primary concept for this chapter is {}. Give subconcept strongly in context to the concept.
@@ -92,5 +91,4 @@ After generating the topic enclose it within <subconcept> tags
 You will receive a tip of $$$ for correct description.
 You will be penalized if you fail to follow instructions or guidance.
 subconcept:
-""".format(chapter, concept)
-
+"""

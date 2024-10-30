@@ -2,7 +2,6 @@
 
 # FastAPI imports 
 from fastapi import FastAPI 
-from fastapi import HTTPException 
 
 from models import DataLoaderModel 
 from models import GenerationContext
@@ -114,7 +113,7 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
         )
 
     return DataLoaderModel(
-        filename=pdf_file.filename.strip(".pdf")[0], 
+        filename=pdf_file.filename, 
         email_id=pdf_file.email_id, 
         uri=json_path, 
     ) 
