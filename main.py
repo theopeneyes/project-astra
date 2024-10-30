@@ -84,9 +84,6 @@ async def home() -> Dict[str, str]:
     
 @app.post("/convert_pdf")
 async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel: 
-    if pdf_file.content_type != "application/pdf": 
-        raise HTTPException(status_code=400, detail="Please upload a pdf file!")
-
     # accessing the file blob from the URI 
     pdf_blob = bucket.blob(pdf_file.uri)
     
@@ -108,7 +105,7 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
         # formatting it as json 
         encoded_images.append(image)
 
-    json_path: str = f"{pdf_file.email_id}/processed_image/{pdf_file.filename.strip(".pdf")[0]}.json"
+    json_path: str = f"{pdf_file.email_id}/processed_image/{pdf_file.filename.split('.pdf')[0]}.json"
     json_blob = bucket.blob(json_path)
     
     with json_blob.open("w") as f: 

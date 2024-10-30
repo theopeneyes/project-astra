@@ -191,7 +191,8 @@ messages: List[Dict] = [
 # bucket = gcs_client.bucket(BUCKET_NAME)
 
 # LLMs for our application 
-URL: str = "https://project-astra-1086049785812.us-central1.run.app"
+# URL: str = "https://project-astra-1086049785812.us-central1.run.app"
+URL: str = "http://127.0.0.1:8000"
 
 def visualizer(items: List[str]) -> pd.DataFrame: 
     # this function converts a list of topics to semantic vectors 
@@ -648,7 +649,8 @@ def objective():
             # pushing the pdf to gcp
             pdf_blob_path: str = f"{st.session_state.email}/uploaded_document/{uploaded_pdf.name}"
             pdf_blob = bucket.blob(pdf_blob_path)
-            with pdf_blob.open("w") as pdf: 
+
+            with pdf_blob.open("wb") as pdf: 
                 pdf.write(uploaded_pdf.getbuffer())
             
             with st.spinner("Parsing the file..."): 
@@ -681,7 +683,7 @@ def objective():
                     text_op = requests.post(
                         URL + "/data_classifier", 
                         json={
-                            "filename": uploaded_pdf.filename, 
+                            "filename": uploaded_pdf.name, 
                             "email_id": st.session_state.email, 
                             "page_number": idx
                         }
