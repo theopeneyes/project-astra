@@ -41,7 +41,6 @@ def subconcept_extractor(json_input, subconcept_prompt, token):
     payload = {
         "inputs": f"{subconcept_prompt}",
         "parameters": {"max_new_tokens": 20, "temperature":0.1}
-
     }
     response = requests.post(API_URL, headers=headers, json=payload)
     subconcept = response.json()[0]["generated_text"].split("subconcept:")[1].split("<subconcept>")[1].split("</subconcept>")[0]
@@ -53,7 +52,7 @@ def topic_extractor(topic_prompt, token):
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
         "inputs": f"{topic_prompt}",
-            "parameters": {"max_new_tokens": 20, "temperature":0.1}
+        "parameters": {"max_new_tokens": 20, "temperature":0.1}
     }
     response = requests.post(API_URL, headers=headers, json=payload)
     topic = response.json()[0]["generated_text"].split("Topic:")[1].split("<topic>")[1].split("</topic>")[0]
@@ -61,7 +60,7 @@ def topic_extractor(topic_prompt, token):
 
 
 ## subtopic
-def subtopic_extractor(subtopic_prompt, token="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"):
+def subtopic_extractor(subtopic_prompt, token):
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
@@ -71,7 +70,6 @@ def subtopic_extractor(subtopic_prompt, token="hf_wtofTqVVNXQXKaYekkxPLsdutTspNK
     response = requests.post(API_URL, headers=headers, json=payload)
     subtopic = response.json()[0]["generated_text"].split("subtopic:")[1].split("<subtopic>")[1].split("</subtopic>")[0]
     return subtopic
-
 
 
 # next_json = {

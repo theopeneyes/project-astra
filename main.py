@@ -198,7 +198,6 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
             f.write(summary)
     else: 
         logging.log("Empty text in chapter identified!")
-        
 
     return SummarizationOutputModel(
         filename=summarization.filename, 
@@ -217,7 +216,6 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
 
     op: Dict[str, Dict|str|None|int|List[str]]|str = get_json(t_json, HF_TOKEN) 
     if op != "": 
-       
        # write into gcp 
         classified_blob_path: str = f"{text_json.email_id}/json_data/{text_json.filename}_{text_json.page_number}.json" 
         cls_blob = bucket.blob(classified_blob_path)
