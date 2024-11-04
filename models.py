@@ -1,30 +1,36 @@
 from pydantic import BaseModel 
 from typing import List 
 
-# sending uri's along with user email 
-class DataLoaderModel(BaseModel): 
-    email_id: str 
-    uri: str 
+#Absolute underlying base model 
+class AbsoluteBaseModel(BaseModel): 
     filename: str 
+    email_id: str 
+
+# sending uri's along with user email 
+class DataLoaderModel(AbsoluteBaseModel): 
+    uri: str 
 
 # output from data loader 
-class StructuredJSONModel(BaseModel): 
-    email_id: str 
-    filename: str
+class StructuredJSONModel(AbsoluteBaseModel): 
     page_count: int 
 
 # output from data classifier
-class DataClassifierModel(BaseModel): 
-    filename: str
-    email_id: str 
+class DataClassifierModel(AbsoluteBaseModel): 
     page_number: int 
+
+# summarization model 
+class SummarizationInputModel(AbsoluteBaseModel): 
+    chapter_title: str 
+
+class SummarizationOutputModel(AbsoluteBaseModel): 
+    status: bool 
     
 # generation context model 
-class GenerationContext(BaseModel): 
+class GenerationContext(AbsoluteBaseModel): 
     topics: List[str]
     context: str
     question_type: str
 
 # encoded images list 
-class EncodedImages(BaseModel): 
+class EncodedImages(AbsoluteBaseModel): 
     images: List[str]

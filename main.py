@@ -7,13 +7,17 @@ from models import DataLoaderModel
 from models import GenerationContext
 from models import StructuredJSONModel
 from models import DataClassifierModel
+from models import SummarizationInputModel
+from models import SummarizationOutputModel
+
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
 
 import PIL 
 import os 
-import json 
+import json
+import logging  
 import pdf2image as p2i 
 
 from google import generativeai as genai
@@ -22,6 +26,8 @@ from openai import OpenAI
 # generation model 
 from generation.generate import generate_response
 from generation.prompts import prompts 
+
+from summarizer.summarize import summarize_texts
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -140,18 +146,65 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
     structured_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     
     # writing data from each page into a json file to paralellize the rest of the code from out here 
+    title: str | None = None 
+    chapter_texts : List[str] = []
+
+    # creating a folder with the name of the pdf file in the summaries directory  
+    (bucket
+        .blob(f'{user_image_data.email_id}/summaries/{user_image_data.filename}/')
+        .upload_from_string(''))
+
     for idx, json_page in enumerate(structured_json):
         blob_path: str = f"{user_image_data.email_id}/text_extract/{user_image_data.filename}_{idx}.json"
+
+        # if title is None or if it is unequal to json_page != title  
+        if title and title != json_page["heading_text"]: 
+
+            content_blob = (bucket
+                            .blob(
+                f"{user_image_data.email_id}/summaries/{user_image_data.filename}/{title}_content.txt")
+            )
+
+            with content_blob.open("w") as f:
+                f.write(" ".join(chapter_texts).strip())
+
+            chapter_texts.clear()
+
+        title = json_page["heading_text"]
+
         json_blob = bucket.blob(blob_path)
         with json_blob.open("w") as f:
             json.dump(json_page, fp=f)
+            chapter_texts.append(json_page["text"])
             
     return StructuredJSONModel(
-        email_id =user_image_data.email_id, 
+        email_id=user_image_data.email_id, 
         filename=user_image_data.filename, 
         page_count=len(structured_json), 
     ) 
     
+@app.post("/summarize")
+async def summarize(summarization: SummarizationInputModel) -> SummarizationOutputModel: 
+    chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
+    chapter_name: str = summarization.chapter_title.split("_content")[0]
+    chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}") 
+    summary_blob = bucket.blob(f"{chapter_path}/{chapter_name}_summary.txt")
+    with chapter_blob.open("r") as f: 
+        content = f.read()
+    
+    if content:  
+        summary: str = summarize_texts(content, HF_TOKEN)
+        with summary_blob.open("w") as f: 
+            f.write(summary)
+    else: 
+        logging.log("Empty text in chapter identified!")
+        
+
+    return SummarizationOutputModel(
+        filename=summarization.filename, 
+        email_id=summarization.email_id, 
+        status=True
+    )
 
 # data classifier endpoint  
 @app.post("/data_classifier")

@@ -5,7 +5,7 @@ import time
 import asyncio
 import aiohttp 
 import os 
-from codetiming import Timer 
+import json 
 
 from typing import List, Dict 
 from google.cloud import storage
@@ -221,7 +221,7 @@ async def stats() -> Dict[str, int]:
     stat: Dict[str, int] = {}
     elems: int = random.randint(1, len(os.listdir(BASE_DIR)))
 
-    pdf_names: List[str] = random.choice(os.listdir(BASE_DIR), elems) 
+    pdf_names: List[str] = random.sample(os.listdir(BASE_DIR), elems) 
 
     init = time.time()
     run_sync(pdf_names)
@@ -241,10 +241,27 @@ async def stats() -> Dict[str, int]:
     await run_async_at_once(pdf_names)
     duration = time.time() - init 
     stat["at_once"] = duration 
+
+    return stats
+
+async def main(): 
+    result : List[Dict[str, str]] = await asyncio.gather(
+        *[asyncio.create_task(
+            stats()
+        ) for _ in range(30)]
+    )
     
+    with open(".test_result/result.json", "w") as json_fp: 
+        json.dump(result, fp=json_fp)
+
+def func(): 
+    blobs = gcs_client.list_blobs(BUCKET_NAME)
+    for blob in blobs: 
+        print(blob.name)
 
 if __name__ == '__main__': 
-    asyncio.run(main()) 
+    func()
+    
 
 # next is converting this pdf by making a request to the conversion model 
 # for path, pdf_name in zip(blob_paths, pdf_names):  

@@ -18,11 +18,12 @@ import numpy as np
 import plotly.express as px 
 import pyrebase
 import json 
+import asyncio 
+import aiohttp
 
 
 from google.cloud import storage
 from dotenv import load_dotenv
-from secret_downloader import download_secrets
 import google.generativeai as genai 
 
 load_dotenv()
@@ -36,8 +37,6 @@ json_example: str = """{
     "Attributes and connections": Dict[str, List[str]],
     "formal_representations": Dict[str, List[str]],
 }"""
-
-
 # definition prompt 
 definitions = '''
 Here is a thought: ### Ontology creation prompt ###
@@ -50,7 +49,6 @@ Objective: Develop Root Concept, Major Domains, Sub Domains, Concepts, Attribute
 5. Attributes and connections: Characteristics or properties that describe a concept. Attributes provide additional detail and context, helping to define the concept more clearly. Connections or interactions between concepts, attributes, and other entities. Relationships illustrate how different elements relate to one another within the context of the root concept.
 6. Formal Representations: Structured ways of depicting concepts, attributes, and relationships, such as models, diagrams, or frameworks. These representations help visualize the connections and hierarchies within the subject matter.
 '''
-
 # The inputs go, chapter json, definition json and json_example json 
 json_extractor_prompt: str = """
 Read the {} and find me the following out of it: 
@@ -68,7 +66,6 @@ You will be penalized if you fail to follow instructions or guidance
 Your output must be unambiguous. DO NOT EXPLAIN.
 Extracted JSON:
 """
-
 short_question_answer_prompt: str = """
 You are a Short Question Answer Generator Bot. Your goal is to generate Short 
 Question Answers based on the following instructions.  
@@ -103,7 +100,6 @@ You MUST also provide the correct answer along with the reasons.
 
 ### Question Answers: 
 """
-
 clause_prompt: str = "If one doesn't exist then use '{}' as the title. "
 # main prompts
 prompt: str = """
@@ -266,10 +262,6 @@ def generate_response(
         .split("Answers:")[1]
     )
 
-from typing import Dict 
-from streamlit_cookies_controller import CookieController
-
-cookies = CookieController()
 # prompts for generation for different types of outputs 
 
 short_question_answer_prompt: str = """
@@ -548,15 +540,11 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str]):
 
         st.write(content, unsafe_allow_html=True)
 
-# Application code starts here. We can also replace the above code with endpoints once they are deployed. 
-file_id: str = '1kTXuGtEUyZDrb4g7-2MxiXBgWW9WBaJT' # remote file id to download secrets from 
 
-secrets: Dict[str, str] = download_secrets(file_id)
-
-PROMPT_FILE_ID: str =  secrets["FILE_ID"] # file_id to fetch remote prompt design sheet
-GEMINI_API_KEY: str = secrets["GEMINI_API_KEY"] # gemini api key 
-OPENAI_API_KEY: str = secrets["OPENAI_API_KEY"] # openai api key 
-HF_TOKEN: str = secrets["HF_TOKEN"] # huggingface token 
+PROMPT_FILE_ID: str =  os.getenv("FILE_ID") # file_id to fetch remote prompt design sheet
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") # gemini api key 
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY") # openai api key 
+HF_TOKEN: str = os.getenv("HF_TOKEN") # huggingface token 
 
 ERROR_DIR: str = "data_loader/image_error"
 
@@ -571,7 +559,6 @@ config = genai.GenerationConfig(
 gemini = genai.GenerativeModel(model_name="gemini-1.5-flash")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 
-
 #models we will be using 
 models: List = [gemini, gpt4o]
 
@@ -584,14 +571,43 @@ def create_user_folders(email: str):
     subfolders = [
         "uploaded_document",
         "processed_image",
+        "summaries", 
         "text_extract",
         "json_data",
         "graph_data"
     ]
+
     for subfolder in subfolders:
         blob = bucket.blob(f"{user_folder}/{subfolder}/")  # Append a trailing slash to create a folder
         blob.upload_from_string('')
 
+async def async_summarize(url: str, email_id: str, pdf_name: str, chapter_title: str) -> Dict: 
+    async with aiohttp.ClientSession() as client: 
+        async with client.post(url + "/summarize", json={
+            "email_id":email_id, 
+            "filename": pdf_name, 
+            "chapter_title": chapter_title, 
+        }) as response:  
+            return await response.json()
+
+async def async_summarize_multiple(pdf_name: str, email_id: str): 
+    summarized_blob_path: str = f"{email_id}/summaries/{pdf_name}/" 
+    # could cause a problem if the pdf already exists 
+    blobs = gcs_client.list_blobs(
+        BUCKET_NAME, 
+        prefix=summarized_blob_path, 
+        delimiter="/", 
+    )
+
+    return await asyncio.gather(
+        *[asyncio.create_task(
+            async_summarize(
+                URL, pdf_name,
+                email_id,  
+                chapter_title=blob.name.split("/")[3], 
+            )
+        ) for blob in blobs if blob.name.endswith("_content.txt")]
+    )
 # If a file is uploaded
 # @st.fragment
 # def register() -> bool | None:
@@ -646,7 +662,6 @@ def objective():
     if uploaded_pdf is not None:
         button : bool = st.button("Process PDF")
         if button: 
-
             # pushing the pdf to gcp
             pdf_blob_path: str = f"{st.session_state.email}/uploaded_document/{uploaded_pdf.name}"
             pdf_blob = bucket.blob(pdf_blob_path)
@@ -665,21 +680,44 @@ def objective():
                     }
                 )
             
-            
             with st.spinner("Converting HTML to Table..."): 
                 # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
                 text_metadata = requests.post(
                     URL + "/data_loader", 
                     json=pdf2images.json()
                 ).json()
+            
+            # the summarization docs have been created. 
+            # next step is to summarize all the individual chapters 
+            with st.spinner("Summarizing the docs paralelly..."): 
+                #TODO: make all of this async 
+                # asyncio.run(async_summarize_multiple(
+                #     text_metadata["filename"], text_metadata["email_id"]
+                # ))
+
+                summarized_blob_path: str = f"{st.session_state.email}/summaries/{uploaded_pdf.name}/" 
+                # could cause a problem if the pdf already exists 
+                blobs = gcs_client.list_blobs(
+                    BUCKET_NAME, 
+                    prefix=summarized_blob_path, 
+                    delimiter="/", 
+                )
+                
+                for blob in blobs: 
+                    if blob.name.endswith("_content.txt"):
+                        summaries = requests.post(
+                            URL + "/summarize", 
+                            json = {
+                                "email_id": st.session_state.email, 
+                                "filename": uploaded_pdf.name, 
+                                "chapter_title": blob.name.split("/")[3], 
+                            }
+                        )
 
             # Data classifier part 
             with st.spinner("Sending each text to the classifier..."): 
                 json_outputs: List[Dict] = []
-                msg: str = "Sending HTMLs to be converted to JSON..."
 
-                progress_bar = st.progress(0, text=msg)
-            
                 for idx in range(text_metadata["page_count"]): 
                     text_op = requests.post(
                         URL + "/data_classifier", 
@@ -690,10 +728,6 @@ def objective():
                         }
                     )
 
-                    if idx == len(text_metadata): 
-                        msg = "Processing JSON from HTML has finished!"
-
-                    progress_bar.progress((idx+1) / len(text_metadata), text=msg)
 
                 # json_outputs = requests.post(
                 #     URL + "/data_classifier", 
@@ -715,7 +749,6 @@ def objective():
 
             topics: List[str] = sub_domains + major_domains + concepts 
 
-            
             # Converting into embeddings  
             embeds_2d: pd.DataFrame = visualizer(topics)
             figure = px.scatter(
@@ -751,7 +784,6 @@ def password_reset():
 
     st.success(f"Verification Email Sent to ```{email}```.")
     st.markdown(f'''
-
     We have successfully sent a verification email to **{email}**.
 
     Please check your inbox and follow the instructions in the email to verify your account. If you don’t see the email in your inbox, check your spam or junk folder.
