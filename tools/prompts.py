@@ -36,7 +36,7 @@ classification:
 
 
 topic_prompt = """
-You are an Concept extractor bot. Your TASK is to help extract Concept from {1} in maximum of 4 words . The following is the definition for ease of understanding: A concept is an abstract idea or general notion that represents something, often serving as the foundation for thinking or communication about a particular topic.  You are extracting concepts from educational text books/ chapters.
+You are an topic extractor bot. Your TASK is to help extract topic from {1} in maximum of 4 words . The following is the definition for ease of understanding: A topic is a broad subject or area of interest. You are extracting topics from educational text books/chapters.
 ### Instructions###:
 Your outcomes MUST be simple and unambiguous.
 
@@ -44,30 +44,31 @@ Your outcomes MUST be simple and unambiguous.
 You will receive a tip of $$$ for correct description.
 You will be penalized if you fail to follow instructions or guidance.
 
-concept:
+topic:
 {} {}
 """
 
 subtopic_prompt = """
-You are an Sub concept extractor bot. Your TASK is to help extract Sub concept from {1} in maximum of 4 words . The following is the definition for ease of understanding: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts. You are extracting concepts from educational text books/ chapters.
+You are an Sub topic extractor bot. Your TASK is to help extract Sub concept from {1} in maximum of 4 words . The following is the definition for ease of understanding: a subtopic is a more specific aspect or division within that larger topic. You are extracting subtopics from educational text books/
+chapters.
 
-The primary concept for this chapter is {2}. Give subconcept strongly in context to the concept.
+The primary topic for this chapter is {2}. Give subtopic strongly in context to the topic.
 
 ### Instructions###:
-Your outcomes MUST be simple, unambiguous and should only contain the desired subconcept.
-After generating the topic enclose it within <subconcept> tags
+Your outcomes MUST be simple, unambiguous and should only contain the desired subtopic.
+After generating the topic enclose it within <subtopic> tags
 
 ###Incentives###
 You will receive a tip of $$$ for correct description.
 You will be penalized if you fail to follow instructions or guidance.
-subconcept
+subtopic
 {} 
 
 """
 
 
 concept_prompt = """
-You are an Concept extractor bot. Your TASK is to help extract Concept from {} in maximum of 4 words . The following is the definition for ease of understanding: A concept is an abstract idea or general notion that represents something, often serving as the foundation for thinking or communication about a particular topic.  You are extracting concepts from educational text books/ chapters.
+You are a Concept extractor bot. Your TASK is to help extract Concept from {} in maximum of 4 words . The following is the definition for ease of understanding: A concept is an abstract idea or general notion that represents something, often serving as the foundation for thinking or communication about a particular topic. You are extracting concepts from educational text books/chapters.
 ### Instructions###:
 Your outcomes MUST be simple and unambiguous.
 
@@ -79,7 +80,7 @@ concept
 """
 
 subconcept_prompt = """
-You are an Sub concept extractor bot. Your TASK is to help extract Sub concept from {} in maximum of 4 words . The following is the definition for ease of understanding: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts. You are extracting concepts from educational text books/ chapters.
+You are a Sub concept extractor bot. Your TASK is to help extract Sub concept from {} in maximum of 4 words . The following is the definition for ease of understanding: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts. You are extracting concepts from educational text books/ chapters.
 
 The primary concept for this chapter is {}. Give subconcept strongly in context to the concept.
 
