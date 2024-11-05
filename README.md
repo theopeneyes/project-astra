@@ -43,7 +43,7 @@ Example:
         "sub_heading_text":null,
         "text_type":"text",
         "paragraph_number":1,
-        "text":"Sample text about carburetor"
+        "text":"Paragraph 1 about carburetor"
     }, 
     .
     .
@@ -55,7 +55,7 @@ Example:
         "sub_heading_text": "Trannosaurous Rex",
         "text_type":"text",
         "paragraph_number":9,
-        "text":"Sample text about Dinosaurs"
+        "text":"Paragraph n about Dinosaurs"
     }, 
 
 ]
