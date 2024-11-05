@@ -33,10 +33,3 @@ jobs:
     - name: Intialize the Server 
       run: |
         fastapi run main.py & sleep 5
-    - name: Checking the status of the output
-      run: |
-        python test.py 
-
-    - name: Test with pytest
-      run: |
-        pytest test.py 

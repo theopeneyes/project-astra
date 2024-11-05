@@ -44,7 +44,7 @@ ENCLOSE your answer in <category> tags.
 You will receive a tip of $$$ for correct description.
 You will be penalized if you fail to follow instructions or guidance
 
-Please refer to this summary to validate the classified output. 
+Please refer to this summary of the chapter as background context to classify output. 
 
 Summary Text: 
 {}

@@ -34,3 +34,12 @@ class GenerationContext(AbsoluteBaseModel):
 # encoded images list 
 class EncodedImages(AbsoluteBaseModel): 
     images: List[str]
+
+# Image model 
+class DataMapPlotInputModel(BaseModel): 
+    X_col: List[float]
+    Y_col: List[float] 
+    labels: List[str]
+
+class GeneratedImageModel(BaseModel):
+    encoded_image: str 
