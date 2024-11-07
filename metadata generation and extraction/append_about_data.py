@@ -12,14 +12,14 @@ about_json_example = {
     'Topic': str,
     'Sub topic': str,
     "root_concept": str,
-    "major_domains": [str],
-    "sub_domains": [str],
+    "major_domains": str,
+    "sub_domains": str,
     "Attributes and connections": {
-    str: [str]
+    str: str
   },
     "formal_representations": {
-    "Diagram": [str],
-    "Model": [str]
+    "Diagram": str,
+    "Model": str
   }
 
 }
@@ -98,8 +98,8 @@ def append_about(token, about_metadata_prompt, json_list):
 
 def classify_about(single_json):
 
-    json_text = single_json["text"]
     prompt = f'''
+    json_text = {single_json["text"]}
     You are a classification BOT. Your task is to go through step by step and classify the given text and save the results of each step into JSON.
 
     step 1: Classify the text into one of the concepts from the list of concepts provided:{generated_list[0]["Concept"]}.
@@ -109,7 +109,7 @@ def classify_about(single_json):
     step 5: Classify the text into one of the root concepts from the list of root concepts provided: {generated_list[1]["root_concept"]}.
     step 6: Classify the text into one of the Major Domains from the list of major domains provided: {generated_list[1]["major_domains"]}.
     step 7: Classify the text into one of the Sub Domains from the list of sub domains provided: {generated_list[1]["sub_domains"]}.
-    step 7: Classify the text into one of the Attributes and connections from the list of attributes and connections provided: {generated_list[1]["Attributes and connections"]}.
+    step 7: For the text, select a key-value pair of Attributes and connections from the dictionary provided: {generated_list[1]["Attributes and connections"]} .
     step 7: Classify the text into one of the Formal representations from the list of Formal representations provided: {generated_list[1]["formal_representations"]}.
     
     The JSON you return should look like following:
@@ -125,11 +125,15 @@ def classify_about(single_json):
         "parameters": {"max_new_tokens": 700, "temperature":0.1}
     }
     response = requests.post(API_URL, headers=headers, json=payload)
-    print(response.json())
+    print(response.json()[0]["generated_text"])
+    # string_json = response.json()[0]["generated_text"].split("```json")[1].split("```")[0]
+
+    
     # string_json = response.json()[0]["generated_text"].split("### JSON Output ###")[1].split("### Explanation ###")[0]
     # clean_json = json.loads(string_json)
     # result = {** single_json, **clean_json}
     # print(result)
     return 0
 
-classify_about(json_list)
+y = classify_about(json_list)
+print(type(y))

@@ -51,26 +51,6 @@ Your output must be unambiguous. DO NOT EXPLAIN.
 ### OUTPUT ###
 '''
 
-# API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
-# headers = {"Authorization": f"Bearer {token}"}
-# payload = {
-#     "inputs": f"{depth_list_generation_prompt}",
-#     "parameters": {"max_new_tokens": 600, "temperature":0.1}
-# }
-# response = requests.post(API_URL, headers=headers, json=payload)
-# # print(response.json())
-# noisy_json = response.json()[0]['generated_text'].split("### OUTPUT ###")[1]
-# # print(noisy_json)
-# x = json.loads(noisy_json)
-# # print(type(x))
-# clean_json = noisy_json.split("```")
-# x = json.loads(clean_json[0])
-# type(x)
-
-
-
-
-
 def generateList(about_list_generation_prompt, depth_list_generation_prompt, summary, token):    
     #about extraction
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
