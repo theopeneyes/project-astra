@@ -724,9 +724,7 @@ def objective():
 
             # Data classifier part 
             with st.spinner("Sending each text to the classifier..."): 
-                json_outputs: List[Dict] = []
-
-                for idx in range(text_metadata["page_count"] - 1): 
+                for idx in range(text_metadata["page_count"]): 
                     requests.post(
                         URL + "/data_classifier", 
                         json={
@@ -736,11 +734,19 @@ def objective():
                         }
                     )
 
-                    with bucket.blob(
-                        f"{st.session_state.email}/json_data/{uploaded_pdf.name}_{idx}.json"
-                    ).open("r") as f: 
-                        json_outputs.append(json.loads(f.read())) 
+            json_outputs: List[Dict] = []
 
+            with st.spinner("Getting output json from the bucket..."): 
+                classifier_blobs = gcs_client.list_blobs(
+                    BUCKET_NAME, 
+                    prefix=f"{st.session_state.email}/json_data/", 
+                    delimiter="/", 
+                )
+
+                for blob in classifier_blobs: 
+                    if uploaded_pdf.name in blob.name:
+                        with blob.open("r") as f:
+                            json_outputs.append(json.load(fp=f))  
                 # json_outputs = requests.post(
                 #     URL + "/data_classifier", 
                 #     json=text_metadata.json()
@@ -748,6 +754,7 @@ def objective():
 
             with st.spinner("Generating json..."): 
                 json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
+
 
             # gets all unique sub-domains and then chooses three from it 
             # essentially a for loop to sum a list of lists and then get unique sub_domains 

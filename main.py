@@ -138,6 +138,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
     with image_json_blob.open("r") as img_json: 
         images: List[Dict[str, str]] = json.load(img_json)
 
+    print(f"processing step here for pdf {user_image_data.filename}...")
     # sending images to the images function 
     html_pages: List[str] = parse_images(
         models=[gemini, gpt4o], 
@@ -147,6 +148,8 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         clause_prompt=clause_prompt, 
         messages=messages,  
     )
+
+    print(f"processing step is done for filename {user_image_data.filename}...")
 
     structured_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     
@@ -163,7 +166,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         blob_path: str = f"{user_image_data.email_id}/text_extract/{user_image_data.filename}_{idx}.json"
 
         # if title is None or if it is unequal to json_page != title  
-        if title and title != json_page["heading_text"]: 
+        if title and title != json_page["heading_identifier"]: 
 
             content_blob = (bucket
                             .blob(
@@ -175,7 +178,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 
             chapter_texts.clear()
 
-        title = json_page["heading_text"]
+        title = json_page["heading_identifier"]
 
         json_blob = bucket.blob(blob_path)
         with json_blob.open("w") as f:
