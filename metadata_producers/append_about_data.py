@@ -129,11 +129,11 @@ def classify_about(single_json):
     # string_json = response.json()[0]["generated_text"].split("```json")[1].split("```")[0]
 
     
-    # string_json = response.json()[0]["generated_text"].split("### JSON Output ###")[1].split("### Explanation ###")[0]
-    # clean_json = json.loads(string_json)
-    # result = {** single_json, **clean_json}
+    string_json = response.json()[0]["generated_text"].split("### JSON Output ###")[1].split("### Explanation ###")[0]
+    clean_json = json.loads(string_json)
+    result = {** single_json, **clean_json}
     # print(result)
-    return 0
+    return result
 
-y = classify_about(json_list)
-print(type(y))
+# y = classify_about(json_list)
+# print(type(y))
