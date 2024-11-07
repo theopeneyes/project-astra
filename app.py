@@ -726,7 +726,7 @@ def objective():
             with st.spinner("Sending each text to the classifier..."): 
                 json_outputs: List[Dict] = []
 
-                for idx in range(text_metadata["page_count"]): 
+                for idx in range(text_metadata["page_count"] - 1): 
                     requests.post(
                         URL + "/data_classifier", 
                         json={
