@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import pandas as pd 
+
 from typing import List, Dict
 from gensim.models import Word2Vec
 from io import BytesIO
@@ -11,11 +12,12 @@ from openai import OpenAI
 import requests 
 import PIL 
 import base64
+import datamapplot
+import matplotlib
 
 import pandas as pd 
 import streamlit as st
 import numpy as np 
-import plotly.express as px 
 import pyrebase
 import json 
 import asyncio 
@@ -190,6 +192,12 @@ messages: List[Dict] = [
 # LLMs for our application 
 # URL: str = "https://project-astra-1086049785812.us-central1.run.app"
 URL: str = "http://127.0.0.1:8000"
+
+def decode_image(encoded_string: str) -> PIL.Image:
+    image_data = base64.b64decode(encoded_string)
+    buffered = BytesIO(image_data)
+    image = PIL.Image.open(buffered)
+    return image
 
 def visualizer(items: List[str]) -> pd.DataFrame: 
     # this function converts a list of topics to semantic vectors 
@@ -705,7 +713,7 @@ def objective():
                 
                 for blob in blobs: 
                     if blob.name.endswith("_content.txt"):
-                        summaries = requests.post(
+                        requests.post(
                             URL + "/summarize", 
                             json = {
                                 "email_id": st.session_state.email, 
@@ -718,8 +726,8 @@ def objective():
             with st.spinner("Sending each text to the classifier..."): 
                 json_outputs: List[Dict] = []
 
-                for idx in range(text_metadata["page_count"]): 
-                    text_op = requests.post(
+                for idx in range(text_metadata["page_count"] - 1): 
+                    requests.post(
                         URL + "/data_classifier", 
                         json={
                             "filename": uploaded_pdf.name, 
@@ -728,6 +736,10 @@ def objective():
                         }
                     )
 
+                    with bucket.blob(
+                        f"{st.session_state.email}/json_data/{uploaded_pdf.name}_{idx}.json"
+                    ).open("r") as f: 
+                        json_outputs.append(json.loads(f.read())) 
 
                 # json_outputs = requests.post(
                 #     URL + "/data_classifier", 
@@ -735,7 +747,7 @@ def objective():
                 # )
 
             with st.spinner("Generating json..."): 
-                json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs.json())
+                json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
 
             # gets all unique sub-domains and then chooses three from it 
             # essentially a for loop to sum a list of lists and then get unique sub_domains 
@@ -751,12 +763,67 @@ def objective():
 
             # Converting into embeddings  
             embeds_2d: pd.DataFrame = visualizer(topics)
-            figure = px.scatter(
-                embeds_2d, x='x', y='y', 
-                color='cluster_label', hover_data=['labels'], 
-            )
+            data = embeds_2d[["x", "y"]].values 
+            labels = embeds_2d["labels"].values 
 
-            st.plotly_chart(figure)
+            with st.spinner("Rendering the image..."): 
+                data = data * 50 
+                
+                # Mapplot on the app 
+                # with tempfile.TemporaryDirectory() as tmp_dir: 
+                # img_folder_blob = bucket.blob(f"{st.session_state.email}/datamapplots/")
+                # img_folder_blob.upload_from_string('')
+                
+                # img_blob = bucket.blob(f"{st.session_state.email}/datamapplots/{uploaded_pdf.name}_topic_img.jpg")
+                matplotlib_fig, _ = datamapplot.create_plot(
+                    data[:50], labels[:50],
+                    title="Visual Representation of the topics in the book.", 
+                    label_over_points=True,
+                    dynamic_label_size=True,
+                    dynamic_label_size_scaling_factor=1.5,
+                    max_font_size=24,
+                    min_font_size=4,
+                    min_font_weight=100,
+                    max_font_weight=400,
+                )
+
+                st.pyplot(matplotlib_fig, bbox_inches="tight")
+
+                # with img_blob.open("w") as f: 
+                    
+
+
+                    # fig.savefig(f"{tmp_dir}/saved_img.jpg")
+                    # matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
+                # endpoint approach 
+
+                # x_col = data[:, 0].tolist()
+                # y_col = data[:, 1].tolist()
+                # labels = labels.tolist()
+                # print("We're here before posting...")
+
+                # response_img = requests.post(
+                #     URL + "/create_img", 
+                #     json={
+                #         "X_col": x_col[:20], 
+                #         "Y_col": y_col[:20], 
+                #         "labels": labels[:20],  
+                #     }, 
+                #     timeout=1000
+                # )
+
+                # print("Posting is done and successfull")
+
+                # matplotlib_fig = decode_image(response_img.json()["encoded_image"]) 
+                # st.image(matplotlib_fig, use_column_width=True)
+                # print("Issue is in image rendering!")
+
+            # figure = px.scatter(
+            #     embeds_2d, x='x', y='y', 
+            #     hover_data=['labels'], 
+            # )
+
+            # st.plotly_chart(figure)
             generate_qna(json_df, topics)
 
 @st.fragment

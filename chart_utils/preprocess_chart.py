@@ -1,7 +1,6 @@
 from typing import List 
 from gensim.models import Word2Vec
 from sklearn.decomposition import PCA 
-from sklearn.cluster import DBSCAN
 
 import numpy as np 
 import pandas as pd 
@@ -25,15 +24,10 @@ def visualizer(items: List[str]) -> pd.DataFrame:
 
     #vectors 
     vectors = np.vstack(word_vectors)
-
-    # Cluster labels
-    cluster = DBSCAN(eps=0.5)
-    cluster_labels = cluster.fit_predict(vectors)
     
     embeds = pca.fit_transform(vectors) 
     df: pd.DataFrame = pd.DataFrame(embeds, columns=["x", "y"])
     df["labels"] = items 
-    df["cluster_label"] = cluster_labels  
     return df  
 
 

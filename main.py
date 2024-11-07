@@ -9,6 +9,8 @@ from models import StructuredJSONModel
 from models import DataClassifierModel
 from models import SummarizationInputModel
 from models import SummarizationOutputModel
+from models import GeneratedImageModel 
+from models import DataMapPlotInputModel 
 
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
@@ -19,6 +21,9 @@ import os
 import json
 import logging  
 import pdf2image as p2i 
+import numpy as np 
+import datamapplot
+import tempfile 
 
 from google import generativeai as genai
 from openai import OpenAI 
@@ -182,7 +187,8 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         filename=user_image_data.filename, 
         page_count=len(structured_json), 
     ) 
-    
+
+# segerates via chapter and summarizes the chapter  
 @app.post("/summarize")
 async def summarize(summarization: SummarizationInputModel) -> SummarizationOutputModel: 
     chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
@@ -197,7 +203,7 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
         with summary_blob.open("w") as f: 
             f.write(summary)
     else: 
-        logging.log("Empty text in chapter identified!")
+        logging.info("Empty text in chapter identified! content: {content}")
 
     return SummarizationOutputModel(
         filename=summarization.filename, 
@@ -223,6 +229,31 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
             json.dump(op, fp=f)
        
     return text_json
+
+@app.post("/create_img")
+async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
+    with tempfile.TemporaryDirectory() as tmp_dir: 
+        data = np.hstack((np.array(img_model.X_col).reshape(-1, 1), 
+                   np.array(img_model.Y_col).reshape(-1, 1)))  
+
+        # scaling the data 
+        data = data * 50 
+        labels = np.array(img_model.labels).reshape(-1,)
+
+        fig, _ = datamapplot.create_plot(
+            data, labels, 
+            noise_label="Unimportant topics", 
+            title="Topic Map", 
+            sub_title="Visual representation of topics found within the book", 
+            label_font_size=11, 
+        )
+
+        fig.savefig(f"{tmp_dir}/saved_img.jpg")
+        matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
+
+        return GeneratedImageModel(
+            encoded_image=encode_image(matplotlib_fig)
+        )
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:
