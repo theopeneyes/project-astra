@@ -9,10 +9,10 @@ about_list_generation_prompt = f'''
 TASK: Generate a list of Concept, Sub concept, Topic, and Sub topic for the summary provided herewith.
 summary = {summary}
 ### Definitions ###
-1. Concept: A concept is an abstract idea or general notion that represents something, often serving as the foundation for thinking or communication about a particular topic. Concepts represent specific instances, theories, or practices related to the subject matter.
-2. Sub concept: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts.
-3. Topic: A topic is a broad subject or area of interest.
-4. Sub topic: a subtopic is a more specific aspect or division within that larger topic.
+1. concept: A concept is an abstract idea or general notion that represents something, often serving as the foundation for thinking or communication about a particular topic. Concepts represent specific instances, theories, or practices related to the subject matter.
+2. sub_concept: A sub-concept is a more specific idea that falls under the broader umbrella of a primary concept. It represents a more focused or specialized aspect of the main concept. Sub-concepts help break down complex ideas into smaller, more understandable parts.
+3. topic: A topic is a broad subject or area of interest.
+4. sub_topic: a subtopic is a more specific aspect or division within that larger topic.
 Generate lists of each of the above and return them as a JSON.
 ### Instructions ###
 enclose your final json output in the <json> tag.
@@ -97,3 +97,4 @@ def generateList(about_list_generation_prompt, depth_list_generation_prompt, sum
     final_list.append(y)
     return final_list
 generated_list = generateList(about_list_generation_prompt, depth_list_generation_prompt, summary, token)
+print(generated_list)

@@ -71,7 +71,7 @@ def subtopic_extractor(subtopic_prompt, token):
     subtopic = response.json()[0]["generated_text"].split("subtopic:")[1].split("<subtopic>")[1].split("</subtopic>")[0]
     return subtopic
 
-
+subtopic_extractor(subtopic_prompt, token)
 # next_json = {
 
 #     'topic': topic,
