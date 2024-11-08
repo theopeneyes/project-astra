@@ -24,7 +24,7 @@ class SummarizationInputModel(AbsoluteBaseModel):
 
 class SummarizationOutputModel(AbsoluteBaseModel): 
     status: bool 
-    
+
 # generation context model 
 class GenerationContext(AbsoluteBaseModel): 
     topics: List[str]
@@ -43,3 +43,9 @@ class DataMapPlotInputModel(BaseModel):
 
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
+
+class SummaryChapterModel(AbsoluteBaseModel): 
+    chapter_name: str 
+
+class SummarizedLabelOutputModel(AbsoluteBaseModel): 
+    pass 

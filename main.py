@@ -11,10 +11,12 @@ from models import SummarizationInputModel
 from models import SummarizationOutputModel
 from models import GeneratedImageModel 
 from models import DataMapPlotInputModel 
-
+from models import SummaryChapterModel
+from models import SummarizedLabelOutputModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
+from fastapi.responses import HTMLResponse
 
 import PIL 
 import os 
@@ -42,6 +44,7 @@ from data_loader.opeanai_formatters import messages
 from data_classifier.classification_pipeline import get_json
 from google.cloud import storage 
 from image_utils.encoder import encode_image 
+# from metadata_producers.generate_list import  generateList
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -164,7 +167,6 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 
     for idx, json_page in enumerate(structured_json):
         blob_path: str = f"{user_image_data.email_id}/text_extract/{user_image_data.filename}_{idx}.json"
-
         # if title is None or if it is unequal to json_page != title  
         if title and title != json_page["heading_identifier"]: 
 
@@ -257,6 +259,39 @@ async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel:
         return GeneratedImageModel(
             encoded_image=encode_image(matplotlib_fig)
         )
+
+@app.get("/interactive_plot/{email_id}/{filename}")
+async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
+    blob_path: str = f"{email_id}/rendered_html/{filename}.html"  
+    blob = bucket.blob(blob_path)
+    with blob.open("r") as html: 
+        content = html.read()
+
+    return HTMLResponse(
+        content = content 
+    ) 
+
+# @app.post("/summary_classifier")
+# async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterModel: 
+#     summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
+#     summary_blob = bucket.blob(summary_path)
+#     with summary_blob.open("r") as f: 
+#         summary_content: str = f.read()
+    
+#     content = generateList(summary_content, HF_TOKEN)
+#     classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
+#     classified_summary_blob = bucket.blob(classified_summary_path)
+#     with classified_summary_blob.open("w") as f: 
+#         f.write(json.dumps(content))
+
+#     return SummaryChapterModel(
+#         filename=summ_input.filename, 
+#         email_id=summ_input.email_id, 
+#         chapter_name=summ_input.chapter_name, 
+#     ) 
+
+# @app.get("/rewrite_json")
+# async def rewrite_json(summ_input: SummaryChapterModel) -> 
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:
