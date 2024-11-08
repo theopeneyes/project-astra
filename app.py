@@ -581,8 +581,9 @@ def create_user_folders(email: str):
         "processed_image",
         "summaries", 
         "text_extract",
-        "json_data",
-        "graph_data"
+        "intermediate_json_data",
+        "graph_data", 
+        "json_data"
     ]
 
     for subfolder in subfolders:

@@ -13,12 +13,15 @@ from models import GeneratedImageModel
 from models import DataMapPlotInputModel 
 from models import SummaryChapterModel
 from models import SummarizedLabelOutputModel
+from models import DetectedLanguageModel
+from models import AbsoluteBaseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
 from fastapi.responses import HTMLResponse
 
 import PIL 
+import random 
 import os 
 import json
 import logging  
@@ -35,6 +38,9 @@ from generation.generate import generate_response
 from generation.prompts import prompts 
 
 from summarizer.summarize import summarize_texts
+
+from language_detection.detector import detect_language
+from language_detection.prompts import language_detection_prompt
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -94,7 +100,12 @@ app = FastAPI(debug=True, title="project-astra")
 @app.get("/")
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
-    
+
+# # login trigger 
+# @app.post("/trigger")
+# async def login_trigger()
+
+
 @app.post("/convert_pdf")
 async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel: 
     # accessing the file blob from the URI 
@@ -132,6 +143,27 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
         uri=json_path, 
     ) 
         
+
+@app.post("/detect_lang") 
+async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
+    image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
+    with image_blob.open("r") as f: 
+        images: List[Dict] = json.load(fp=f)
+
+    if len(images) > 5:  
+        chosen_images = random.sample(population=images, k=5)
+    else: chosen_images = images 
+
+    languages : List[str] = []
+    for image in chosen_images: 
+        encoded_image: str = image["img_b64"]
+        languages.append(detect_language(encoded_image,  messages, language_detection_prompt, gpt4o)) 
+    
+    return DetectedLanguageModel(
+        filename=lng_model.filename, 
+        email_id=lng_model.email_id, 
+        detected_language=max(languages, key=languages.count)
+    ) 
 
 # the data loading endpoint 
 @app.post("/data_loader")
@@ -192,6 +224,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         filename=user_image_data.filename, 
         page_count=len(structured_json), 
     ) 
+
 
 # segerates via chapter and summarizes the chapter  
 @app.post("/summarize")

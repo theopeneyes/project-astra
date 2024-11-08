@@ -2,13 +2,14 @@ from google.cloud import storage
 from typing import List, Dict 
 from dotenv import load_dotenv
 
+import asyncio 
+
 import requests 
 import os 
 
 load_dotenv()
 
-
-def process_pdf(pdf_name: str, user_email: str, gcs_client): 
+async def process_pdf(pdf_name: str, user_email: str, gcs_client): 
     with open(os.path.join(PDF_DIR, pdf_name), "rb") as fr: 
         pdf_blob = bucket.blob(f"{EMAIL_ID}/uploaded_document/{pdf_name}")
         with pdf_blob.open("wb") as f:
@@ -86,12 +87,19 @@ gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json"
 bucket = gcs_client.bucket(BUCKET_NAME)
 
 
-def main():
-    for pdf_name in os.listdir(PDF_DIR): 
-        process_pdf(pdf_name, EMAIL_ID, gcs_client)
+async def main():
+    # for pdf_name in os.listdir(PDF_DIR): 
+    #     process_pdf(pdf_name, EMAIL_ID, gcs_client)
+
+    pdf_names = os.listdir(PDF_DIR)
+    await asyncio.gather(
+        *[asyncio.create_task(
+            process_pdf(pdf_name, EMAIL_ID, gcs_client)
+        ) for pdf_name in pdf_names]
+    )
 
 if __name__ == "__main__": 
-    main()
+    asyncio.run(main()) 
 
     # classifier_blobs = gcs_client.list_blobs(
     #     BUCKET_NAME, 
@@ -105,19 +113,3 @@ if __name__ == "__main__":
     #         f = blob.open("r")
     #         json_outputs.append(f.read())
     #         f.close()
-    
-        
-    
-    
-    
-    
-
-
-    
-    
-    
-
-
-
-
-

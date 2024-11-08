@@ -40,7 +40,10 @@ class DataMapPlotInputModel(BaseModel):
     X_col: List[float]
     Y_col: List[float] 
     labels: List[str]
-
+    
+class DetectedLanguageModel(AbsoluteBaseModel): 
+    detected_language: str
+    
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
 
