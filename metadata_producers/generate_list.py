@@ -3,10 +3,13 @@ import json
 from typing import Dict 
 
 # list generation prompts imported from the other file 
-from prompts import about_list_generation_prompt, depth_list_generation_prompt
 
 # add summary to it 
-def generateList(summary, token) -> Dict:    
+def generateList(summary, 
+                 about_list_generation_prompt, 
+                 depth_list_generation_prompt, 
+                 token) -> Dict:    
+
     #about extraction
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}

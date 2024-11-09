@@ -12,7 +12,6 @@ from models import SummarizationOutputModel
 from models import GeneratedImageModel 
 from models import DataMapPlotInputModel 
 from models import SummaryChapterModel
-from models import SummarizedLabelOutputModel
 from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
 
@@ -50,7 +49,9 @@ from data_loader.opeanai_formatters import messages
 from data_classifier.classification_pipeline import get_json
 from google.cloud import storage 
 from image_utils.encoder import encode_image 
-# from metadata_producers.generate_list import  generateList
+
+from metadata_producers.generate_list import generateList
+from metadata_producers.prompts import about_list_generation_prompt, depth_list_generation_prompt
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -187,7 +188,6 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
     print(f"processing step is done for filename {user_image_data.filename}...")
 
     structured_json: List[Dict[str, str|int]] = structure_html(html_pages) 
-    
     # writing data from each page into a json file to paralellize the rest of the code from out here 
     title: str | None = None 
     chapter_texts : List[str] = []
@@ -218,6 +218,18 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         with json_blob.open("w") as f:
             json.dump(json_page, fp=f)
             chapter_texts.append(json_page["text"])
+    
+    if chapter_texts: 
+        content_blob = (bucket
+                        .blob(
+            f"{user_image_data.email_id}/summaries/{user_image_data.filename}/{title}_content.txt")
+        )
+
+        with content_blob.open("w") as f:
+            f.write(" ".join(chapter_texts).strip())
+
+        chapter_texts.clear()
+    
             
     return StructuredJSONModel(
         email_id=user_image_data.email_id, 
@@ -304,24 +316,28 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
         content = content 
     ) 
 
-# @app.post("/summary_classifier")
-# async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterModel: 
-#     summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
-#     summary_blob = bucket.blob(summary_path)
-#     with summary_blob.open("r") as f: 
-#         summary_content: str = f.read()
+@app.post("/summary_classifier")
+async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterModel: 
+    summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
+    summary_blob = bucket.blob(summary_path)
+    with summary_blob.open("r") as f: 
+        summary_content: str = f.read()
     
-#     content = generateList(summary_content, HF_TOKEN)
-#     classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
-#     classified_summary_blob = bucket.blob(classified_summary_path)
-#     with classified_summary_blob.open("w") as f: 
-#         f.write(json.dumps(content))
+    content = generateList(summary_content, 
+                           about_list_generation_prompt, 
+                           depth_list_generation_prompt, 
+                           HF_TOKEN)
 
-#     return SummaryChapterModel(
-#         filename=summ_input.filename, 
-#         email_id=summ_input.email_id, 
-#         chapter_name=summ_input.chapter_name, 
-#     ) 
+    classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
+    classified_summary_blob = bucket.blob(classified_summary_path)
+    with classified_summary_blob.open("w") as f: 
+        f.write(json.dumps(content))
+
+    return SummaryChapterModel(
+        filename=summ_input.filename, 
+        email_id=summ_input.email_id, 
+        chapter_name=summ_input.chapter_name, 
+    ) 
 
 # @app.get("/rewrite_json")
 # async def rewrite_json(summ_input: SummaryChapterModel) -> 

@@ -240,8 +240,8 @@ prompts: Dict[str, str] = {
     "Software Code Questions": software_code_questions_prompt 
 }
 
-async def process_pdf(pdf_name: str, user_email: str): 
-    with open(pdf_name, "rb") as fr: 
+async def process_pdf(pdf_name: str, user_email: str, base_directory: str): 
+    with open(os.path.join(base_directory, pdf_name), "rb") as fr: 
         pdf_blob = bucket.blob(f"{user_email}/uploaded_document/{pdf_name}")
         with pdf_blob.open("wb") as f:
             f.write(fr.read())
@@ -300,10 +300,10 @@ async def process_pdf(pdf_name: str, user_email: str):
             }
         )
 
-async def run_async(pdf_names: List[str], user_email: str):
+async def run_async(pdf_names: List[str], user_email: str, base_directory: str):
     await asyncio.gather(
         *[ asyncio.create_task(
-            process_pdf(pdf_name, user_email)
+            process_pdf(pdf_name, user_email, base_directory)
         ) for pdf_name in pdf_names]
     )
 
@@ -405,9 +405,8 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str]):
 
         st.download_button(label="Download QNA", data=content, file_name="qna.txt", mime="text/plain")
 
-
 @st.fragment
-def run_process(book_name: str, directory_path: str, non_existent_pdfs: List[str]): 
+def run_process(book_name: str): 
     
     if st.button("Select book"): 
         with st.spinner("Loading data..."): 
@@ -458,6 +457,7 @@ def run_process(book_name: str, directory_path: str, non_existent_pdfs: List[str
                 font_family="Playfair Display SC",
             )
 
+
             with tempfile.TemporaryDirectory() as tmp_dir: 
                 matplotlib_fig.save(f"{tmp_dir}/{book_name}.html")
                 html_folder = bucket.blob(f"{st.session_state.email}/rendered_html/")
@@ -468,25 +468,33 @@ def run_process(book_name: str, directory_path: str, non_existent_pdfs: List[str
                     with open(f"{tmp_dir}/{book_name}.html") as html: 
                         f.write(html.read())
             
-            requests.get(
-                URL + "/interactive_plot", 
-                json = {
-                    "email_id": st.session_state.email,
-                    "filename": book_name, 
-                }
-            )
-
-            st.write(
-                f"Click on this link to view the interactive plot: [link]({URL}/interactive_plot/{st.session_state.email}/{book_name})")
+            st.markdown(
+                f"Click on this link to view the interactive plot: [{book_name}]({URL}/interactive_plot/{st.session_state.email}/{book_name})")
 
             # running the endpoint asynchronously 
             generate_qna(json_df, topics)
 
 def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str): 
     asyncio.run(run_async(
-        [os.path.join(directory_path, pdf_name)
-         for pdf_name in pdfs], user_email 
+        [pdf_name
+         for pdf_name in pdfs], user_email, directory_path 
     ))
+@st.fragment
+def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: str): 
+    book_name = st.selectbox(
+        label="Select one of the following pdfs...",
+        options=blob_names)
+
+    with st.spinner("Are we waiting for it?..."):         
+        thread = threading.Thread(target=parse_pdfs, args=(directory_path, 
+                                non_existent_pdfs, st.session_state.email)) 
+        thread.start()
+
+    if book_name: 
+        run_process(book_name)
+        # asyncio.run(run_async(
+        #     *[os.path.join(directory_path, pdf) for pdf in non_existent_pdfs], 
+        # ))
 
 @st.fragment
 def run_main(): 
@@ -504,22 +512,8 @@ def run_main():
         blob_names: List[str] = [blob.name.split("/")[-1] for blob in existent_blobs]
         non_existent_pdfs = list(pdfs - set(blob_names))
 
-        
         # documents that are ready... 
-        book_name = st.selectbox(
-            label="Select one of the following pdfs...",
-            options=blob_names[1:])
-
-        with st.spinner("Are we waiting for it?..."):         
-            thread = threading.Thread(target=parse_pdfs, args=(directory_path, 
-                                    non_existent_pdfs, st.session_state.email)) 
-            thread.start()
-
-        if book_name: 
-            run_process(book_name, directory_path, non_existent_pdfs)
-            # asyncio.run(run_async(
-            #     *[os.path.join(directory_path, pdf) for pdf in non_existent_pdfs], 
-            # ))
+        select_book(blob_names[1:], directory_path, non_existent_pdfs)
 
 @st.fragment
 def password_reset():
