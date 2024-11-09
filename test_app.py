@@ -288,17 +288,16 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                 }
             )
     
-
-    print(f"Generating a classified output for pdf {pdf_name}...")
-    for idx in range(data_loader_output["page_count"]):  
-        requests.post(
-            URL + "/data_classifier", 
-            json = {
-                "filename": pdf_name, 
-                "email_id": user_email, 
-                "page_number": idx,  
-            }
-        )
+    # print(f"Generating a classified output for pdf {pdf_name}...")
+    # for idx in range(data_loader_output["page_count"]):  
+    #     requests.post(
+    #         URL + "/data_classifier", 
+    #         json = {
+    #             "filename": pdf_name, 
+    #             "email_id": user_email, 
+    #             "page_number": idx,  
+    #         }
+    #     )
 
 async def run_async(pdf_names: List[str], user_email: str, base_directory: str):
     await asyncio.gather(
@@ -342,7 +341,6 @@ def generate_response(
         ["generated_text"]
         .split("Answers:")[1]
     )
-
 
 # client 
 @st.fragment
@@ -479,6 +477,7 @@ def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str):
         [pdf_name
          for pdf_name in pdfs], user_email, directory_path 
     ))
+
 @st.fragment
 def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: str): 
     book_name = st.selectbox(
@@ -607,7 +606,6 @@ with st.sidebar:
                     st.write(":red[There was some issue registering you... Maybe you are already registered? Try the login page]")
                     print(E)
 
-                    
 page_to_func[page.lower()]()
 
 

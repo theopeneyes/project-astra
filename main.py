@@ -11,9 +11,10 @@ from models import SummarizationInputModel
 from models import SummarizationOutputModel
 from models import GeneratedImageModel 
 from models import DataMapPlotInputModel 
-from models import SummaryChapterModel
 from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
+from models import RewriteJSONFileModel
+from models import SummaryChapterModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -52,6 +53,9 @@ from image_utils.encoder import encode_image
 
 from metadata_producers.generate_list import generateList
 from metadata_producers.prompts import about_list_generation_prompt, depth_list_generation_prompt
+
+from metadata_producers.append_about_data import classify_about
+from metadata_producers.prompts import classification_prompt
 
 # loads the variables in the .env file 
 load_dotenv()
@@ -109,6 +113,16 @@ async def home() -> Dict[str, str]:
 
 @app.post("/convert_pdf")
 async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel: 
+    """
+    Input: {
+        filename: name of the book 
+        email_id: email id of the user used as a unique identified 
+        uri: uri of the located file within uploaded_document
+    }
+
+    Function: 
+    Disintegrates the pdf into a set of images to be stored within processed_image directory  
+    """
     # accessing the file blob from the URI 
     pdf_blob = bucket.blob(pdf_file.uri)
     
@@ -147,6 +161,16 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
 
 @app.post("/detect_lang") 
 async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
+    """
+    Input: {
+        filename: Name of the file to detect the language of 
+        email_id: Email id of the user 
+    }
+
+    Function: 
+    Detects the language of the pdf by sampling a few pages from within it. 
+    """
+
     image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
     with image_blob.open("r") as f: 
         images: List[Dict] = json.load(fp=f)
@@ -339,8 +363,52 @@ async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterMod
         chapter_name=summ_input.chapter_name, 
     ) 
 
-# @app.get("/rewrite_json")
-# async def rewrite_json(summ_input: SummaryChapterModel) -> 
+# always executed after the summary has been classified 
+# the input is a rewrite_target which is a paragraph node to be rewritten with more attributes  
+@app.get("/rewrite_json")
+async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileModel: 
+    # picking the relevant book 
+    blob = bucket.blob(os.path.join(
+        rewrite_target.email_id, 
+        "text_extract", 
+        f"{rewrite_target.filename}_{rewrite_target.node_id}.json"
+    ))
+    
+    # after reading this json content you process it with the metadata_generators
+    with blob.open("r") as f:  
+        blob_json_content = json.load(fp=f)
+
+    # open the classified summary blob from the summaries section 
+    classified_summary_blob = bucket.blob(os.path.join(
+        rewrite_target.email_id, 
+        "summaries", 
+        rewrite_target.filename, 
+        f"{blob_json_content['heading_identifier']}_classified_summary.json"
+    )) 
+
+    with classified_summary_blob.open("r") as f:   
+        generated_list = json.load(fp=f)
+
+    # classify the prompt 
+    comprehensive_node = classify_about(
+        HF_TOKEN, 
+        blob_json_content, 
+        generated_list, 
+        classification_prompt
+    )
+
+    # write this onto intermediate_json directory 
+    intermediate_json_blob = bucket.blob(os.path.join(
+        rewrite_target.email_id, 
+        "intermediate_json", 
+        f"{rewrite_target.filename}_{rewrite_target.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(comprehensive_node, fp = f) 
+    
+    # process complete 
+    return rewrite_target
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:

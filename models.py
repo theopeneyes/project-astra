@@ -50,5 +50,5 @@ class GeneratedImageModel(BaseModel):
 class SummaryChapterModel(AbsoluteBaseModel): 
     chapter_name: str 
 
-class SummarizedLabelOutputModel(AbsoluteBaseModel): 
-    pass 
+class RewriteJSONFileModel(AbsoluteBaseModel):
+    node_id: str
