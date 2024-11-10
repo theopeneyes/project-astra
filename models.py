@@ -9,6 +9,7 @@ class AbsoluteBaseModel(BaseModel):
 # sending uri's along with user email 
 class DataLoaderModel(AbsoluteBaseModel): 
     uri: str 
+    language: str 
 
 # output from data loader 
 class StructuredJSONModel(AbsoluteBaseModel): 
@@ -21,6 +22,7 @@ class DataClassifierModel(AbsoluteBaseModel):
 # summarization model 
 class SummarizationInputModel(AbsoluteBaseModel): 
     chapter_title: str 
+    language: str 
 
 class SummarizationOutputModel(AbsoluteBaseModel): 
     status: bool 
@@ -49,6 +51,8 @@ class GeneratedImageModel(BaseModel):
 
 class SummaryChapterModel(AbsoluteBaseModel): 
     chapter_name: str 
+    language: str 
 
 class RewriteJSONFileModel(AbsoluteBaseModel):
     node_id: int  
+    language: str 

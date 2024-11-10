@@ -11,7 +11,7 @@ import re
 def parse_images(models: List, config,   
               images: List[str], prompt: str,
               clause_prompt: str,
-              messages: List) -> List[str]:
+              messages: List, language: str) -> List[str]:
 
     title: str | None = None
     new_prompt: str
@@ -44,9 +44,13 @@ def parse_images(models: List, config,
             if re.findall(r"<title>(.*?)</title>", output[-1])[0] != title:
                 title = re.findall(r"<title>(.*?)</title>", output[-1])[0]
 
-        except Exception as e:
-            messages[0]["content"][0]["text"] = new_prompt 
-            messages[0]["content"][1]["image_url"]["url"] = (
+        except Exception as _:
+            system_msg: str = messages[0]["content"][0]["text"]
+            system_msg = system_msg.format(language)
+            messages[0]["content"][0]["text"] = system_msg
+
+            messages[1]["content"][0]["text"] = new_prompt 
+            messages[1]["content"][1]["image_url"]["url"] = (
                 f"data:image/jpeg;base64,{encode_image(image)}") 
 
             response = gpt4o.chat.completions.create(

@@ -2,6 +2,15 @@ from typing import Dict, List
 
 messages: List[Dict] = [
     {
+      "role": "system", 
+      "content": [
+        {
+          "type": "text", 
+          "text": "Generate your answer in {} language.", 
+        }, 
+      ]
+    }, 
+    {
       "role": "user",
       "content": [
         {

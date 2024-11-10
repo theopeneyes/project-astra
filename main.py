@@ -71,6 +71,7 @@ load_dotenv()
 PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY") 
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY")
+GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY")
 HF_TOKEN: str = os.environ.get("HF_TOKEN")
 BUCKET_NAME: str = os.environ.get("BUCKET_NAME")
 
@@ -207,6 +208,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         prompt=prompt, 
         clause_prompt=clause_prompt, 
         messages=messages,  
+        language=user_image_data.language, 
     )
 
     print(f"processing step is done for filename {user_image_data.filename}...")
@@ -254,7 +256,6 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 
         chapter_texts.clear()
     
-            
     return StructuredJSONModel(
         email_id=user_image_data.email_id, 
         filename=user_image_data.filename, 
@@ -273,7 +274,7 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
         content = f.read()
     
     if content:  
-        summary: str = summarize_texts(content, HF_TOKEN)
+        summary: str = summarize_texts(content, summarization.language, HF_TOKEN)
         with summary_blob.open("w") as f: 
             f.write(summary)
     else: 
@@ -304,42 +305,6 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
        
     return text_json
 
-@app.post("/create_img")
-async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
-    with tempfile.TemporaryDirectory() as tmp_dir: 
-        data = np.hstack((np.array(img_model.X_col).reshape(-1, 1), 
-                   np.array(img_model.Y_col).reshape(-1, 1)))  
-
-        # scaling the data 
-        data = data * 50 
-        labels = np.array(img_model.labels).reshape(-1,)
-
-        fig, _ = datamapplot.create_plot(
-            data, labels, 
-            noise_label="Unimportant topics", 
-            title="Topic Map", 
-            sub_title="Visual representation of topics found within the book", 
-            label_font_size=11, 
-        )
-
-        fig.savefig(f"{tmp_dir}/saved_img.jpg")
-        matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
-
-        return GeneratedImageModel(
-            encoded_image=encode_image(matplotlib_fig)
-        )
-
-@app.get("/interactive_plot/{email_id}/{filename}")
-async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
-    blob_path: str = f"{email_id}/rendered_html/{filename}.html"  
-    blob = bucket.blob(blob_path)
-    with blob.open("r") as html: 
-        content = html.read()
-
-    return HTMLResponse(
-        content = content 
-    ) 
-
 @app.post("/summary_classifier")
 async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterModel: 
     summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
@@ -350,6 +315,7 @@ async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterMod
     content = generateList(summary_content, 
                            about_list_generation_prompt, 
                            depth_list_generation_prompt, 
+                           summ_input.language, 
                            HF_TOKEN)
 
     classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
@@ -394,7 +360,8 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileM
         HF_TOKEN, 
         blob_json_content, 
         generated_list, 
-        classification_prompt
+        classification_prompt, 
+        rewrite_target.language, 
     )
 
     # write this onto intermediate_json directory 
@@ -409,6 +376,43 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileM
     
     # process complete 
     return rewrite_target
+
+@app.post("/create_img")
+async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
+    with tempfile.TemporaryDirectory() as tmp_dir: 
+        data = np.hstack((np.array(img_model.X_col).reshape(-1, 1), 
+                   np.array(img_model.Y_col).reshape(-1, 1)))  
+
+        # scaling the data 
+        data = data * 50 
+        labels = np.array(img_model.labels).reshape(-1,)
+
+        fig, _ = datamapplot.create_plot(
+            data, labels, 
+            noise_label="Unimportant topics", 
+            title="Topic Map", 
+            sub_title="Visual representation of topics found within the book", 
+            label_font_size=11, 
+        )
+
+        fig.savefig(f"{tmp_dir}/saved_img.jpg")
+        matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
+
+        return GeneratedImageModel(
+            encoded_image=encode_image(matplotlib_fig)
+        )
+
+@app.get("/interactive_plot/{email_id}/{filename}")
+async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
+    blob_path: str = f"{email_id}/rendered_html/{filename}.html"  
+    blob = bucket.blob(blob_path)
+    with blob.open("r") as html: 
+        content = html.read()
+
+    return HTMLResponse(
+        content = content 
+    ) 
+
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:

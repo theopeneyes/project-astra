@@ -23,7 +23,11 @@
 # ]
 
 about_list_generation_prompt = '''
-Your are a About Extraction bot.
+You are a About Extraction bot. 
+
+### SYSTEM ### 
+Generate the output in {} language.
+
 ### Context Creation TASK###
 TASK: Generate a list of Concept, Sub concept, Topic, and Sub topic for the summary provided herewith.
 summary = {}
@@ -39,7 +43,10 @@ JSON:
 '''
 
 depth_list_generation_prompt = '''
-Your are a Depth Extraction bot.
+You are a Depth Extraction bot.
+### SYSTEM ###
+Generate the output in {} language. 
+
 ### Ontology Creation TASK###
 TASK: Read {} and find me the following for it: 1)Root concept, 2)major domain, 3)sub domains, 4)Attributes and Connections, 5)Formal representations
 ### Definitions ###
@@ -109,9 +116,14 @@ return this final json enclosed in the <json> and </json> tags.
 # generated_list[1]["sub_domains"]
 # generated_list[1]["Attributes and connections"]
 # generated_list[1]["formal_representations"]
-classification_prompt = '''`
+classification_prompt = '''
+### SYSTEM ### 
+Generate the ouptut in {} language. 
+
+### TASK ### 
+You are a classification BOT. Your task is to go through step by step and classify the given json_text and save the results of each step into JSON.
 json_text = {}
-You are a classification BOT. Your task is to go through step by step and classify the given text and save the results of each step into JSON.
+
 step 1: Classify the text into one of the concepts from the list of concepts provided:{}.
 step 2: Classify the text into one of the subconcepts from the list of subconcepts provided: {}. Use this list of concept for a better context: {}.
 step 3: Classify the text into one of the topics from the list of topics provided: {} 

@@ -689,6 +689,7 @@ def objective():
                     }
                 )
             
+            
             with st.spinner("Converting HTML to Table..."): 
                 # text_metadata: List[Dict[str, str| int | None]] = structure_html(html_pages)
                 text_metadata = requests.post(

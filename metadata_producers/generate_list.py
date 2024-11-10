@@ -6,10 +6,11 @@ import re
 # list generation prompts imported from the other file 
 
 # add summary to it 
-def generateList(summary, 
-                 about_list_generation_prompt, 
-                 depth_list_generation_prompt, 
-                 token) -> List[Dict]:    
+def generateList(summary: str , 
+                 about_list_generation_prompt: str , 
+                 depth_list_generation_prompt: str , 
+                 language: str, 
+                 token: str) -> List[Dict]:    
 
     about_json: Dict = {}
     depth_json: Dict = {}
@@ -18,7 +19,7 @@ def generateList(summary,
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
     payload = {
-        "inputs": about_list_generation_prompt.format(summary), 
+        "inputs": about_list_generation_prompt.format(language, summary), 
         "parameters": {"max_new_tokens": 600, "temperature":0.1}
     }
 
@@ -38,7 +39,7 @@ def generateList(summary,
     
     #depth extraction
     payload_d = {
-        "inputs": depth_list_generation_prompt.format(summary),
+        "inputs": depth_list_generation_prompt.format(language, summary),
         "parameters": {"max_new_tokens": 600, "temperature":0.1}
     }
 

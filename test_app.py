@@ -3,7 +3,8 @@ import os
 import json 
 
 from google.cloud import storage
-from typing import Dict, List, Set
+from typing import Dict, List 
+
 import pandas as pd 
 from dotenv import load_dotenv
 import datamapplot
@@ -231,6 +232,7 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 
 ### Software code questions and Answers:
 """
+
 prompts: Dict[str, str] = {
     "True/False": true_false_prompt,
     "Fill in the blanks": fill_in_the_blanks_prompt,
@@ -246,6 +248,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
         with pdf_blob.open("wb") as f:
             f.write(fr.read())
 
+    
     # Asking the endpoint to convert the pdf
     print(f"Currently at converting stage for pdf {pdf_name}...")
     convert_response = requests.post(
@@ -256,15 +259,31 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
         })
     
     convert_output : Dict = convert_response.json()
+
+    print("Detecting the language in which the book is written")
+    language_response = requests.post(
+        URL + "/detect_lang", 
+        json = {
+            "email_id": user_email, 
+            "filename": pdf_name, 
+        }
+    )
+
+    text_language: str = language_response.json()["detected_language"]
+    print(text_language)
     
     print(f"Currently at data_loading and processing state for {pdf_name}...") 
     data_loader_response = requests.post(
         URL + "/data_loader", 
-        json = convert_output, 
+        json = {
+            "filename": pdf_name, 
+            "email_id": user_email, 
+            "uri": convert_output["uri"], 
+            "detected_language": text_language
+        }, 
     )
 
     print(f"Currently at summarizing stage for pdf {pdf_name}...")
-    data_loader_output: Dict = data_loader_response.json()
 
     # generating summary 
     summarized_blob_path: str = f"{user_email}/summaries/{pdf_name}/" 
@@ -284,10 +303,44 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                 json = {
                     "email_id": user_email, 
                     "filename": pdf_name, 
-                    "chapter_title": blob.name.split("/")[3], 
+                    "chapter_title": blob.name.split("/")[3].split("_content")[0], 
+                    "language": text_language, 
+                }
+            )
+            
+            requests.post(
+                URL + "/summary_classifier", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "chapter_name": blob.name.split("/")[3].split("_content")[0], 
+                    "language": text_language, 
                 }
             )
     
+    print("Classified our data and rewriting it within intermediate_json folder")
+    text_extract_blob = gcs_client.list_blobs(
+        BUCKET_NAME, 
+        prefix=f"{user_email}/text_extract/", 
+        delimiter="/"
+    )
+
+    for paragraph_node_blob in text_extract_blob:
+        if pdf_name in paragraph_node_blob.name: 
+            requests.post(
+                URL + "/rewrite_json", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "language": text_language, 
+                }
+            )
+        
     # print(f"Generating a classified output for pdf {pdf_name}...")
     # for idx in range(data_loader_output["page_count"]):  
     #     requests.post(
@@ -378,7 +431,7 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str]):
         # Using the sub domains obtained above to filter the dataframe  
         # TODO: Use groq api for this generation  
             filtered_df: pd.DataFrame = json_df[json_df.apply(
-                lambda x: any([ topic in x["major_domains"] + x["concepts"] + x["sub_domains"]
+                lambda x: any([ topic in x["major_domains"] + x["Concept"] + x["sub_domains"]
                             for topic in selected_topics]), axis=1)]
 
             texts: List[str] = filtered_df["text"].to_list()
@@ -403,6 +456,16 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str]):
 
         st.download_button(label="Download QNA", data=content, file_name="qna.txt", mime="text/plain")
 
+# def generate_unique_values(items: List[str| List[str]]) -> List[str]: 
+#     unique_values: List[str] = [] 
+#     for item in items: 
+#         if isinstance(item, str): 
+#             unique_values.append(unique_values)
+#         elif isinstance(item, list): 
+#             unique_values = unique_values + item
+    
+#     return list(set(unique_values)) 
+
 @st.fragment
 def run_process(book_name: str): 
     
@@ -411,7 +474,7 @@ def run_process(book_name: str):
         # st.session_state.page = "pdf_project_page"
             classifier_blobs = gcs_client.list_blobs(
                 BUCKET_NAME, 
-                prefix=f"{st.session_state.email}/json_data/", 
+                prefix=f"{st.session_state.email}/intermediate_json/", 
                 delimiter="/", 
             )
 
@@ -427,13 +490,17 @@ def run_process(book_name: str):
         # essentially a for loop to sum a list of lists and then get unique sub_domains 
         # out of it. Out of which we pick three at random. This code may be changed later.  
 
-        # let's also include major domains and concepts as well  
-
-        sub_domains: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))  
-        major_domains: List[str] =  list(set(sum(json_df["major_domains"].to_list(), []))) 
-        concepts: List[str] = list(set(sum(json_df["sub_domains"].to_list(), [])))        
-
+        # let's also include major domains and concepts as well 
+        # st.json(json_outputs)
+        st.dataframe(json_df)
+        # print(json_df["sub_domains"].to_list()) 
+        # print(type(json_df["sub_domains"].to_list())) 
+        sub_domains: List[str] = list(set(json_df["sub_domains"].to_list()))   
+        major_domains: List[str] =  list(set(json_df["major_domains"].to_list())) 
+        concepts: List[str] = list(set(json_df["Concept"].to_list()))         
+        
         topics: List[str] = sub_domains + major_domains + concepts 
+        
 
         # Converting into embeddings  
         embeds_2d: pd.DataFrame = visualizer(topics)
