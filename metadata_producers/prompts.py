@@ -80,24 +80,20 @@ Step 2: Classify the text into one of the items from the list provided below: {}
 Step 3: Classify the text into one of the items from the list provided below: {}
 Step 4: Classify the text into one of the items from the list provided below: {}. Use Sub concept {} as contect to the sub topic you are supposed to extract. 
 Then, add your classifications to a JSON in the following format:
-{
-    'Concept': str,
-    'Sub concept': str,
-    'Topic': str,
-    'Sub topic': str,
-    "root_concept": str,
-    "major_domains": str,
-    "sub_domains": str,
-    "Attributes and connections": {
-    str: str
-  },
-    "formal_representations": {
+
+'Concept': str,
+'Sub concept': str,
+'Topic': str,
+'Sub topic': str,
+"root_concept": str,
+"major_domains": str,
+"sub_domains": str,
+"Attributes and connections": Dict[str,str]
+"formal_representations": Dict[ 
     "Diagram": str,
     "Model": str
-  }
-}
+]
 
- 
 return this final json enclosed in the <json> and </json> tags.
 ### JSON: ###
 '''
@@ -127,19 +123,21 @@ step 8: For the text, select a key-value pair of Attributes and connections from
 step 9: Classify the text into one of the Formal representations from the list of Formal representations provided: {}.
 
 The JSON you return should look like following:
-{
-    'Concept': str,
-    'Sub concept': str,
-    'Topic': str,
-    'Sub topic': str,
-    "root_concept": str,
-    "major_domains": str,
-    "sub_domains": str,
-    "Attributes and connections": Dict[str, str],
-    "formal_representations": {
-        "Diagram": str,
-        "Model": str
-    }
-}
+'Concept': str,
+'Sub concept': str,
+'Topic': str,
+'Sub topic': str,
+"root_concept": str,
+"major_domains": str,
+"sub_domains": str,
+"Attributes and connections": Dict[str,str]
+"formal_representations": Dict[ 
+    "Diagram": str,
+    "Model": str
+]
+
+### Instruction ### 
+Enclose your output within <json> tags. 
+
 ### OUTPUT JSON ###
 '''

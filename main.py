@@ -267,7 +267,7 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 async def summarize(summarization: SummarizationInputModel) -> SummarizationOutputModel: 
     chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
     chapter_name: str = summarization.chapter_title.split("_content")[0]
-    chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}") 
+    chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}_content.txt") 
     summary_blob = bucket.blob(f"{chapter_path}/{chapter_name}_summary.txt")
     with chapter_blob.open("r") as f: 
         content = f.read()
@@ -277,7 +277,7 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
         with summary_blob.open("w") as f: 
             f.write(summary)
     else: 
-        logging.info("Empty text in chapter identified! content: {content}")
+        logging.info(f"Empty text in chapter identified! content: {content}")
 
     return SummarizationOutputModel(
         filename=summarization.filename, 
@@ -365,7 +365,7 @@ async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterMod
 
 # always executed after the summary has been classified 
 # the input is a rewrite_target which is a paragraph node to be rewritten with more attributes  
-@app.get("/rewrite_json")
+@app.post("/rewrite_json")
 async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileModel: 
     # picking the relevant book 
     blob = bucket.blob(os.path.join(

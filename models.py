@@ -51,4 +51,4 @@ class SummaryChapterModel(AbsoluteBaseModel):
     chapter_name: str 
 
 class RewriteJSONFileModel(AbsoluteBaseModel):
-    node_id: str
+    node_id: int  
