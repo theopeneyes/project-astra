@@ -273,7 +273,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
     print(text_language)
     
     print(f"Currently at data_loading and processing state for {pdf_name}...") 
-    data_loader_response = requests.post(
+    requests.post(
         URL + "/data_loader", 
         json = {
             "filename": pdf_name, 
@@ -340,6 +340,15 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                     "language": text_language, 
                 }
             )
+    
+    # putting it all in one directory  
+    requests.post(
+        URL + "/preprocess_for_graph", 
+        json = {
+            "filename": pdf_name, 
+            "email_id": user_email, 
+        } 
+    )
         
     # print(f"Generating a classified output for pdf {pdf_name}...")
     # for idx in range(data_loader_output["page_count"]):  

@@ -56,7 +56,9 @@ from metadata_producers.prompts import about_list_generation_prompt, depth_list_
 
 from metadata_producers.append_about_data import classify_about
 from metadata_producers.prompts import classification_prompt
+from generation.groq_formatter import messages as groq_messages 
 
+from groq import Groq 
 # loads the variables in the .env file 
 load_dotenv()
 
@@ -89,6 +91,7 @@ config = genai.GenerationConfig(
 # initializing the model clients 
 gemini = genai.GenerativeModel(model_name="gemini-1.5-flash-001")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
+groqAi = Groq(api_key=GROQ_API_KEY)
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -377,6 +380,34 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileM
     # process complete 
     return rewrite_target
 
+@app.post("/preprocess_for_graph")
+async def push_to_json(base_model: AbsoluteBaseModel) -> AbsoluteBaseModel: 
+    blobs = gcs_client.list_blobs(
+        BUCKET_NAME, 
+        prefix=os.path.join(
+            base_model.email_id, 
+            "intermediate_json/", 
+        ), 
+        delimiter="/"
+    )
+
+    json_blob = bucket.blob(os.path.join(
+        base_model.email_id, 
+        "json_data", 
+        f"{base_model.filename}.json", 
+    ))
+
+    all_jsons: List = []
+    for blob in blobs: 
+        if base_model.filename in blob.name: 
+            with blob.open("r") as jason: 
+                all_jsons.append(json.load(fp=jason)) 
+    
+    with json_blob.open("w") as all_in_one: 
+        json.dump(all_jsons, fp=all_in_one)
+    
+    return base_model  
+
 @app.post("/create_img")
 async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
     with tempfile.TemporaryDirectory() as tmp_dir: 
@@ -417,12 +448,13 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str]:
     qna_prompt: str = prompts[context.question_type]
+    
     qna: str = generate_response(
-       prompt=qna_prompt, 
-       context=context.context, 
-       hf_token=HF_TOKEN, 
-       model="mistral",  
-       topics=context.topics, 
+        messages=groq_messages, 
+        prompt=qna_prompt, 
+        context=context.context, 
+        topics=context.topics, 
+        groqAi=groqAi, 
     )
     
     return {"output": qna}

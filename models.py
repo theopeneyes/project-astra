@@ -32,6 +32,7 @@ class GenerationContext(AbsoluteBaseModel):
     topics: List[str]
     context: str
     question_type: str
+    language: str
 
 # encoded images list 
 class EncodedImages(AbsoluteBaseModel): 

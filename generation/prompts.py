@@ -136,7 +136,6 @@ You are a Multiple Choice Question Generator Bot. Your task is to create questio
 
 ### Question Answers:
 """
-
 computational_questions_prompt: str = """
 You are a Computational Question Generator Bot. Your task is to create question as per instructions
  
@@ -165,7 +164,6 @@ You are a Computational Question Generator Bot. Your task is to create question 
 
 ### Question Answers:
 """
-
 software_code_questions_prompt: str ="""
 You are a Software writing Question Generator Bot. Your task is to create question as per instructions
  
@@ -197,8 +195,6 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 
 ### Question Answers:
 """
-
-
 prompts: Dict[str, str] = {
     "True/False": true_false_prompt,
     "Fill in the blanks": fill_in_the_blanks_prompt,
