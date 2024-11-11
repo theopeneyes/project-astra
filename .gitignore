@@ -8,3 +8,4 @@ ignore.py
 .env_bin
 .secrets
 .anam.py
+testj.py

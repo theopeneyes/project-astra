@@ -5,7 +5,6 @@ import re
 import logging 
 
 def append_about(token: str, about_metadata_prompt: str, json_list: List[Dict], generated_list: str):
-    # What list is it iterating over? 
     for item in json_list:
         about_metadata_prompt = about_metadata_prompt.format(
             item["text"], 
