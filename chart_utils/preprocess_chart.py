@@ -9,9 +9,10 @@ items: List[str] = ["Canadian Football","Green Infrastructure","Energy Efficienc
 
 def visualizer(items: List[str]) -> pd.DataFrame: 
     # this function converts a list of topics to semantic vectors 
+    items = [item for item in items if isinstance(item, str)]
     tokenized_list = [item.split() for item in items]
     model = Word2Vec(sentences=tokenized_list, vector_size=100, window=5, min_count=1, workers=4)
-    
+
     word_vectors = []
     for word in items: 
         sentence_vector = np.zeros((100,)) 

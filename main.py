@@ -15,6 +15,7 @@ from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
 from models import RewriteJSONFileModel
 from models import SummaryChapterModel
+from models import ConvertPDFModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -38,6 +39,7 @@ from generation.generate import generate_response
 from generation.prompts import prompts 
 
 from summarizer.summarize import summarize_texts
+from summarizer.prompts import summarization_prompt
 
 from language_detection.detector import detect_language
 from language_detection.prompts import language_detection_prompt
@@ -58,9 +60,10 @@ from metadata_producers.append_about_data import classify_about
 from metadata_producers.prompts import classification_prompt
 from generation.groq_formatter import messages as groq_messages 
 
+
 from groq import Groq 
 # loads the variables in the .env file 
-load_dotenv()
+load_dotenv(override=True)
 
 # environment variables: configured in .env file
 # these variables will be instantiated once the server starts and 
@@ -116,7 +119,7 @@ async def home() -> Dict[str, str]:
 
 
 @app.post("/convert_pdf")
-async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel: 
+async def convert_pdf(pdf_file: ConvertPDFModel) -> ConvertPDFModel: 
     """
     Input: {
         filename: name of the book 
@@ -156,7 +159,7 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
             json.dumps(encoded_images, ensure_ascii=True)
         )
 
-    return DataLoaderModel(
+    return ConvertPDFModel(
         filename=pdf_file.filename, 
         email_id=pdf_file.email_id, 
         uri=json_path, 
@@ -277,11 +280,15 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
         content = f.read()
     
     if content:  
-        summary: str = summarize_texts(content, summarization.language, HF_TOKEN)
-        with summary_blob.open("w") as f: 
-            f.write(summary)
+        status, summary = summarize_texts(content, summarization.language, HF_TOKEN, summarization_prompt)
+        if status: 
+            with summary_blob.open("w") as f: 
+                f.write(summary)
+        else: 
+            print("Empty summary here. Bad summarization output from llm")
+            print(summary)
     else: 
-        logging.info(f"Empty text in chapter identified! content: {content}")
+        print(f"Empty text in chapter identified! content: {content}")
 
     return SummarizationOutputModel(
         filename=summarization.filename, 
@@ -301,7 +308,7 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
     op: Dict[str, Dict|str|None|int|List[str]]|str = get_json(t_json, HF_TOKEN) 
     if op != "": 
        # write into gcp 
-        classified_blob_path: str = f"{text_json.email_id}/json_data/{text_json.filename}_{text_json.page_number}.json" 
+        classified_blob_path: str = f"{text_json.email_id}/final_json/{text_json.filename}_{text_json.page_number}.json" 
         cls_blob = bucket.blob(classified_blob_path)
         with cls_blob.open("w") as f:
             json.dump(op, fp=f)
@@ -330,6 +337,7 @@ async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterMod
         filename=summ_input.filename, 
         email_id=summ_input.email_id, 
         chapter_name=summ_input.chapter_name, 
+        language=summ_input.language, 
     ) 
 
 # always executed after the summary has been classified 
@@ -393,7 +401,7 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> AbsoluteBaseModel:
 
     json_blob = bucket.blob(os.path.join(
         base_model.email_id, 
-        "json_data", 
+        "final_json", 
         f"{base_model.filename}.json", 
     ))
 
@@ -454,6 +462,7 @@ async def generate(context: GenerationContext) -> Dict[str, str]:
         prompt=qna_prompt, 
         context=context.context, 
         topics=context.topics, 
+        language=context.language, 
         groqAi=groqAi, 
     )
     

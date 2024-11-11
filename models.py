@@ -28,7 +28,7 @@ class SummarizationOutputModel(AbsoluteBaseModel):
     status: bool 
 
 # generation context model 
-class GenerationContext(AbsoluteBaseModel): 
+class GenerationContext(BaseModel): 
     topics: List[str]
     context: str
     question_type: str
@@ -57,3 +57,6 @@ class SummaryChapterModel(AbsoluteBaseModel):
 class RewriteJSONFileModel(AbsoluteBaseModel):
     node_id: int  
     language: str 
+
+class ConvertPDFModel(AbsoluteBaseModel): 
+    uri: str 

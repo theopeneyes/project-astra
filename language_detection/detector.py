@@ -14,6 +14,7 @@ def detect_language(img_encoding: str, messages: Dict, language_detection_prompt
 
     # extracting the output from the language 
     response_content = response.choices[0].message.content
+    language = "English" # a default language 
     if re.findall(r"<language>(.*?)</language>", response_content):
         language: str = re.findall(r"<language>(.*?)</language>", response_content)[0]
 
