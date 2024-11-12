@@ -45,7 +45,7 @@ Generate lists of each of the above and return them as a JSON.
 "sub_topic": str 
 
 ### Instructions ###
-You MUST enclose your final json output in the <json> tag.
+You MUST write your final Json output in between <json> tags.
 You MUST ensure all the keys are in lower case. 
 JSON:
 '''
@@ -76,7 +76,7 @@ Your output should be a JSON, with each variable being the key and the content c
 
 ####Instructions####:
 Your output must be unambiguous. DO NOT EXPLAIN. 
-You MUST enclose your final json output within <json> tags.
+You MUST write your final JSON output in between <json> tags.
 
 ### OUTPUT ###
 '''

@@ -204,3 +204,18 @@ prompts: Dict[str, str] = {
     "Software Code Questions": software_code_questions_prompt 
 }
 
+qna_validation_prompt: str = """
+Reflect on Previous Attempts:
+Think about any past responses to similar tasks. Identify what went well and any common mistakes. Plan adjustments to avoid repeating errors.
+Thought Process (Step-by-Step Reasoning):
+Break down the task step-by-step to ensure clarity and accuracy.
+{}
+Actions:
+Step 1: Convert the given context into desired question using the following prompt {}
+Step 2: Validate the clarity, conciseness, and context relevance and consolidate them as described in {}
+Observation:
+After each step, check if the output aligns with task requirements. Adjust if necessary.
+Reflection:
+Review the completed answer. Reflect on whether all aspects of the prompt were addressed accurately and concisely.
+Revise if any critical detail is missing or any part of the response fails to meet the prompt’s requirements.
+"""

@@ -7,5 +7,5 @@ You will be provided with the input of an image. There is going to be some conte
 this image. You have to simply identify the language in which this content is written. 
 
 ### Instruction ###
-You MUST encapsulate the identified language within <language> tags. 
+You MUST write the identified language in between <language> tags. 
 """

@@ -14,6 +14,8 @@ class DataLoaderModel(AbsoluteBaseModel):
 # output from data loader 
 class StructuredJSONModel(AbsoluteBaseModel): 
     page_count: int 
+    time: float 
+    token_count: int 
 
 # output from data classifier
 class DataClassifierModel(AbsoluteBaseModel): 
@@ -26,6 +28,8 @@ class SummarizationInputModel(AbsoluteBaseModel):
 
 class SummarizationOutputModel(AbsoluteBaseModel): 
     status: bool 
+    token_count: int
+    time: float 
 
 # generation context model 
 class GenerationContext(BaseModel): 
@@ -46,6 +50,8 @@ class DataMapPlotInputModel(BaseModel):
     
 class DetectedLanguageModel(AbsoluteBaseModel): 
     detected_language: str
+    time: float
+    token_count: int
     
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
@@ -54,9 +60,24 @@ class SummaryChapterModel(AbsoluteBaseModel):
     chapter_name: str 
     language: str 
 
+class SummaryChapterOutputModel(SummaryChapterModel): 
+    time: float 
+    token_count: int 
+
 class RewriteJSONFileModel(AbsoluteBaseModel):
     node_id: int  
     language: str 
 
+class RewriteJSONFileOutputModel(RewriteJSONFileModel):
+    time: float 
+    token_count: int  
+
 class ConvertPDFModel(AbsoluteBaseModel): 
     uri: str 
+
+class ConvertPDFOutputModel(AbsoluteBaseModel): 
+    uri: str 
+    time: float # in seconds 
+
+class PushToJSONModel(AbsoluteBaseModel): 
+    time: float 

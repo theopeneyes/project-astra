@@ -26,3 +26,21 @@ messages: List[Dict] = [
       ]
     }
 ]
+
+summary_message: str = [
+  {
+    "role": "system", 
+    "content": [{
+      "type": "text", 
+      "text": "Generate the output in {} language."
+    }]
+  }, 
+  
+  {
+    "role": "user", 
+    "content": [{
+      "type": "text", 
+      "text": ""
+    }]
+  }
+]

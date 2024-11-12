@@ -2,7 +2,6 @@ from typing import Dict, List
 import requests
 import json 
 import re 
-import logging 
 
 def append_about(token: str, about_metadata_prompt: str, json_list: List[Dict], generated_list: str):
     # What list is it iterating over? 
@@ -32,7 +31,7 @@ def classify_about(token: str,
                    single_json: Dict, 
                    generated_list: Dict, 
                    classification_prompt: str, 
-                   language: str):
+                   language: str, phi_encoder):
 
     API_URL = "https://api-inference.huggingface.co/models/microsoft/Phi-3.5-mini-instruct"
     headers = {"Authorization": f"Bearer {token}"}
@@ -54,14 +53,17 @@ def classify_about(token: str,
 
             "parameters": {"max_new_tokens": 700, "temperature":0.1}
         }
+
+        response = requests.post(API_URL, headers=headers, json=payload)
+        llm_response = (response.json()[0]["generated_text"]
+                        .split("### OUTPUT JSON ###")[1]) 
     except Exception as E: 
         print("Got a key as follows : " + str(E))
         print("The generated list is as follows: ")
         print(json.dumps(generated_list, indent=4)) 
+        llm_response = ""
 
-    response = requests.post(API_URL, headers=headers, json=payload)
-    llm_response = (response.json()[0]["generated_text"]
-                    .split("### OUTPUT JSON ###")[1]) 
+    token_count: int = len(phi_encoder(llm_response)["input_ids"]) 
 
     if re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL): 
         classified_json = re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL)[0]
@@ -72,5 +74,5 @@ def classify_about(token: str,
 
     clean_json = json.loads(classified_json)
     result = {** single_json, **clean_json}
-    return result
+    return result, token_count 
 

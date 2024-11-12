@@ -4,7 +4,11 @@ from typing import Tuple
 from typing import Dict
 
 # summarized document 
-def summarize_texts(text_content: str, language: str,  prompt: str, messages: Dict, token: str, groqAi) -> Tuple[str| None, str] : 
+def summarize_texts(text_content: str, 
+                    language: str,  
+                    prompt: str, 
+                    messages: Dict, 
+                    gpt4o_encoder, gpt4o) -> Tuple[str| None, str] : 
     # TODO: Using an SLM to summarize the document, cannot make the language custom  
 
     # LM Approach 
@@ -26,23 +30,24 @@ def summarize_texts(text_content: str, language: str,  prompt: str, messages: Di
     # response = requests.post(API_URL, headers=headers, json=payload)
 
     # Bigger language model  
-    messages[0]["content"] = messages[0]["content"].format(language)
-    messages[1]["content"] = prompt.format(language, text_content) 
-    completion = groqAi.chat.completions.create(
+    messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
+    messages[1]["content"][0]["text"] = prompt.format(language, text_content) 
+    completion = gpt4o.chat.completions.create(
         messages=messages, 
-        model="llama3-8b-8192", 
+        model="gpt-4o-mini", 
         temperature=0.1
     )
 
     llm_response = completion.choices[0].message.content
+    token_count = len(gpt4o_encoder.encode(llm_response)) 
 
     if re.findall(r"<summary>(.*?)</summary>", llm_response, re.DOTALL): 
         summary = re.findall(r"<summary>(.*?)</summary>", llm_response, re.DOTALL)[0]
     
     if summary == "": 
-        return (None, llm_response) 
+        return (None, llm_response, token_count) 
     else: 
-        return ("done", summary)  
+        return ("done", summary, token_count)  
 
     
         
