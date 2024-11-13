@@ -26,7 +26,7 @@ def generate_response(
     )
 
     llm_response = completion.choices[0].message.content
-    token_count: int = gpt4o_encoder.encode(llm_response)
+    token_count: int = len(gpt4o_encoder.encode(llm_response)) 
 
     # validation of the output 
     system_prompt = messages[0]["content"][0]["text"] 
@@ -40,7 +40,7 @@ def generate_response(
     )
 
     validated_llm_response = completion.choices[0].message.content
-    token_count +=  gpt4o_encoder.encode(validated_llm_response)
+    token_count +=  len(gpt4o_encoder.encode(validated_llm_response)) 
 
     return validated_llm_response, token_count 
 

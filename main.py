@@ -363,7 +363,7 @@ async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterOut
     with summary_blob.open("r") as f: 
         summary_content: str = f.read()
     
-    token_count, content = generateList(summary_content, 
+    content, token_count = generateList(summary_content, 
                            about_list_generation_prompt, 
                            depth_list_generation_prompt, 
                            summ_input.language, 
@@ -437,10 +437,10 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileO
     duration = time.time() - start_time
     # process complete 
     return RewriteJSONFileOutputModel(
-        filename=rewrite_json.filename, 
-        email_id=rewrite_json.email_id, 
-        node_id=rewrite_json.node_id, 
-        language=rewrite_json.language, 
+        filename=rewrite_target.filename, 
+        email_id=rewrite_target.email_id, 
+        node_id=rewrite_target.node_id, 
+        language=rewrite_target.language, 
         time=duration, 
         token_count=token_count, 
     )
@@ -518,7 +518,7 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
 
 
 @app.post("/generate")
-async def generate(context: GenerationContext) -> Dict[str, str | int]:
+async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     start_time: float = time.time()
     qna_prompt: str = prompts[context.question_type]
     qna, token_count = generate_response(

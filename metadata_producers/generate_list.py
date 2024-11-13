@@ -40,8 +40,7 @@ def generateList(summary: str ,
     # adding a system message 
     token_count: int =  0
     messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
-    messages[0]["content"][0]["text"] = about_list_generation_prompt.format(language, summary)
-    about_list_generation_prompt.format(language, summary)
+    messages[1]["content"][0]["text"] = about_list_generation_prompt.format(language, summary)
 
     completion = gpt4o.chat.completions.create(
         messages=messages, 
@@ -51,14 +50,20 @@ def generateList(summary: str ,
 
     llm_response: str = completion.choices[0].message.content
     token_count += len(gpt4o_encoder.encode(llm_response)) 
-    print(llm_response)
 
     if re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL): 
-        about_json = json.loads(
-            re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL)[0])
+        try: 
+            about_json = json.loads(
+                re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL)[0])
+        except Exception as _:
+            print("The output identified is ... ")
+            print(re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL)[0])
     else: 
         print("Encountered a JSON error parsing error from llm output from About Agent...")
-        print(llm_response)
+        print(f"The prompt provided is {about_list_generation_prompt.format(language, summary)}")
+        print(f"The chat completion provided is : {llm_response}")
+        print(json.dumps(messages, indent=4))
+
 
     #TODO: These two tasks should be two seperate agents: Fixme @Jevin
     
@@ -73,7 +78,7 @@ def generateList(summary: str ,
 
 
     messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
-    messages[0]["content"][0]["text"] = depth_list_generation_prompt.format(language, summary)
+    messages[1]["content"][0]["text"] = depth_list_generation_prompt.format(language, summary)
     about_list_generation_prompt.format(language, summary)
     completion = gpt4o.chat.completions.create(
         messages=messages, 
@@ -83,15 +88,19 @@ def generateList(summary: str ,
 
     depth_llm_response: str = completion.choices[0].message.content
     token_count += len(gpt4o_encoder.encode(depth_llm_response)) 
-    print(depth_llm_response)
 
     if re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL): 
-        depth_json = json.loads(
-            re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL)[0])
+        try: 
+            depth_json = json.loads(
+                re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL)[0])
+        except Exception as _: 
+            print("The output identified while identifying depth json is...")
+            print(re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL)[0])
     else: 
         print("Encountered a JSON error parsing error from llm output from Depth Agent...")
-        print(depth_llm_response)
-
+        print(f"The prompt provided is {depth_list_generation_prompt.format(language, summary)}")
+        print(f"The chat completion provided is : {depth_llm_response}")
+        print(json.dumps(messages, indent=4))
 
     return [
         about_json, 
