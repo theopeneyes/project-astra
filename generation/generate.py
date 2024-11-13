@@ -1,27 +1,49 @@
-from .llms import llms 
 from typing import List, Dict 
 
 
 def generate_response(
     messages: List[Dict], 
     prompt: str, 
+    validation_prompt: str, 
     topics: List[str], 
-    context: List[str], 
-    groqAi) -> str: 
+    context: List[str],
+    language: str,  
+    gpt4o_encoder, 
+    gpt4o) -> str: 
 
     prompt = prompt.format(
         str(topics), 
-        context.context, 
+        context, 
     )
 
-    messages[0]["content"] = messages[0]["content"].format(context.language)
-    messages[1]["content"] = messages[1]["content"].format(prompt)
+    messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
+    messages[1]["content"][0]["text"] = prompt
 
-    completion = groqAi.chat.completions.create(
+    completion = gpt4o.chat.completions.create(
         messages=messages, 
-        model="mixtral-8x7b-32768"
+        model="gpt-4o-mini", 
+        temperature=0.1
     )
-    return completion.choices[0].message.content
+
+    llm_response = completion.choices[0].message.content
+    token_count: int = len(gpt4o_encoder.encode(llm_response)) 
+
+    # validation of the output 
+    system_prompt = messages[0]["content"][0]["text"] 
+    validation_prompt = validation_prompt.format(system_prompt, prompt, llm_response)
+    messages[1]["content"][0]["text"] = validation_prompt
+
+    completion = gpt4o.chat.completions.create(
+        messages=messages, 
+        model="gpt-4o-mini", 
+        temperature=0.1
+    )
+    # NLLB to translate the output if it is not in desired language 
+
+    validated_llm_response = completion.choices[0].message.content
+    token_count +=  len(gpt4o_encoder.encode(validated_llm_response)) 
+
+    return validated_llm_response, token_count 
 
 
 

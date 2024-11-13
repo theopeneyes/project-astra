@@ -15,16 +15,24 @@ from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
 from models import RewriteJSONFileModel
 from models import SummaryChapterModel
+from models import ConvertPDFModel
+from models import ConvertPDFOutputModel
+from models import SummaryChapterOutputModel
+from models import RewriteJSONFileOutputModel 
+from models import PushToJSONModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
 from fastapi.responses import HTMLResponse
+from transformers import AutoTokenizer
 
 import PIL 
 import random 
 import os 
 import json
-import logging  
+import time 
+import tiktoken 
+
 import pdf2image as p2i 
 import numpy as np 
 import datamapplot
@@ -35,17 +43,18 @@ from openai import OpenAI
 
 # generation model 
 from generation.generate import generate_response
-from generation.prompts import prompts 
+from generation.prompts import prompts, qna_validation_prompt
 
 from summarizer.summarize import summarize_texts
+from summarizer.prompts import summarization_prompt
 
 from language_detection.detector import detect_language
 from language_detection.prompts import language_detection_prompt
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
-from data_loader.prompts import prompt, clause_prompt 
-from data_loader.opeanai_formatters import messages 
+from data_loader.prompts import generation_prompt, clause_prompt, validation_prompt 
+from data_loader.opeanai_formatters import messages, summary_message as text_message 
 
 from data_classifier.classification_pipeline import get_json
 from google.cloud import storage 
@@ -53,14 +62,12 @@ from image_utils.encoder import encode_image
 
 from metadata_producers.generate_list import generateList
 from metadata_producers.prompts import about_list_generation_prompt, depth_list_generation_prompt
-
 from metadata_producers.append_about_data import classify_about
 from metadata_producers.prompts import classification_prompt
-from generation.groq_formatter import messages as groq_messages 
 
 from groq import Groq 
 # loads the variables in the .env file 
-load_dotenv()
+load_dotenv(override=True)
 
 # environment variables: configured in .env file
 # these variables will be instantiated once the server starts and 
@@ -92,6 +99,8 @@ config = genai.GenerationConfig(
 gemini = genai.GenerativeModel(model_name="gemini-1.5-flash-001")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 groqAi = Groq(api_key=GROQ_API_KEY)
+gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
+phi_encoder = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -115,8 +124,10 @@ async def home() -> Dict[str, str]:
 # async def login_trigger()
 
 
+# No LLM is used in this step. SO we are not charging tokens. 
+# we are however computing the amount of time this endpoint takes to run 
 @app.post("/convert_pdf")
-async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel: 
+async def convert_pdf(pdf_file: ConvertPDFModel) -> ConvertPDFOutputModel: 
     """
     Input: {
         filename: name of the book 
@@ -128,6 +139,7 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
     Disintegrates the pdf into a set of images to be stored within processed_image directory  
     """
     # accessing the file blob from the URI 
+    start_time = time.time()
     pdf_blob = bucket.blob(pdf_file.uri)
     
     images: List[PIL.Image] = p2i.convert_from_bytes(
@@ -155,11 +167,14 @@ async def convert_pdf(pdf_file: DataLoaderModel) -> DataLoaderModel:
         f.write(
             json.dumps(encoded_images, ensure_ascii=True)
         )
+    
+    duration = time.time() - start_time
 
-    return DataLoaderModel(
+    return ConvertPDFOutputModel(
         filename=pdf_file.filename, 
         email_id=pdf_file.email_id, 
         uri=json_path, 
+        time=duration,  
     ) 
         
 
@@ -174,7 +189,8 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     Function: 
     Detects the language of the pdf by sampling a few pages from within it. 
     """
-
+    
+    start_time = time.time()  
     image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
     with image_blob.open("r") as f: 
         images: List[Dict] = json.load(fp=f)
@@ -186,31 +202,45 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     languages : List[str] = []
     for image in chosen_images: 
         encoded_image: str = image["img_b64"]
-        languages.append(detect_language(encoded_image,  messages, language_detection_prompt, gpt4o)) 
+        language, token_count = detect_language(
+            encoded_image, 
+            messages, 
+            language_detection_prompt,
+            gpt4o_encoder, 
+            gpt4o)
+
+        languages.append(language) 
+    
+    duration = time.time() - start_time
     
     return DetectedLanguageModel(
         filename=lng_model.filename, 
         email_id=lng_model.email_id, 
-        detected_language=max(languages, key=languages.count)
+        detected_language=max(languages, key=languages.count),
+        time=duration, 
+        token_count=token_count, 
     ) 
 
 # the data loading endpoint 
 @app.post("/data_loader")
 async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel: 
     # reading the images from the bucket 
+    start_time = time.time()
     image_json_blob = bucket.blob(user_image_data.uri) 
     with image_json_blob.open("r") as img_json: 
         images: List[Dict[str, str]] = json.load(img_json)
 
     print(f"processing step here for pdf {user_image_data.filename}...")
     # sending images to the images function 
-    html_pages: List[str] = parse_images(
-        models=[gemini, gpt4o], 
-        config=config, 
+    html_pages, token_count = parse_images(
+        gpt4o, 
         images=images, 
-        prompt=prompt, 
+        prompt=generation_prompt, 
         clause_prompt=clause_prompt, 
+        validation_prompt=validation_prompt, 
         messages=messages,  
+        text_messages=text_message, 
+        gpt4o_encoder=gpt4o_encoder, 
         language=user_image_data.language, 
     )
 
@@ -259,16 +289,21 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 
         chapter_texts.clear()
     
+    duration = time.time() - start_time
+    
     return StructuredJSONModel(
         email_id=user_image_data.email_id, 
         filename=user_image_data.filename, 
         page_count=len(structured_json), 
+        time=duration, 
+        token_count=token_count, 
     ) 
 
 
 # segerates via chapter and summarizes the chapter  
 @app.post("/summarize")
 async def summarize(summarization: SummarizationInputModel) -> SummarizationOutputModel: 
+    start_time = time.time()
     chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
     chapter_name: str = summarization.chapter_title.split("_content")[0]
     chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}_content.txt") 
@@ -277,15 +312,27 @@ async def summarize(summarization: SummarizationInputModel) -> SummarizationOutp
         content = f.read()
     
     if content:  
-        summary: str = summarize_texts(content, summarization.language, HF_TOKEN)
-        with summary_blob.open("w") as f: 
-            f.write(summary)
-    else: 
-        logging.info(f"Empty text in chapter identified! content: {content}")
+        status, summary, token_count = summarize_texts(
+            content, 
+            summarization.language, 
+            summarization_prompt, 
+            text_message, gpt4o_encoder, gpt4o)
 
+        if status: 
+            with summary_blob.open("w") as f: 
+                f.write(summary)
+        else: 
+            print("Empty summary here. Bad summarization output from llm")
+            print(summary)
+    else: 
+        print(f"Empty text in chapter identified! content: {content}")
+
+    duration = time.time() - start_time 
     return SummarizationOutputModel(
         filename=summarization.filename, 
         email_id=summarization.email_id, 
+        time=duration, 
+        token_count=token_count, 
         status=True
     )
 
@@ -301,7 +348,7 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
     op: Dict[str, Dict|str|None|int|List[str]]|str = get_json(t_json, HF_TOKEN) 
     if op != "": 
        # write into gcp 
-        classified_blob_path: str = f"{text_json.email_id}/json_data/{text_json.filename}_{text_json.page_number}.json" 
+        classified_blob_path: str = f"{text_json.email_id}/final_json/{text_json.filename}_{text_json.page_number}.json" 
         cls_blob = bucket.blob(classified_blob_path)
         with cls_blob.open("w") as f:
             json.dump(op, fp=f)
@@ -309,33 +356,42 @@ async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel
     return text_json
 
 @app.post("/summary_classifier")
-async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterModel: 
+async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterOutputModel: 
+    start_time = time.time()
     summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
     summary_blob = bucket.blob(summary_path)
     with summary_blob.open("r") as f: 
         summary_content: str = f.read()
     
-    content = generateList(summary_content, 
+    content, token_count = generateList(summary_content, 
                            about_list_generation_prompt, 
                            depth_list_generation_prompt, 
                            summ_input.language, 
-                           HF_TOKEN)
+                           text_message, 
+                           gpt4o_encoder, 
+                           gpt4o)
 
     classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
     classified_summary_blob = bucket.blob(classified_summary_path)
     with classified_summary_blob.open("w") as f: 
         f.write(json.dumps(content))
+    
+    duration = float(time.time() - start_time) 
 
-    return SummaryChapterModel(
+    return SummaryChapterOutputModel(
         filename=summ_input.filename, 
         email_id=summ_input.email_id, 
         chapter_name=summ_input.chapter_name, 
+        language=summ_input.language, 
+        time=duration, 
+        token_count = token_count
     ) 
 
 # always executed after the summary has been classified 
 # the input is a rewrite_target which is a paragraph node to be rewritten with more attributes  
 @app.post("/rewrite_json")
-async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileModel: 
+async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileOutputModel: 
+    start_time = time.time()
     # picking the relevant book 
     blob = bucket.blob(os.path.join(
         rewrite_target.email_id, 
@@ -359,12 +415,13 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileM
         generated_list = json.load(fp=f)
 
     # classify the prompt 
-    comprehensive_node = classify_about(
+    comprehensive_node, token_count = classify_about(
         HF_TOKEN, 
         blob_json_content, 
         generated_list, 
         classification_prompt, 
         rewrite_target.language, 
+        phi_encoder,  
     )
 
     # write this onto intermediate_json directory 
@@ -377,11 +434,20 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileM
     with intermediate_json_blob.open("w") as f: 
         json.dump(comprehensive_node, fp = f) 
     
+    duration = time.time() - start_time
     # process complete 
-    return rewrite_target
+    return RewriteJSONFileOutputModel(
+        filename=rewrite_target.filename, 
+        email_id=rewrite_target.email_id, 
+        node_id=rewrite_target.node_id, 
+        language=rewrite_target.language, 
+        time=duration, 
+        token_count=token_count, 
+    )
 
 @app.post("/preprocess_for_graph")
-async def push_to_json(base_model: AbsoluteBaseModel) -> AbsoluteBaseModel: 
+async def push_to_json(base_model: AbsoluteBaseModel) -> PushToJSONModel: 
+    start_time: float = time.time()
     blobs = gcs_client.list_blobs(
         BUCKET_NAME, 
         prefix=os.path.join(
@@ -393,7 +459,7 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> AbsoluteBaseModel:
 
     json_blob = bucket.blob(os.path.join(
         base_model.email_id, 
-        "json_data", 
+        "final_json", 
         f"{base_model.filename}.json", 
     ))
 
@@ -406,10 +472,15 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> AbsoluteBaseModel:
     with json_blob.open("w") as all_in_one: 
         json.dump(all_jsons, fp=all_in_one)
     
-    return base_model  
+    return PushToJSONModel(
+        filename=base_model.filename, 
+        email_id=base_model.email_id, 
+        time=time.time() - start_time
+    ) 
 
 @app.post("/create_img")
 async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
+    start_time: float = time.time()
     with tempfile.TemporaryDirectory() as tmp_dir: 
         data = np.hstack((np.array(img_model.X_col).reshape(-1, 1), 
                    np.array(img_model.Y_col).reshape(-1, 1)))  
@@ -430,7 +501,8 @@ async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel:
         matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
 
         return GeneratedImageModel(
-            encoded_image=encode_image(matplotlib_fig)
+            encoded_image=encode_image(matplotlib_fig), 
+            time=time.time() - start_time
         )
 
 @app.get("/interactive_plot/{email_id}/{filename}")
@@ -446,16 +518,19 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
 
 
 @app.post("/generate")
-async def generate(context: GenerationContext) -> Dict[str, str]:
+async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
+    start_time: float = time.time()
     qna_prompt: str = prompts[context.question_type]
-    
-    qna: str = generate_response(
-        messages=groq_messages, 
+    qna, token_count = generate_response(
+        messages=text_message, 
         prompt=qna_prompt, 
+        validation_prompt=qna_validation_prompt, 
         context=context.context, 
         topics=context.topics, 
-        groqAi=groqAi, 
+        language=context.language, 
+        gpt4o_encoder=gpt4o_encoder, 
+        gpt4o=gpt4o, 
     )
     
-    return {"output": qna}
+    return {"output": qna, "time": time.time() - start_time, "token_count": token_count}
      

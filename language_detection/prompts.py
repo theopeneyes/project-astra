@@ -6,5 +6,6 @@ of content which is present within the page.
 You will be provided with the input of an image. There is going to be some content within 
 this image. You have to simply identify the language in which this content is written. 
 
-Encapsulate the identified language within <language> tags in your output. 
+### Instruction ###
+You MUST write the identified language in between <language> tags. 
 """

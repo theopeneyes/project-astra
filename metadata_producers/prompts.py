@@ -37,8 +37,16 @@ summary = {}
 3. topic: A topic is a broad subject or area of interest.
 4. sub_topic: a subtopic is a more specific aspect or division within that larger topic.
 Generate lists of each of the above and return them as a JSON.
+
+### JSON Example 
+"concept": str 
+"sub_concept": str 
+"topic": str 
+"sub_topic": str 
+
 ### Instructions ###
-enclose your final json output in the <json> tag.
+You MUST write your final Json output in between <json> tags.
+You MUST ensure all the keys are in lower case. 
 JSON:
 '''
 
@@ -68,7 +76,7 @@ Your output should be a JSON, with each variable being the key and the content c
 
 ####Instructions####:
 Your output must be unambiguous. DO NOT EXPLAIN. 
-Enclose your final json output within <json> tags.
+You MUST write your final JSON output in between <json> tags.
 
 ### OUTPUT ###
 '''
@@ -88,10 +96,10 @@ Step 3: Classify the text into one of the items from the list provided below: {}
 Step 4: Classify the text into one of the items from the list provided below: {}. Use Sub concept {} as contect to the sub topic you are supposed to extract. 
 Then, add your classifications to a JSON in the following format:
 
-'Concept': str,
-'Sub concept': str,
-'Topic': str,
-'Sub topic': str,
+"concept": str,
+"sub_concept": str,
+"topic": str,
+"sub_topic": str,
 "root_concept": str,
 "major_domains": str,
 "sub_domains": str,
@@ -101,7 +109,9 @@ Then, add your classifications to a JSON in the following format:
     "Model": str
 ]
 
-return this final json enclosed in the <json> and </json> tags.
+### INSTRUCTION ###
+You MUST encapsulate the JSON within <json> tags. 
+
 ### JSON: ###
 '''
 
@@ -135,10 +145,10 @@ step 8: For the text, select a key-value pair of Attributes and connections from
 step 9: Classify the text into one of the Formal representations from the list of Formal representations provided: {}.
 
 The JSON you return should look like following:
-'Concept': str,
-'Sub concept': str,
-'Topic': str,
-'Sub topic': str,
+'concept': str,
+'sub_concept': str,
+'topic': str,
+'sub_topic': str,
 "root_concept": str,
 "major_domains": str,
 "sub_domains": str,
@@ -149,7 +159,7 @@ The JSON you return should look like following:
 ]
 
 ### Instruction ### 
-strictely enclose your output within <json> and </json> tags. 
+Enclose your output within <json> tags. 
 
 ### OUTPUT JSON ###
 '''

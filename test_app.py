@@ -279,7 +279,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
             "filename": pdf_name, 
             "email_id": user_email, 
             "uri": convert_output["uri"], 
-            "detected_language": text_language
+            "language": text_language
         }, 
     )
 
@@ -422,7 +422,7 @@ def intro():
     """)
 
 @st.fragment
-def generate_qna(json_df: pd.DataFrame, topics: List[str]): 
+def generate_qna(json_df: pd.DataFrame, topics: List[str], language: str): 
     selected_topics = st.multiselect("Topics", options=topics)
 
     qna_type: str = st.selectbox(
@@ -439,18 +439,31 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str]):
         with st.spinner("Generating Question Answers..."): 
         # Using the sub domains obtained above to filter the dataframe  
         # TODO: Use groq api for this generation  
+            json_df.dropna(inplace=True)
             filtered_df: pd.DataFrame = json_df[json_df.apply(
-                lambda x: any([ topic in x["major_domains"] + x["Concept"] + x["sub_domains"]
+                lambda x: any([ topic in x["major_domains"] + x["concept"] + x["sub_domains"]
                             for topic in selected_topics]), axis=1)]
 
-            texts: List[str] = filtered_df["text"].to_list()
 
-            content: str = generate_response(
-                prompts[qna_type], 
-                topics=topics, 
-                context=texts, 
-                hf_token=HF_TOKEN, 
+            texts: List[str] = filtered_df["text"].to_list()
+            topics = [topic for topic in topics if isinstance(topic, str)]
+
+            response = requests.post(
+                URL + "/generate", 
+                json = {
+                    "topics": topics, 
+                    "context": " ".join(texts), 
+                    "question_type": qna_type, 
+                    "language": language  
+                }
             )
+            content = response.json()["output"]
+            # content: str = generate_response(
+            #     prompts[qna_type], 
+            #     topics=topics, 
+            #     context=texts, 
+            #     hf_token=HF_TOKEN, 
+            # )
 
             # content = requests.post(
             #     URL + "/generate", 
@@ -506,7 +519,7 @@ def run_process(book_name: str):
         # print(type(json_df["sub_domains"].to_list())) 
         sub_domains: List[str] = list(set(json_df["sub_domains"].to_list()))   
         major_domains: List[str] =  list(set(json_df["major_domains"].to_list())) 
-        concepts: List[str] = list(set(json_df["Concept"].to_list()))         
+        concepts: List[str] = list(set(json_df["concept"].to_list()))         
         
         topics: List[str] = sub_domains + major_domains + concepts 
         
@@ -542,11 +555,23 @@ def run_process(book_name: str):
                     with open(f"{tmp_dir}/{book_name}.html") as html: 
                         f.write(html.read())
             
+            with st.spinner("Detecting the lanugage within the book..."): 
+                language_response = requests.post(
+                    URL + "/detect_lang", 
+                    json = {
+                        "email_id": st.session_state.email, 
+                        "filename": book_name, 
+                    }
+                )
+
+                text_language: str = language_response.json()["detected_language"]
+
             st.markdown(
                 f"Click on this link to view the interactive plot: [{book_name}]({URL}/interactive_plot/{st.session_state.email}/{book_name})")
-
+            
+            
             # running the endpoint asynchronously 
-            generate_qna(json_df, topics)
+            generate_qna(json_df, topics, text_language)
 
 def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str): 
     asyncio.run(run_async(
@@ -621,9 +646,9 @@ def create_user_folders(email: str):
         "processed_image",
         "summaries", 
         "text_extract",
-        "intermediate_json_data",
+        "intermediate_json",
         "graph_data", 
-        "json_data"
+        "final_json"
     ]
 
     for subfolder in subfolders:
