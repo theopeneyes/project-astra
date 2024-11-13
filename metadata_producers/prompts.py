@@ -149,7 +149,93 @@ The JSON you return should look like following:
 ]
 
 ### Instruction ### 
-Enclose your output within <json> tags. 
+strictely enclose your output within <json> and </json> tags. 
 
 ### OUTPUT JSON ###
 '''
+
+general_classification_prompt = '''
+
+You are an General content classifier bot. Your TASK is to classify text based on what it relates to from the following:  exercises, main content and illustrations .
+
+This is the text: {}
+Refer to the following definitions to get a clear understanding of each. 
+
+DEFINITIONS =
+Main Content:
+DETAILED information about a topic that explains EVERYTHING clearly and thoroughly. This section should cover ALL important parts of the topic.
+
+Exercises:
+These are QUESTIONS, ACTIVITIES, or TASKS that ask the reader to *respond,* *solve,* or *apply* knowledge. Look for question words (e.g., “What,” “How”), blanks to fill in, instructions, or prompts for practicing or testing understanding.
+
+
+Illustrations:
+Visuals like diagrams, charts, tables, or drawings that help explain or simplify the main content. These visuals make it easier to understand complex ideas by showing them in a simple way.
+
+
+### Instructions###:
+Your outcome MUST be simple, unambiguous, and should only contain the classification.
+Just provide the classification. DO NOT EXPLAIN.
+ENCLOSE your answer in <category> and </category> tags.
+
+###Incentives###
+You will receive a tip of $$$ for correct description.
+You will be penalized if you fail to follow instructions or guidance
+### classification ###
+'''
+
+
+sub_general_classification_exercises_prompt = '''
+You are an Exercises classifier bot. Your TASK is to classify the text based on one of the following categories: Activity, Quiz or Questions.
+Here's the text to classify: {}
+
+Use these definitions to guide your choice:
+
+Activity:
+A **hands-on** or **interactive task** where learners **engage** directly, often with **group** participation or **physical** action to practice or explore ideas.
+
+Quiz: 
+A **short test** that checks knowledge or understanding with **multiple-choice** or **short-answer** questions, providing a quick **assessment** of specific points.
+
+Questions: 
+**Inquiries** designed to make learners **think** or **recall** information. Formats may include **multiple-choice**, **true/false**, or **open-ended** questions to prompt analysis.
+
+### Instructions###
+strictly enclose your output in <exercises-cls> and <exercises-cls> tags.
+Do not add explanations or extra text.
+
+### Incentives ###
+Correct classifications will earn you a tip. Misclassification or failure to follow instructions will result in a penalty.
+
+### OUTPUT ###
+'''
+
+sub_general_classification_illustration_prompt = '''
+
+You are an Illustrations classifier bot. Your TASK is to classify the text based on one of the following categories: Examples, case study, illustrations. 
+Here's the text to classify: {}
+
+Use these definitions to guide your choice:
+
+Examples:
+Specific instances or items that show or clarify a broader idea. They help by demonstrating how something applies or works in different situations.
+
+Case Study:
+A detailed examination of a specific event, group, or individual to understand how something works or to learn from real-life situations. It often includes observations and findings.
+
+Illustration:
+A visual representation or diagram that shows an idea, object, or concept to help explain it more clearly. It often includes pictures, drawings, or charts.
+
+### Instructions###
+strictly enclose your output in <illus> and </illus> tags.
+Do not add explanations or extra text.
+
+### Incentives ###
+Correct classifications will earn you a tip. Misclassification or failure to follow instructions will result in a penalty.
+
+### OUTPUT ###
+
+
+
+'''
+
