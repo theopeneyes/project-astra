@@ -1,6 +1,6 @@
 from typing import Dict, List 
 
-messages: List[Dict] = [
+image_message: List[Dict] = [
     {
       "role": "system", 
       "content": [
@@ -27,7 +27,7 @@ messages: List[Dict] = [
     }
 ]
 
-summary_message: str = [
+text_message: str = [
   {
     "role": "system", 
     "content": [{
