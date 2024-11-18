@@ -38,9 +38,9 @@ class JSONParser:
         book_tree = defaultdict(dict)
         for book_json in vector_book_json:
             heading_sub_tree = self._get_child_node(book_tree, book_json['heading_identifier'], defaultdict(set))
-            sub_heading_tree = self._get_child_node(heading_sub_tree, book_json['heading_text'], defaultdict(set))
-            text_list = self._get_child_node(sub_heading_tree, book_json['sub_heading_text'], set())
-            text_list.add(book_json['text'])
+            sub_heading_tree = self._get_child_node(heading_sub_tree, book_json['heading_text'], set)
+            # text_list = self._get_child_node(sub_heading_tree, book_json['sub_heading_text'], set())
+            # text_list.add(book_json['text'])
         
         return book_tree 
     

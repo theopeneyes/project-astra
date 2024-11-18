@@ -81,3 +81,13 @@ class ConvertPDFOutputModel(AbsoluteBaseModel):
 
 class PushToJSONModel(AbsoluteBaseModel): 
     time: float 
+
+class SynthesisContentInputModel(AbsoluteBaseModel): 
+    node_id: int 
+
+class SynthesisContentOutputModel(AbsoluteBaseModel): 
+    node_id: int
+    time: float 
+    token_count: int 
+    
+ 

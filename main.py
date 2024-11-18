@@ -20,6 +20,8 @@ from models import ConvertPDFOutputModel
 from models import SummaryChapterOutputModel
 from models import RewriteJSONFileOutputModel 
 from models import PushToJSONModel
+from models import SynthesisContentInputModel 
+from models import SynthesisContentOutputModel 
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -68,6 +70,11 @@ from metadata_producers.prompts import about_list_generation_prompt, depth_list_
 from metadata_producers.append_about_data import classify_about
 from metadata_producers.prompts import classification_prompt
 
+from synthesizers.prompts import representation_depth_prompt
+from synthesizers.prompts import representation_strength_prompt 
+from synthesizers.prompts import topic_strength_prompt 
+from synthesizers.synthesize import synthesizer 
+
 # loads the variables in the .env file 
 load_dotenv(override=True)
 
@@ -113,6 +120,8 @@ app = FastAPI(debug=True, title="project-astra")
 origins = [
     "http://localhost:5174",  
     "http://localhost:5173", 
+    "http://127.0.0.1:5173", 
+    "http://127.0.0.1:5174", 
 ]
 
 app.add_middleware(
@@ -553,6 +562,126 @@ async def react_flow(emailId: str, fileName: str ) -> JSONResponse:
         nodes, edges = parser.parse_tree(concept_tree)
 
     return JSONResponse(content = [nodes, edges])  
+
+@app.post("/synthesize/strength/relational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        topic_strength_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["topic_strength"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
+
+
+@app.post("/synthesize/strength/representational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        representation_strength_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["representation_strength"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
+
+
+@app.post("/synthesize/depth/representational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        representation_depth_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["representation_depth"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
+
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str | int| float]:

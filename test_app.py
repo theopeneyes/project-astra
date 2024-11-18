@@ -24,9 +24,6 @@ OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY") # openai api key
 HF_TOKEN: str = os.getenv("HF_TOKEN") # huggingface token 
 URL: str = "http://127.0.0.1:8000"
 
-
-
-
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
 # bucket 
 bucket = gcs_client.bucket(BUCKET_NAME)
@@ -146,6 +143,49 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                     "language": text_language, 
                 }
             )
+
+
+            requests.post(
+                URL + "/synthesize/strength/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                }
+            )
+
+
+            requests.post(
+                URL + "/synthesize/strength/relational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                }
+            )
+
+            requests.post(
+                URL + "/synthesize/depth/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                }
+            )
+    
+    
     
     # putting it all in one directory  
     requests.post(
