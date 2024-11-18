@@ -52,10 +52,9 @@ def classify_about(token: str,
 
             "parameters": {"max_new_tokens": 700, "temperature":0.1}
         }
-
-    response = requests.post(API_URL, headers=headers, json=payload)
-    llm_response = (response.json()[0]["generated_text"]
-                    .split("### OUTPUT JSON ###")[1]) 
+    except:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        llm_response = (response.json()[0]["generated_text"].split("### OUTPUT JSON ###")[1]) 
 
     if re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL): 
         classified_json = re.findall(r"<json>(.*?)</json>", llm_response, re.DOTALL)[0]
