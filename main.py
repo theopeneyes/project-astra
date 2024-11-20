@@ -20,10 +20,14 @@ from models import ConvertPDFOutputModel
 from models import SummaryChapterOutputModel
 from models import RewriteJSONFileOutputModel 
 from models import PushToJSONModel
+from models import SynthesisContentInputModel 
+from models import SynthesisContentOutputModel 
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
 from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from transformers import AutoTokenizer
 
 import PIL 
@@ -41,7 +45,8 @@ import tempfile
 from google import generativeai as genai
 from openai import OpenAI 
 
-# generation model 
+# custom defined libraries 
+from json_trees.generate import JSONParser 
 from generation.generate import generate_response
 from generation.prompts import prompts, qna_validation_prompt
 
@@ -54,7 +59,7 @@ from language_detection.prompts import language_detection_prompt
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
 from data_loader.prompts import generation_prompt, clause_prompt, validation_prompt 
-from data_loader.opeanai_formatters import messages, summary_message as text_message 
+from data_loader.opeanai_formatters import image_message as messages, text_message  
 
 from data_classifier.classification_pipeline import get_json
 from google.cloud import storage 
@@ -65,7 +70,11 @@ from metadata_producers.prompts import about_list_generation_prompt, depth_list_
 from metadata_producers.append_about_data import classify_about
 from metadata_producers.prompts import classification_prompt
 
-from groq import Groq 
+from synthesizers.prompts import representation_depth_prompt
+from synthesizers.prompts import representation_strength_prompt 
+from synthesizers.prompts import topic_strength_prompt 
+from synthesizers.synthesize import synthesizer 
+
 # loads the variables in the .env file 
 load_dotenv(override=True)
 
@@ -76,6 +85,8 @@ load_dotenv(override=True)
 # GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
 # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
 # HF_TOKEN: str = os.getenv("HF_TOKEN", None) # Huggingface token 
+
+
 
 PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
 GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY") 
@@ -95,10 +106,7 @@ config = genai.GenerationConfig(
     top_k = 5,
 )
 
-# initializing the model clients 
-gemini = genai.GenerativeModel(model_name="gemini-1.5-flash-001")
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
-groqAi = Groq(api_key=GROQ_API_KEY)
 gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 phi_encoder = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
 
@@ -109,6 +117,14 @@ bucket = gcs_client.bucket(BUCKET_NAME)
 # testing phase therefore `debug=True`
 app = FastAPI(debug=True, title="project-astra")
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],            
+    allow_credentials=True,
+    allow_methods=["*"],              
+    allow_headers=["*"],              
+)
 # logger 
 # def logger(response: Dict[str, str] | Exception):
 #     # posts this response or exception to a database that is meant to store logs 
@@ -511,10 +527,154 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
     blob = bucket.blob(blob_path)
     with blob.open("r") as html: 
         content = html.read()
+    with blob.open("r") as html: 
+        content = html.read()
 
     return HTMLResponse(
         content = content 
     ) 
+
+@app.get("/reactFlow/{emailId}/{fileName}")
+async def react_flow(emailId: str, fileName: str ) -> JSONResponse: 
+    try: 
+        processed_json_blob = bucket.blob(os.path.join(
+            emailId, 
+            "final_json", 
+            f"{fileName}.json", 
+        ))
+        
+    except Exception as _: 
+        print("Exception occured")
+        print("The blob does not exist")
+        print(_)
+
+    with processed_json_blob.open("r") as processed_json_fp: 
+        processed_json = json.load(fp=processed_json_fp) 
+
+        parser = JSONParser(book_name=fileName) 
+        concept_tree = parser.to_tree(processed_json)
+        nodes, edges = parser.parse_tree(concept_tree)
+
+    return JSONResponse(content = [nodes, edges])  
+
+@app.post("/synthesize/strength/relational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        topic_strength_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["topic_strength"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
+
+
+@app.post("/synthesize/strength/representational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        representation_strength_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["representation_strength"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
+
+
+@app.post("/synthesize/depth/representational")
+async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+    starting_time: float = time.time()
+    intermediate_json_blob = bucket.blob(os.path.join(
+        content.email_id, 
+        "intermediate_json", 
+        f"{content.filename}_{content.node_id}.json"
+    ))
+
+    with intermediate_json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    status, score, token_count = synthesizer(
+        json_content["topic"], 
+        json_content["text"],
+        representation_depth_prompt, 
+        text_message, 
+        gpt4o, 
+        gpt4o_encoder, 
+    )
+
+    if not status: 
+        score = 0
+    
+    json_content["representation_depth"] = score
+
+    with intermediate_json_blob.open("w") as f: 
+        json.dump(json_content, fp=f)
+    
+    duration = time.time() - starting_time
+    
+    return SynthesisContentOutputModel(
+        filename=content.filename, 
+        email_id=content.email_id, 
+        node_id=content.node_id, 
+        time=duration, 
+        token_count=token_count
+    )
 
 
 @app.post("/generate")

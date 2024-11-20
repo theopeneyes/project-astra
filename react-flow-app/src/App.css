@@ -1,0 +1,28 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.Main {
+    width: 100vw; 
+    display: inline-block;
+}
+
+.Reactflow{
+    width: 83vw; 
+    height: 100vh; 
+    background-color: aquamarine;
+    margin-left: 0; 
+    padding-left: 0; 
+    margin-bottom: 0;
+    padding-bottom: 0;
+    float: left; 
+}
+
+.Sidebar {
+    width: 17vw;
+    height: 100vh; 
+    float: right; 
+}

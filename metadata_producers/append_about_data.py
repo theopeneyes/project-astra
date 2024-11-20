@@ -50,7 +50,7 @@ def classify_about(token: str,
                 generated_list[1]["formal_representations"], 
             ),
 
-            "parameters": {"max_new_tokens": 700, "temperature":0.1}
+            "parameters": {"max_new_tokens": 2000, "temperature":0.1}
         }
     except:
         response = requests.post(API_URL, headers=headers, json=payload)
