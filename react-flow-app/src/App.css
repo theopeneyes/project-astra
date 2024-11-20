@@ -11,7 +11,7 @@ html, body {
 }
 
 .Reactflow{
-    width: 83vw; 
+    width: 84vw; 
     height: 100vh; 
     background-color: aquamarine;
     margin-left: 0; 
@@ -22,7 +22,8 @@ html, body {
 }
 
 .Sidebar {
-    width: 17vw;
+    width: 16vw;
     height: 100vh; 
     float: right; 
+    background-color: #374151;
 }

@@ -494,6 +494,9 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> PushToJSONModel:
         time=time.time() - start_time
     ) 
 
+# @app.post("/divider")
+# async def json_divider(): 
+
 @app.post("/create_img")
 async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
     start_time: float = time.time()

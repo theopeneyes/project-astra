@@ -300,7 +300,6 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str], language: str):
 
 @st.fragment
 def run_process(book_name: str): 
-    
     if st.button("Select book"): 
         with st.spinner("Loading data..."): 
         # st.session_state.page = "pdf_project_page"
@@ -415,11 +414,13 @@ def run_main():
 
         existent_blobs = gcs_client.list_blobs(
             BUCKET_NAME, 
-            prefix=f"{st.session_state.email}/uploaded_document/", 
+            prefix=f"{st.session_state.email}/final_json/", 
             delimiter="/"
         )
 
-        blob_names: List[str] = [blob.name.split("/")[-1] for blob in existent_blobs]
+        blob_names: List[str] = [blob.name.split("/")[-1].split(".json")[0]
+                                 for blob in existent_blobs]
+
         non_existent_pdfs = list(pdfs - set(blob_names))
 
         # documents that are ready... 

@@ -2,47 +2,48 @@ import React from 'react'
 import "../index.css"
 import ChapterForm from './ChapterForm'
 import TopicForm from './TopicForm'
+import SidebarHeader from './SidebarHeader'
+import SidebarTemplate from './SidebarTemplate'
+import PropTypes from 'prop-types'
+
 
 const JsonSidebar = (props) => {
   if(props.nodeType == "Chapter") {
     return (
       <>
-      <form className="max-w-sm mx-auto">
-          <div className="mb-5">
-            <h3>Node Name: { props.nodeName } </h3>
-            <h3>Node Type: { props.nodeType } </h3> 
-            <ChapterForm/> 
-          </div>
-      </form>
+      <SidebarTemplate> 
+        <SidebarHeader ElementValue={props.nodeName} /> 
+        <SidebarHeader ElementValue={props.nodeType} /> 
+        <ChapterForm/> 
+      </SidebarTemplate>
       </>
     )
   } else if (props.nodeType == "Topic") {
     return (
       <>
-      <form className="max-w-sm mx-auto">
-          <div className="mb-5">
-            <h3>Node Name: { props.nodeName } </h3>
-            <h3>Node Type: { props.nodeType } </h3> 
-            <TopicForm/> 
-          </div>
-      </form>
+      <SidebarTemplate>
+        <SidebarHeader ElementValue= {props.nodeName } /> 
+        <SidebarHeader ElementValue={props.nodeType} /> 
+        <TopicForm/> 
+      </SidebarTemplate>
       </>
     )
   } else {
 
     return (
       <>
-      <form className="max-w-sm mx-auto">
-          <div className="mb-5">
-            <h3>Node Name: { props.nodeName } </h3>
-            <h3>Node Type: { props.nodeType } </h3> 
-          </div>
-      </form>
+      <SidebarTemplate>
+        <SidebarHeader ElementValue={props.nodeName} /> 
+        <SidebarHeader ElementValue={props.nodeType} /> 
+      </SidebarTemplate>
       </>
     )
-
   }
-  
+}
+
+JsonSidebar.propTypes = {
+  nodeName: PropTypes.string,  
+  nodeType: PropTypes.string
 }
 
 export default JsonSidebar
