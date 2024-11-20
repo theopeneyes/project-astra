@@ -103,6 +103,5 @@ def generateList(summary: str ,
         print(json.dumps(messages, indent=4))
 
     return [
-        about_json, 
-        depth_json, 
+        {**about_json, **depth_json} 
     ], token_count   

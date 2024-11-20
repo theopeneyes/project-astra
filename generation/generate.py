@@ -38,10 +38,11 @@ def generate_response(
         model="gpt-4o-mini", 
         temperature=0.1
     )
-    # NLLB to translate the output if it is not in desired language 
 
     validated_llm_response = completion.choices[0].message.content
     token_count +=  len(gpt4o_encoder.encode(validated_llm_response)) 
+
+    
 
     return validated_llm_response, token_count 
 
