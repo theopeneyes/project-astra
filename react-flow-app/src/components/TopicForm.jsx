@@ -26,4 +26,4 @@ const TopicForm = () => {
     )
 }
 
-export default TopicForm 
+export { TopicForm, questionTypes } 

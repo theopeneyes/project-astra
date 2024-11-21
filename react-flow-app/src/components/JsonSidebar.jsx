@@ -1,14 +1,29 @@
 import React from 'react'
 import "../index.css"
 import ChapterForm from './ChapterForm'
-import TopicForm from './TopicForm'
+import {TopicForm} from './TopicForm'
 import SidebarHeader from './SidebarHeader'
 import SidebarTemplate from './SidebarTemplate'
 import PropTypes from 'prop-types'
+import BookForm from "./BookForm"
 
 
 const JsonSidebar = (props) => {
-  if(props.nodeType == "Chapter") {
+  if (props.nodeType == "Book") {
+    return (
+      <>
+      <SidebarTemplate> 
+        <div className="mb-5">
+          <SidebarHeader ElementValue={props.nodeName} /> 
+          <SidebarHeader ElementValue={props.nodeType} /> 
+        </div>
+        <BookForm />
+      </SidebarTemplate>
+      </>
+    )
+
+  }
+  else if(props.nodeType == "Chapter") {
     return (
       <>
       <SidebarTemplate> 
