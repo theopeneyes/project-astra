@@ -85,6 +85,13 @@ class PushToJSONModel(AbsoluteBaseModel):
 class SynthesisContentInputModel(AbsoluteBaseModel): 
     node_id: int 
 
+class ModificationInputModel(AbsoluteBaseModel): 
+    branch_name: str 
+
+class ModificationOutputModel(ModificationInputModel):
+    time: float 
+    token_count: int 
+
 class SynthesisContentOutputModel(AbsoluteBaseModel): 
     node_id: int
     time: float 

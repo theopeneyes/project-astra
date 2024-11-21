@@ -22,6 +22,8 @@ from models import RewriteJSONFileOutputModel
 from models import PushToJSONModel
 from models import SynthesisContentInputModel 
 from models import SynthesisContentOutputModel 
+from models import ModificationInputModel 
+from models import ModificationOutputModel 
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -74,6 +76,10 @@ from synthesizers.prompts import representation_depth_prompt
 from synthesizers.prompts import representation_strength_prompt 
 from synthesizers.prompts import topic_strength_prompt 
 from synthesizers.synthesize import synthesizer 
+
+from segregator.segregation import segregator
+from segregator.prompts import counting_prompt 
+from segregator.modifier import get_relevant_count
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -599,7 +605,84 @@ async def synthesize_relative_strength(content: SynthesisContentInputModel) -> S
         token_count=token_count
     )
 
+@app.post("/segregate")
+async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel: 
+    final_json_blob = bucket.blob(os.path.join(
+        uploaded_file.email_id, 
+        "final_json", 
+        f"{uploaded_file.filename}.json"
+    ))
 
+    with final_json_blob.open("r") as f: 
+        final_json = json.load(fp=f)
+    
+    topics, headings, concepts = segregator(final_json)
+    
+    topic_blob = bucket.blob(os.path.join(
+        uploaded_file.email_id, 
+        "books", 
+        uploaded_file.filename, 
+        "topics.json"
+    ))
+
+
+    concept_blob = bucket.blob(os.path.join(
+        uploaded_file.email_id, 
+        "books", 
+        uploaded_file.filename, 
+        "concepts.json"
+    ))
+
+
+    headings_blob = bucket.blob(os.path.join(
+        uploaded_file.email_id, 
+        "books", 
+        uploaded_file.filename, 
+        "headings.json"
+    ))
+
+    with topic_blob.open("w") as f: 
+        json.dump(topics, fp=f)
+
+    
+    with headings_blob.open("w") as f: 
+        json.dump(headings, fp=f)
+
+
+    with concept_blob.open("w") as f: 
+        json.dump(concepts, fp=f)
+    
+    return uploaded_file 
+
+@app.post("/modify_branch") 
+async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutputModel: 
+    start_time = time.time()
+    branch_blob = bucket.blob(os.path.join(
+        branch_data.email_id, 
+        "books", 
+        branch_data.filename, 
+        f"{branch_data.branch_name}.json", 
+    ))
+
+    with branch_blob.open("r") as f:
+        js_object = json.load(fp=f)
+    
+    branch_modified, token_count = get_relevant_count(
+        js_object, text_message[1], 
+        counting_prompt, gpt4o, gpt4o_encoder
+    )
+
+    with branch_blob.open("w") as f: 
+        json.dump(branch_modified, fp=f)
+    
+    return ModificationOutputModel(
+        filename=branch_data.filename, 
+        email_id=branch_data.email_id, 
+        branch_name=branch_data.branch_name, 
+        time=time.time() - start_time, 
+        token_count=token_count, 
+    )
+    
 @app.post("/synthesize/strength/representational")
 async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
     starting_time: float = time.time()

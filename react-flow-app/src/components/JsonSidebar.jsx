@@ -12,8 +12,10 @@ const JsonSidebar = (props) => {
     return (
       <>
       <SidebarTemplate> 
-        <SidebarHeader ElementValue={props.nodeName} /> 
-        <SidebarHeader ElementValue={props.nodeType} /> 
+        <div className="mb-5">
+          <SidebarHeader ElementValue={props.nodeName} /> 
+          <SidebarHeader ElementValue={props.nodeType} /> 
+        </div>
         <ChapterForm/> 
       </SidebarTemplate>
       </>
@@ -22,8 +24,10 @@ const JsonSidebar = (props) => {
     return (
       <>
       <SidebarTemplate>
-        <SidebarHeader ElementValue= {props.nodeName } /> 
-        <SidebarHeader ElementValue={props.nodeType} /> 
+        <div className="mb-5">
+          <SidebarHeader ElementValue={props.nodeName} /> 
+          <SidebarHeader ElementValue={props.nodeType} /> 
+        </div>
         <TopicForm/> 
       </SidebarTemplate>
       </>
@@ -33,8 +37,10 @@ const JsonSidebar = (props) => {
     return (
       <>
       <SidebarTemplate>
-        <SidebarHeader ElementValue={props.nodeName} /> 
-        <SidebarHeader ElementValue={props.nodeType} /> 
+        <div className="mb-5"> 
+          <SidebarHeader ElementValue={props.nodeName} /> 
+          <SidebarHeader ElementValue={props.nodeType} /> 
+        </div>
       </SidebarTemplate>
       </>
     )

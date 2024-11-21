@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 import datamapplot
 from chart_utils.preprocess_chart import visualizer
 import requests
-import tempfile 
 import pyrebase
 import asyncio 
 import threading 
@@ -22,6 +21,7 @@ PROMPT_FILE_ID: str =  os.getenv("FILE_ID") # file_id to fetch remote prompt des
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") # gemini api key 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY") # openai api key 
 HF_TOKEN: str = os.getenv("HF_TOKEN") # huggingface token 
+NODE_SERVER_URL: str = "http://127.0.0.1:5173"
 URL: str = "http://127.0.0.1:8000"
 
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -36,14 +36,14 @@ firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
 auth = firebase.auth()
 
 
-prompts: List[str] = {
+prompts: List[str] = [ 
     "True/False",
     "Fill in the blanks",
     "Short Question Answer",
     "Multiple Choice",
     "Computational Questions",
     "Software Code Questions",
-}
+]
 
 async def process_pdf(pdf_name: str, user_email: str, base_directory: str): 
     with open(os.path.join(base_directory, pdf_name), "rb") as fr: 
@@ -303,20 +303,15 @@ def run_process(book_name: str):
     if st.button("Select book"): 
         with st.spinner("Loading data..."): 
         # st.session_state.page = "pdf_project_page"
-            classifier_blobs = gcs_client.list_blobs(
-                BUCKET_NAME, 
-                prefix=f"{st.session_state.email}/intermediate_json/", 
-                delimiter="/", 
+            classifier_blob = bucket.blob(
+                f"{st.session_state.email}/final_json/{book_name}.json",
             )
 
-            json_outputs : List[Dict] = [] 
-            for blob in classifier_blobs: 
-                if book_name in blob.name: 
-                    with blob.open("r") as f: 
-                        json_outputs.append(json.loads(f.read()))
+            with classifier_blob.open("r") as f: 
+                json_outputs = json.load(fp=f)
             
             json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
-
+    
         # gets all unique sub-domains and then chooses three from it 
         # essentially a for loop to sum a list of lists and then get unique sub_domains 
         # out of it. Out of which we pick three at random. This code may be changed later.  
@@ -336,10 +331,8 @@ def run_process(book_name: str):
         # Converting into embeddings  
         embeds_2d: pd.DataFrame = visualizer(topics)
         data = embeds_2d[["x", "y"]].values 
-        labels = embeds_2d["labels"].values 
 
         with st.spinner("Rendering the image..."): 
-            data = data * 50 
             
             # Mapplot on the app 
             # with tempfile.TemporaryDirectory() as tmp_dir: 
@@ -347,22 +340,22 @@ def run_process(book_name: str):
             # img_folder_blob.upload_from_string('')
             
             # img_blob = bucket.blob(f"{st.session_state.email}/datamapplots/{uploaded_pdf.name}_topic_img.jpg")
-            matplotlib_fig = datamapplot.create_interactive_plot(
-                data[:50], labels[:50],
-                title="Visual Representation of the topics in the book.", 
-                font_family="Playfair Display SC",
-            )
+            # matplotlib_fig = datamapplot.create_interactive_plot(
+            #     data[:50], labels[:50],
+            #     title="Visual Representation of the topics in the book.", 
+            #     font_family="Playfair Display SC",
+            # )
 
 
-            with tempfile.TemporaryDirectory() as tmp_dir: 
-                matplotlib_fig.save(f"{tmp_dir}/{book_name}.html")
-                html_folder = bucket.blob(f"{st.session_state.email}/rendered_html/")
-                html_folder.upload_from_string('')
+            # with tempfile.TemporaryDirectory() as tmp_dir: 
+            #     matplotlib_fig.save(f"{tmp_dir}/{book_name}.html")
+            #     html_folder = bucket.blob(f"{st.session_state.email}/rendered_html/")
+            #     html_folder.upload_from_string('')
                 
-                html_file = bucket.blob(f"{st.session_state.email}/rendered_html/{book_name}.html")
-                with html_file.open("w") as f: 
-                    with open(f"{tmp_dir}/{book_name}.html") as html: 
-                        f.write(html.read())
+            #     html_file = bucket.blob(f"{st.session_state.email}/rendered_html/{book_name}.html")
+            #     with html_file.open("w") as f: 
+            #         with open(f"{tmp_dir}/{book_name}.html") as html: 
+            #             f.write(html.read())
             
             with st.spinner("Detecting the lanugage within the book..."): 
                 language_response = requests.post(
@@ -376,7 +369,7 @@ def run_process(book_name: str):
                 text_language: str = language_response.json()["detected_language"]
 
             st.markdown(
-                f"Click on this link to view the interactive plot: [{book_name}]({URL}/interactive_plot/{st.session_state.email}/{book_name})")
+                f"Click on this link to view the JSON Tree: [{book_name}]({NODE_SERVER_URL}/{st.session_state.email}/{book_name})")
             
             
             # running the endpoint asynchronously 
@@ -456,6 +449,7 @@ def create_user_folders(email: str):
         "uploaded_document",
         "processed_image",
         "summaries", 
+        "books", 
         "text_extract",
         "intermediate_json",
         "graph_data", 
