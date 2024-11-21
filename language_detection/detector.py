@@ -20,10 +20,13 @@ def detect_language(img_encoding: str, messages: Dict, language_detection_prompt
     if re.findall(r"<language>(.*?)</language>", response_content):
         language: str = re.findall(r"<language>(.*?)</language>", response_content)[0]
     else: 
-        print("Unable to detect language.")
-        print("View llm response down below")
-        print(response_content)
-        language = response_content
 
-    return language, token_count 
+        if re.findall(r"<(.*?)>", response_content):
+            language: str = re.findall(r"<(.*?)>", response_content)[0]
+        else:
+            print("Unable to detect language.")
+            print("View llm response down below")
+            print(response_content)
+
+    return language.lower(), token_count 
     

@@ -22,7 +22,7 @@ function App() {
   const params = useParams(); 
   const emailId = params.emailId; 
   const fileName = params.fileName;  
-  const url = `http://127.0.0.1:8000/reactFlow/${emailId}/${fileName}` 
+  const url = `http://127.0.0.1:4000/reactFlow/${emailId}/${fileName}` 
 
   // add effect 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);

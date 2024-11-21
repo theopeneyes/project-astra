@@ -753,7 +753,7 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         js_object = json.load(fp=f)
     
     branch_modified, token_count = get_relevant_count(
-        js_object, text_message[1], 
+        js_object, [text_message[1]], 
         counting_prompt, gpt4o, gpt4o_encoder
     )
 

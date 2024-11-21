@@ -49,22 +49,24 @@ class JSONParser:
         edges = []
         origins = []
         
-        child_node_x_distance = 2000 / len(child_titles) 
-        child_node_x_position = origin.get("x") - child_node_x_distance 
+        child_node_y_distance = 2000 / len(child_titles) 
+        child_node_y_position = origin.get("y") - child_node_y_distance 
         for child_title in child_titles: 
             # add the child node
-            node_origin = {"x": int(child_node_x_position), "y": origin.get("y") + 200}
+            node_origin = {"y": int(child_node_y_position), "x": origin.get("x") + 200}
             origins.append(node_origin)
 
             nodes.append({
                 "id": f"{category}:{child_title}", 
                 "position": node_origin, 
+                "sourcePosition": "right", 
+                "targetPosition": "left", 
                 "data": {
                     "label": child_title,  
                 }
             })
 
-            child_node_x_position += child_node_x_distance
+            child_node_y_position += child_node_y_distance
 
             # connect the two nodes. 
             edges.append({
@@ -82,6 +84,8 @@ class JSONParser:
 
         nodes = [{
             "id": self.book_name, 
+            "sourcePosition": "right", 
+            "targetPosition": "left", 
             "position": origin, 
             "data": {
                 "label": self.book_name, 

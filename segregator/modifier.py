@@ -24,13 +24,15 @@ def get_relevant_count(js_object: Dict,
         llm_response = content.choices[0].message.content
         token_count += len(gpt4o_encoder.encode(llm_response)) 
 
-        if re.findall(r"<count>(.*?)</count>", llm_response, re.DOTALL)[0]: 
+        relevant_count : int = 0 
+
+        if re.findall(r"<count>(.*?)</count>", llm_response, re.DOTALL): 
             try: 
                 relevant_count = int(re.findall(
                     r"<count>(.*?)</count>", 
                     llm_response, 
                     re.DOTALL,  
-                ))
+                )[0])
             except Exception as _: 
                 print(f"The word count for topic: {js_key} by llm is not an integer...\nView the response below")
                 print(llm_response)
@@ -44,7 +46,7 @@ def get_relevant_count(js_object: Dict,
             print(f"The llm couldn't produce an output in section: {js_key}. Response: ")
             print(llm_response)
         
-    return relevant_documents
+    return relevant_documents, token_count 
 
 
         

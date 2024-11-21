@@ -10,6 +10,23 @@ def synthesizer(
         gpt4o_encoder, 
     ) -> Tuple[str| None, str | int, int]: 
 
+
+    converter: Dict[str, int] = {
+        "high": 3, 
+        "medium": 2, 
+        "low": 1, 
+        "minimal detail": 1,
+        "limited detail": 2,
+        "moderately detail": 3,
+        "substantial detail": 4,
+        "exceptional detail": 5, 
+        "not related": 1,
+        "weakly related": 2,
+        "moderately related": 3,
+        "strongly related": 4,
+        "directly and fully related": 5
+    }
+
     score: str = ""
     text_message[1]["content"][0]["text"] = strength_prompt.format(topic, text)
     completion = gpt4o.chat.completions.create(
@@ -34,6 +51,7 @@ def synthesizer(
         print("Here is the llm response")
         print(f"{llm_response}")
         print(f"Here is the score extracted: {score}")
+        score = converter[score.lower()]
         
     
     if score == "": 
