@@ -92,8 +92,14 @@ class ModificationOutputModel(ModificationInputModel):
     time: float 
     token_count: int 
 
+
+class SynthesisContentInputModel(AbsoluteBaseModel): 
+    node_id: int 
+    branch_name: str
+
 class SynthesisContentOutputModel(AbsoluteBaseModel): 
     node_id: int
+    branch_name: str 
     time: float 
     token_count: int 
     

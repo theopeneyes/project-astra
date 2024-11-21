@@ -7,7 +7,6 @@ from typing import Dict, List
 
 import pandas as pd 
 from dotenv import load_dotenv
-import datamapplot
 from chart_utils.preprocess_chart import visualizer
 import requests
 import pyrebase
@@ -144,7 +143,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                 }
             )
 
-
+            # topic extraction 
             requests.post(
                 URL + "/synthesize/strength/representational", 
                 json = {
@@ -155,6 +154,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                                 .split("_")[-1]
                                 .split(".")[0]
                             ), 
+                    "branch_name": "topic" 
                 }
             )
 
@@ -169,6 +169,7 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                                 .split("_")[-1]
                                 .split(".")[0]
                             ), 
+                    "branch_name": "topic" 
                 }
             )
 
@@ -182,11 +183,101 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
                                 .split("_")[-1]
                                 .split(".")[0]
                             ), 
+                    "branch_name": "topic" 
+                }
+            )
+
+
+            # concept extraction 
+            requests.post(
+                URL + "/synthesize/strength/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "concept" 
+                }
+            )
+
+
+            requests.post(
+                URL + "/synthesize/strength/relational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "concept" 
+                }
+            )
+
+            requests.post(
+                URL + "/synthesize/depth/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "concept" 
+                }
+            )
+
+            # heading extraction 
+            requests.post(
+                URL + "/synthesize/strength/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "heading_text" 
+                }
+            )
+
+
+            requests.post(
+                URL + "/synthesize/strength/relational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "heading_text" 
+                }
+            )
+
+            requests.post(
+                URL + "/synthesize/depth/representational", 
+                json = {
+                    "email_id": user_email, 
+                    "filename": pdf_name, 
+                    "node_id": int(paragraph_node_blob.name
+                                .split("/")[-1]
+                                .split("_")[-1]
+                                .split(".")[0]
+                            ), 
+                    "branch_name": "heading_text" 
                 }
             )
     
     
-    
+    print("Preprocessing the data for the graph...")    
     # putting it all in one directory  
     requests.post(
         URL + "/preprocess_for_graph", 
@@ -195,6 +286,49 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
             "email_id": user_email, 
         } 
     )
+
+    print("Segregating the json by topics, headings and concepts....")
+    requests.post(
+        URL + "/segregate", 
+        json = {
+            "filename": pdf_name, 
+            "email_id": user_email, 
+        } 
+    )
+
+    print("Getting topic relevant count") 
+    requests.post(
+        URL + "/modify_branch", 
+        json = {
+           "filename": pdf_name, 
+           "email_id": user_email,  
+           "branch_name": "topic"
+        }
+        
+    )
+
+
+    print("Getting concept relevant count") 
+    requests.post(
+        URL + "/modify_branch", 
+        json = {
+           "filename": pdf_name, 
+           "email_id": user_email,  
+           "branch_name": "concept"
+        }
+        
+    )
+
+    print("Getting heading relevant count") 
+    requests.post(
+        URL + "/modify_branch", 
+        json = {
+           "filename": pdf_name, 
+           "email_id": user_email,  
+           "branch_name": "heading_text"
+        }
+    )
+    
         
     # print(f"Generating a classified output for pdf {pdf_name}...")
     # for idx in range(data_loader_output["page_count"]):  

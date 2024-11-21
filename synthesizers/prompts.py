@@ -1,4 +1,4 @@
-topic_strength_prompt: str = """
+strength_prompt: str = """
 Assign the degree of relationship between the following:
 {} and {}
 
