@@ -20,7 +20,7 @@ PROMPT_FILE_ID: str =  os.getenv("FILE_ID") # file_id to fetch remote prompt des
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY") # gemini api key 
 OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY") # openai api key 
 HF_TOKEN: str = os.getenv("HF_TOKEN") # huggingface token 
-NODE_SERVER_URL: str = "http://127.0.0.1:5173"
+NODE_SERVER_URL: str = "http://localhost:5173"
 URL: str = "http://127.0.0.1:8000"
 
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")

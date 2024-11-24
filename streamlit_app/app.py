@@ -191,7 +191,7 @@ messages: List[Dict] = [
 
 # LLMs for our application 
 # URL: str = "https://project-astra-1086049785812.us-central1.run.app"
-URL: str = "http://127.0.0.1:8000"
+URL: str = "http:localhost:8000"
 
 def decode_image(encoded_string: str) -> PIL.Image:
     image_data = base64.b64decode(encoded_string)
