@@ -1,4 +1,6 @@
 # Example json to store in the prompt 
+
+# great code 
 json_example: str = """{
     "root_concept": str,
     "major_domains": List[str],
@@ -7,6 +9,8 @@ json_example: str = """{
     "Attributes and connections": Dict[str, List[str]],
     "formal_representations": Dict[str, List[str]],
 })"""
+
+
 
 
 # definition prompt 
