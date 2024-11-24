@@ -63,6 +63,7 @@ class JSONParser:
                 "targetPosition": "left", 
                 "data": {
                     "label": child_title,  
+                    "expanded": False 
                 }
             })
 
@@ -89,6 +90,7 @@ class JSONParser:
             "position": origin, 
             "data": {
                 "label": self.book_name, 
+                "expanded": False 
             }
         }] 
         edges = []

@@ -9,3 +9,4 @@ ignore.py
 .secrets
 .anam.py
 test_sample
+json_editor/ignoreme

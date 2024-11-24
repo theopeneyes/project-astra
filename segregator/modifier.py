@@ -36,12 +36,14 @@ def get_relevant_count(js_object: Dict,
             except Exception as _: 
                 print(f"The word count for topic: {js_key} by llm is not an integer...\nView the response below")
                 print(llm_response)
+                print(f"The value provided here was : {js_value}")
             
             relevant_documents[js_key] = {
                 "text": js_value, 
                 "count": relevant_count, 
                 "llm_response": llm_response, 
             }
+
         else: 
             print(f"The llm couldn't produce an output in section: {js_key}. Response: ")
             print(llm_response)

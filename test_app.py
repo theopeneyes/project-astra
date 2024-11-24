@@ -455,6 +455,10 @@ def run_process(book_name: str):
         # st.dataframe(json_df)
         # print(json_df["sub_domains"].to_list()) 
         # print(type(json_df["sub_domains"].to_list())) 
+        json_df["sub_domains"] = json_df.sub_domains.apply(lambda x: str(x))
+        json_df["major_domains"] = json_df.sub_domains.apply(lambda x: str(x))
+        json_df["concept"] = json_df.sub_domains.apply(lambda x: str(x))
+
         sub_domains: List[str] = list(set(json_df["sub_domains"].to_list()))   
         major_domains: List[str] =  list(set(json_df["major_domains"].to_list())) 
         concepts: List[str] = list(set(json_df["concept"].to_list()))         
@@ -464,7 +468,6 @@ def run_process(book_name: str):
 
         # Converting into embeddings  
         embeds_2d: pd.DataFrame = visualizer(topics)
-        data = embeds_2d[["x", "y"]].values 
 
         with st.spinner("Rendering the image..."): 
             

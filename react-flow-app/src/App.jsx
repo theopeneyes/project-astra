@@ -17,12 +17,37 @@ import {
  
 import '@xyflow/react/dist/style.css';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      error: null,
+      errorInfo: null,
+    };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    this.setState({
+      error,
+      errorInfo,
+    });
+  }
+
+  render() {
+    if (this.state.errorInfo) {
+      return <>Some thing wrong</>;
+    }
+    return this.props.children;
+  }
+}
+
+
 function App() {
 
   const params = useParams(); 
   const emailId = params.emailId; 
   const fileName = params.fileName;  
-  const url = `http://127.0.0.1:4000/reactFlow/${emailId}/${fileName}` 
+  const url = `http://127.0.0.1:8000/reactFlow/${emailId}/${fileName}` 
 
   // add effect 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -65,26 +90,28 @@ function App() {
   );
 
   return (
-    <div className="Main">
-      <div className="Reactflow">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onNodeClick={onNodeClick}
-        >
-          <Background variant={BackgroundVariant.Dots}></Background>
-        </ReactFlow> 
-      </div>
-      <div className="Sidebar">
-        <JsonSidebar 
-          nodeName={nodeName} 
-          nodeType={nodeType} 
-        /> 
-      </div>
-    </div> 
+    <ErrorBoundary> 
+      <div className="Main">
+        <div className="Reactflow">
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodeClick={onNodeClick}
+          >
+            <Background variant={BackgroundVariant.Dots}></Background>
+          </ReactFlow> 
+        </div>
+        <div className="Sidebar">
+          <JsonSidebar 
+            nodeName={nodeName} 
+            nodeType={nodeType} 
+          /> 
+        </div>
+      </div> 
+    </ErrorBoundary>
   );
 
 }
