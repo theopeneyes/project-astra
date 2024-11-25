@@ -49,15 +49,15 @@ class JSONParser:
         edges = []
         origins = []
         
-        child_node_y_distance = 2000 / len(child_titles) 
+        child_node_y_distance = 3000 / len(child_titles) 
         child_node_y_position = origin.get("y") - child_node_y_distance 
         for child_title in child_titles: 
             # add the child node
-            node_origin = {"y": int(child_node_y_position), "x": origin.get("x") + 200}
+            node_origin = {"y": int(child_node_y_position), "x": origin.get("x") + 500}
             origins.append(node_origin)
 
             nodes.append({
-                "id": f"{category}:{child_title}", 
+                "id": f"{category}={parent_title}:{child_title}", 
                 "position": node_origin, 
                 "sourcePosition": "right", 
                 "targetPosition": "left", 
@@ -73,7 +73,7 @@ class JSONParser:
             edges.append({
                 "id": f"{parent_title}={category}:{child_title}", 
                 "source": parent_title, 
-                "target": f"{category}:{child_title}", 
+                "target": f"{category}={parent_title}:{child_title}", 
             })
         
         return nodes, edges, origins
@@ -107,7 +107,7 @@ class JSONParser:
         for idx, chapter_title in enumerate(main_tree.keys()): 
             chapter_child_tree = main_tree[chapter_title]
             heading_nodes, heading_edges, heading_origins = self._connect_parent_child(
-                f"chapter:{chapter_title}", 
+                f"chapter={self.book_name}:{chapter_title}", 
                 chapter_child_tree.keys(), 
                 origin = chapter_origins[idx], 
                 category="topic", 
@@ -120,7 +120,7 @@ class JSONParser:
                 heading_child_tree = chapter_child_tree[heading_title] 
                 
                 sub_heading_nodes, sub_heading_edges, sub_heading_origins = self._connect_parent_child(
-                   f"topic:{heading_title}", 
+                   f"topic=chapter={self.book_name}:{chapter_title}:{heading_title}", 
                    heading_child_tree.keys(), 
                    origin = heading_origins[jdx], 
                    category="sub_heading"
@@ -132,7 +132,7 @@ class JSONParser:
                 for kdx, sub_heading_title in enumerate(heading_child_tree.keys()):
                     text_node_names =  heading_child_tree[sub_heading_title]
                     text_nodes, text_edges, _ = self._connect_parent_child(
-                        f"sub_heading:{sub_heading_title}", 
+                        f"sub_heading=topic=chapter={self.book_name}:{chapter_title}:{heading_title}:{sub_heading_title}", 
                         text_node_names, 
                         origin = sub_heading_origins[kdx], 
                         category="text" 

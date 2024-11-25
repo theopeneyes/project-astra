@@ -6,16 +6,28 @@ import JsonSidebar from './components/JsonSidebar';
 import "./App.css"
 import "./index.css"
 
+
 import {
   ReactFlow,
-  useNodesState,
-  useEdgesState,
+  ReactFlowProvider, 
   Background, 
   BackgroundVariant, 
   addEdge,
+  MiniMap,
+  applyEdgeChanges, 
+  applyNodeChanges
 } from '@xyflow/react';
- 
+
+
+import CustomNode from './CustomNode';
+import useAnimatedNodes from './useAnimatedNodes';
+import useExpandCollapse from './useExpandCollapse';
+import { useControls } from 'leva';
+
+
 import '@xyflow/react/dist/style.css';
+import styles from './styles.module.css';
+
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -41,47 +53,90 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const nodeTypes = {
+  custom: CustomNode,
+};
 
-function App() {
+function ReactFlowApp({
+  treeWidth = 220,
+  treeHeight = 100,
+  animationDuration = 300,
+}) {
 
   const params = useParams(); 
   const emailId = params.emailId; 
   const fileName = params.fileName;  
   const url = `http://127.0.0.1:8000/reactFlow/${emailId}/${fileName}` 
+  const proOptions = { account: 'paid-pro', hideAttribution: true };
 
   // add effect 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]); // console.log(backendData)
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]); // console.log(backendData)
   const [nodeName, setNodeName] = useState(params.fileName); 
   const [nodeType, setNodeType] = useState("Book"); 
-
-  const onNodeClick = (_, node) => {
-    setNodeName(node.data.label); 
-    if(node.id.startsWith("chapter")) {
-      setNodeType("Chapter"); 
-    } else if (node.id.startsWith("topic")) {
-      setNodeType("Topic"); 
-    } else if(node.id.startsWith("sub_heading")) {
-      setNodeType("Sub Heading"); 
-    } else if (node.id.startsWith("text")) {
-      setNodeType("Text")
-    } else {
-      setNodeType("Book")
-    }
-  }
 
   useEffect(() => {
     const fetchUrlData = async () => {
       await fetch(url).then(
         async (response) => await response.json()
-      ).then(async (data) => {
-        let [initialNodes, initialEdges] = data; 
+      ).then(async ({ initialNodes, initialEdges }) => {
         setNodes(initialNodes); 
         setEdges(initialEdges); 
       })
     }
     fetchUrlData(); 
   }, [])
+  
+  const { nodes: visibleNodes, edges: visibleEdges } = useExpandCollapse(
+    nodes,
+    edges,
+    {treeWidth, treeHeight}
+  );
+
+  const { nodes: animatedNodes } = useAnimatedNodes(visibleNodes, {
+    animationDuration,
+  });
+
+  const onNodesChange = useCallback(
+    (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
+    []
+  );
+  const onEdgesChange = useCallback(
+    (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
+    []
+  );
+
+
+  const onNodeClick = useCallback(
+      (_, node) => {
+        setNodeName(node.data.label); 
+        if(node.id.startsWith("chapter")) {
+          setNodeType("Chapter"); 
+        } else if (node.id.startsWith("topic")) {
+          setNodeType("Topic"); 
+        } else if(node.id.startsWith("sub_heading")) {
+          setNodeType("Sub Heading"); 
+        } else if (node.id.startsWith("text")) {
+          setNodeType("Text")
+        } else {
+          setNodeType("Book")
+        }
+
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === node.id) {
+              return {
+                ...n,
+                data: { ...n.data, expanded: !n.data.expanded },
+              };
+            }
+
+            return n;
+          })
+        );
+      }, [setNodes]
+  ); 
+
 
 
   const onConnect = useCallback(
@@ -94,14 +149,23 @@ function App() {
       <div className="Main">
         <div className="Reactflow">
           <ReactFlow
-            nodes={nodes}
-            edges={edges}
+            fitView 
+            nodes={animatedNodes}
+            edges={visibleEdges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            nodesDraggable={false}
+            nodesConnectable={false}
+            nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
+            proOptions={proOptions}
+            className={styles.viewport}
+            zoomOnDoubleClick={false}
+            elementsSelectable={false}
           >
-            <Background variant={BackgroundVariant.Dots}></Background>
+            <Background variant={BackgroundVariant.Dots} />
+            <MiniMap/> 
           </ReactFlow> 
         </div>
         <div className="Sidebar">
@@ -114,6 +178,35 @@ function App() {
     </ErrorBoundary>
   );
 
+}
+
+function App() {
+  const levaProps = useControls({
+    treeWidth: {
+      value: 220,
+      min: 0,
+      max: 440,
+    },
+    treeHeight: {
+      value: 100,
+      min: 0,
+      max: 200,
+    },
+    animationDuration: {
+      value: 300,
+      min: 0,
+      max: 600,
+    },
+  });
+
+  return (
+    <>
+    <ReactFlowProvider>
+      <ReactFlowApp {...levaProps} /> 
+    </ReactFlowProvider>
+    </>
+  )
+  
 }
 
 

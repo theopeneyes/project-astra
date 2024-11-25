@@ -467,50 +467,25 @@ def run_process(book_name: str):
         
 
         # Converting into embeddings  
-        embeds_2d: pd.DataFrame = visualizer(topics)
 
-        with st.spinner("Rendering the image..."): 
             
-            # Mapplot on the app 
-            # with tempfile.TemporaryDirectory() as tmp_dir: 
-            # img_folder_blob = bucket.blob(f"{st.session_state.email}/datamapplots/")
-            # img_folder_blob.upload_from_string('')
-            
-            # img_blob = bucket.blob(f"{st.session_state.email}/datamapplots/{uploaded_pdf.name}_topic_img.jpg")
-            # matplotlib_fig = datamapplot.create_interactive_plot(
-            #     data[:50], labels[:50],
-            #     title="Visual Representation of the topics in the book.", 
-            #     font_family="Playfair Display SC",
-            # )
+        with st.spinner("Detecting the lanugage within the book..."): 
+            language_response = requests.post(
+                URL + "/detect_lang", 
+                json = {
+                    "email_id": st.session_state.email, 
+                    "filename": book_name, 
+                }
+            )
 
+            text_language: str = language_response.json()["detected_language"]
 
-            # with tempfile.TemporaryDirectory() as tmp_dir: 
-            #     matplotlib_fig.save(f"{tmp_dir}/{book_name}.html")
-            #     html_folder = bucket.blob(f"{st.session_state.email}/rendered_html/")
-            #     html_folder.upload_from_string('')
-                
-            #     html_file = bucket.blob(f"{st.session_state.email}/rendered_html/{book_name}.html")
-            #     with html_file.open("w") as f: 
-            #         with open(f"{tmp_dir}/{book_name}.html") as html: 
-            #             f.write(html.read())
-            
-            with st.spinner("Detecting the lanugage within the book..."): 
-                language_response = requests.post(
-                    URL + "/detect_lang", 
-                    json = {
-                        "email_id": st.session_state.email, 
-                        "filename": book_name, 
-                    }
-                )
-
-                text_language: str = language_response.json()["detected_language"]
-
-            st.markdown(
-                f"Click on this link to view the JSON Tree: [{book_name}]({NODE_SERVER_URL}/{st.session_state.email}/{book_name})")
-            
-            
-            # running the endpoint asynchronously 
-            generate_qna(json_df, topics, text_language)
+        st.markdown(
+            f"Click on this link to view the JSON Tree: [{book_name}]({NODE_SERVER_URL}/{st.session_state.email}/{book_name})")
+        
+        
+        # running the endpoint asynchronously 
+        generate_qna(json_df, topics, text_language)
 
 def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str): 
     asyncio.run(run_async(
