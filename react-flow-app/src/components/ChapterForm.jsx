@@ -1,12 +1,39 @@
+import {useState} from "react"; 
 import Glider from './Glider';  
+import PropTypes from "prop-types";
 
-const ChapterForm = () => {
+const ChapterForm = (props) => {
+
+    const [storageNode, setStorageNode] = useState({
+        nodeName: props.chapterName, 
+        nodeType: "chapter", 
+        nodeContent: null,  
+    }) 
+
+    const [nodeContent, setNodeContent] = useState({
+        gliderValue: null, 
+    })
+
+    const onGliderSubmit = (e) => {
+        e.preventDefault(); 
+    }
+
+    const onGliderChangeFunction = (e) => {
+        setNodeContent((prev) => {
+            return {...prev, gliderValue: parseInt(e.target.value)}
+        })
+
+        setStorageNode((prev) => {
+            return {...prev, nodeContent: nodeContent}
+        })
+    }
+
     return (
         <>
         <div >
-            <form className="max-w-sm mx-auto">
+            <form onSubmit = {onGliderSubmit} className="max-w-sm mx-auto">
                 <div className="mb-5">
-                    <Glider/> 
+                    <Glider onChangeFunction = {onGliderChangeFunction} /> 
                 </div>
                 <div className="mb-5"> 
                     <button 
@@ -19,6 +46,10 @@ const ChapterForm = () => {
         </div> 
         </>
     )
+}
+
+ChapterForm.propTypes = {
+    chapterName: PropTypes.string, 
 }
 
 export default ChapterForm 

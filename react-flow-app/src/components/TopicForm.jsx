@@ -1,26 +1,57 @@
 import SelectBox from "./SelectBox"
+import { questionTypes } from "./QuestionTypes";
+import PropTypes from "prop-types";
 
-
-const questionTypes = [ 
-    "True/False",
-    "Fill in the blanks",
-    "Short Question Answer",
-    "Multiple Choice",
-    "Computational Questions",
-    "Software Code Questions",
-]; 
 
 const preferenceLevel = ["Ignore", "High", "Medium", "Low" ]; 
 
-const TopicForm = () => {
+const TopicForm = (props) => {
+    const onTopicSubmit = (e) => {
+        e.preventDefault(); 
+    }
+
+    const [storageContent, setStorageContent] = useState({
+        nodeName: props.topicName, 
+        nodeType: "topic", 
+        nodeContent: null,  
+    })
+
+    const [nodeContent, setNodeContent] = useState({
+        preferenceLevel: null, 
+        questionType: null, 
+    })
+
+    const onTopicMetadataChange = (e) => {
+        const metadataType = e.target.id; 
+        const optionSelected = e.target.value; 
+        
+        setNodeContent((prev) => {
+            return {...prev, [metadataType]: optionSelected}
+        })
+
+        setStorageContent((prev) => {
+            return {...prev, nodeContent: nodeContent}; 
+        })
+    }
+
     return (
         <>
-        <form className="max-w-sm mx-auto"> 
+        <form onSubmit={onTopicSubmit} className="max-w-sm mx-auto"> 
             <div className="mb-5">
-                <SelectBox labelText ="Select your preference of the given topic" Vector={preferenceLevel} /> 
+                <SelectBox 
+                    category="preferenceLevel"
+                    labelText ="Select your preference of the given topic" 
+                    Vector={preferenceLevel} 
+                    onChangeFunction={onTopicMetadataChange}
+                /> 
             </div>
             <div className="mb-5">
-                <SelectBox labelText="Select any one of the question types you require for the given topic" Vector={questionTypes} /> 
+                <SelectBox 
+                    category="questionType"
+                    labelText="Select any one of the question types you require for the given topic" 
+                    Vector={questionTypes} 
+                    onChangeFunction={onTopicMetadataChange}
+                /> 
             </div>
             <div className="mb-5"> 
                 <button 
@@ -32,6 +63,10 @@ const TopicForm = () => {
         </form> 
         </>
     )
+}
+
+TopicForm.propTypes = {
+    topicName: PropTypes.string, 
 }
 
 export { TopicForm, questionTypes } 

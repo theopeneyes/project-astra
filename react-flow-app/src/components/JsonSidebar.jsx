@@ -17,7 +17,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
-        <BookForm />
+        <BookForm bookName={props.nodeName} />
       </SidebarTemplate>
       </>
     )
@@ -31,7 +31,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
-        <ChapterForm/> 
+        <ChapterForm chapterName={props.nodeName} /> 
       </SidebarTemplate>
       </>
     )

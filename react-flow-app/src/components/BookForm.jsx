@@ -1,16 +1,63 @@
-import { questionTypes } from "./TopicForm"
+import { questionTypes } from "./QuestionTypes"; 
+import { useState } from "react"; 
 import QuestionCount from "./QuestionCount" 
+import PropTypes from "prop-types";
 
 
-const BookForm = () => {
+const questionToKeyMap = {
+    "True/False": "trueFalse", 
+    "Fill in the blanks": "fillInTheBlanks", 
+    "Short Question Answer": "shortQuestionAnswer", 
+    "Multiple Choice": "multipleChoice", 
+    "Computational Questions": "computationQuestion", 
+    "Software Code Questions": "softwareCodeQuestion", 
+}
+
+const BookForm = (props) => {
+    const [storageContent, setStorageContent] = useState({
+        nodeName: props.bookName, 
+        nodeType: "book", 
+        nodeContent: null, 
+    })
+
+    const [questionDetails, setQuestionDetails] = useState({
+        fillInTheBlanks: 0, 
+        trueFalse: 0, 
+        shortQuestionAnswer: 0, 
+        multipleChoice: 0, 
+        computationQuestion: 0, 
+        softwareCodeQuestion: 0, 
+    })
+
+    const onQuestionCountChange = (e) => {
+        const questionType = questionToKeyMap[e.target.id]; 
+        const questionCount = e.target.value; 
+        setQuestionDetails((prev) => {
+            return {...prev, [questionType]: parseInt(questionCount) }
+        })
+
+        setStorageContent((prev) => {
+            return {...prev, [nodeContent]: questionDetails}
+        })
+    }
+
+    const onSubmitBookData = (e) => {
+        e.preventDefault(); 
+    }
+
     return (
         <>
-        <form className="max-w-sm mx-auto">
+        <form onSubmit= {onSubmitBookData} className="max-w-sm mx-auto">
             <div className="mb-5">
             {questionTypes.map((value, index) => {
                 return (
                     <div className="mb-4">
-                        <QuestionCount id={`${value}_${index}`} QuestionType = { value }/>
+                        <QuestionCount 
+                            key={value}
+                            onChangeFunction={onQuestionCountChange} 
+                            id={`${value}_${index}`} 
+                            QuestionType = { value }
+                        />
                     </div> 
                 ) 
             })}
@@ -25,6 +72,10 @@ const BookForm = () => {
         </form>
         </>
     )
+}
+
+BookForm.propTypes = {
+    bookName: PropTypes.string, 
 }
 
 export default BookForm 

@@ -1,12 +1,11 @@
+import PropTypes from "prop-types";
 import {useState} from "react"; 
 
-const Glider = () => {
+const Glider = (props) => {
     const [chapterWeight, setChapterWeight] = useState(10); 
-    console.log(document.getElementById("node_type")); 
-    console.log(document.getElementById("node_text"));  
-
     const onChangeCallback = (e) => {
         setChapterWeight(e.target.value); 
+        props.onChangeFunction(e); 
     }
 
     return (
@@ -28,4 +27,9 @@ const Glider = () => {
     )
 }
 
+Glider.propTypes = {
+    onChangeFunction : PropTypes.func, 
+}
+
 export default Glider; 
+
