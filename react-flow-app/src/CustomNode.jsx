@@ -25,7 +25,7 @@ function CustomNode({ data, id, sourcePosition, targetPosition, positionAbsolute
       id: newNodeId,
       sourcePosition: sourcePosition, 
       targetPosition: targetPosition,  
-      position: { x: positionAbsoluteX + 500, y: positionAbsoluteY },
+      position: { x: positionAbsoluteX, y: positionAbsoluteY + 200},
       data: { label: label },
     });
     addEdges({ id: `${id}->${newNodeId}`, source: id, target: newNodeId });

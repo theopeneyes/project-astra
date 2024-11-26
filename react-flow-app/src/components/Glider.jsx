@@ -2,6 +2,8 @@ import {useState} from "react";
 
 const Glider = () => {
     const [chapterWeight, setChapterWeight] = useState(10); 
+    console.log(document.getElementById("node_type")); 
+    console.log(document.getElementById("node_text"));  
 
     const onChangeCallback = (e) => {
         setChapterWeight(e.target.value); 
@@ -10,7 +12,7 @@ const Glider = () => {
     return (
         <>
         <div className="relative mb-6">
-            <label for="large-range" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Chapter Weights</label>
+            <label htmlFor="large-range" className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Chapter Weights</label>
             <input 
                 id="large-range" 
                 type="range" 
