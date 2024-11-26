@@ -23,6 +23,7 @@ import CustomNode from './CustomNode';
 import useAnimatedNodes from './useAnimatedNodes';
 import useExpandCollapse from './useExpandCollapse';
 import { useControls } from 'leva';
+import { useFetchNodes } from './useFetchNodes';
 
 
 import '@xyflow/react/dist/style.css';
@@ -68,34 +69,31 @@ function ReactFlowApp({
   const fileName = params.fileName;  
   const url = `http://127.0.0.1:8000/reactFlow/${emailId}/${fileName}` 
   const proOptions = { account: 'paid-pro', hideAttribution: true };
-
+  const { initialNodes, initialEdges } = useFetchNodes(url); 
+  
   // add effect 
-  const [nodes, setNodes] = useState([]);
-  const [edges, setEdges] = useState([]); // console.log(backendData)
+  console.log("Initial Nodes", initialNodes); 
+  const [nodes, setNodes] = useState(initialNodes);
+  const [edges, setEdges] = useState(initialEdges); // console.log(backendData)
+
   const [nodeName, setNodeName] = useState(params.fileName); 
   const [nodeType, setNodeType] = useState("Book"); 
 
-  useEffect(() => {
-    const fetchUrlData = async () => {
-      await fetch(url).then(
-        async (response) => await response.json()
-      ).then(async ({ initialNodes, initialEdges }) => {
-        setNodes(initialNodes); 
-        setEdges(initialEdges); 
-      })
-    }
-    fetchUrlData(); 
-  }, [])
-  
+  console.log("Nodes", nodes); 
+
   const { nodes: visibleNodes, edges: visibleEdges } = useExpandCollapse(
     nodes,
     edges,
     {treeWidth, treeHeight}
   );
 
+  console.log("The visibleNodes vector = ", visibleNodes)
+
   const { nodes: animatedNodes } = useAnimatedNodes(visibleNodes, {
     animationDuration,
   });
+
+  console.log(animatedNodes); 
 
   const onNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -136,8 +134,6 @@ function ReactFlowApp({
         );
       }, [setNodes]
   ); 
-
-
 
   const onConnect = useCallback(
     (params) => setEdges((eds) => addEdge(params, eds)),
