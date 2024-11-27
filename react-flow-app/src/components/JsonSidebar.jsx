@@ -17,7 +17,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
-        <BookForm bookName={props.nodeName} />
+        <BookForm nodeId={props.nodeId} bookName={props.nodeName} />
       </SidebarTemplate>
       </>
     )
@@ -31,7 +31,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
-        <ChapterForm chapterName={props.nodeName} /> 
+        <ChapterForm nodeId={props.nodeId} chapterName={props.nodeName} /> 
       </SidebarTemplate>
       </>
     )
@@ -43,7 +43,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
-        <TopicForm/> 
+        <TopicForm nodeId={props.nodeId} topicName={props.nodeName}/> 
       </SidebarTemplate>
       </>
     )
@@ -64,7 +64,8 @@ const JsonSidebar = (props) => {
 
 JsonSidebar.propTypes = {
   nodeName: PropTypes.string,  
-  nodeType: PropTypes.string
+  nodeType: PropTypes.string, 
+  nodeId: PropTypes.string, 
 }
 
 export default JsonSidebar

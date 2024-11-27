@@ -1,36 +1,40 @@
 import SelectBox from "./SelectBox"
 import { questionTypes } from "./QuestionTypes";
+import { useState } from "react"; 
 import PropTypes from "prop-types";
 
 
 const preferenceLevel = ["Ignore", "High", "Medium", "Low" ]; 
 
 const TopicForm = (props) => {
-    const onTopicSubmit = (e) => {
-        e.preventDefault(); 
-    }
 
     const [storageContent, setStorageContent] = useState({
         nodeName: props.topicName, 
         nodeType: "topic", 
-        nodeContent: null,  
+        nodeId: props.nodeId, 
+        nodeContent: {
+            preferenceLevel: "Ignore", 
+            questionType: "True/False", 
+        },  
     })
 
-    const [nodeContent, setNodeContent] = useState({
-        preferenceLevel: null, 
-        questionType: null, 
-    })
+    const onTopicSubmit = (e) => {
+        e.preventDefault(); 
+        localStorage.setItem(`topic-${props.topicName}`, JSON.stringify(storageContent))
+    }
 
     const onTopicMetadataChange = (e) => {
         const metadataType = e.target.id; 
         const optionSelected = e.target.value; 
-        
-        setNodeContent((prev) => {
-            return {...prev, [metadataType]: optionSelected}
-        })
 
         setStorageContent((prev) => {
-            return {...prev, nodeContent: nodeContent}; 
+            return {...prev, 
+                nodeName: props.topicName, 
+                nodeId: props.nodeId, 
+                nodeContent: {
+                ...prev.nodeContent, 
+                [metadataType]: optionSelected, 
+            }}; 
         })
     }
 
@@ -67,6 +71,7 @@ const TopicForm = (props) => {
 
 TopicForm.propTypes = {
     topicName: PropTypes.string, 
+    nodeId: PropTypes.string, 
 }
 
 export { TopicForm, questionTypes } 

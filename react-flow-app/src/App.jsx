@@ -57,6 +57,7 @@ function ReactFlowApp({
 
   const [nodeName, setNodeName] = useState(params.fileName); 
   const [nodeType, setNodeType] = useState("Book"); 
+  const [nodeId, setNodeId] = useState("");  
 
   const { nodes: visibleNodes, edges: visibleEdges } = useExpandCollapse(
     nodes,
@@ -83,6 +84,8 @@ function ReactFlowApp({
   const onNodeClick = useCallback(
       (_, node) => {
         setNodeName(node.data.label); 
+        setNodeId(node.id); 
+
         if(node.id.startsWith("chapter")) {
           setNodeType("Chapter"); 
         } else if (node.id.startsWith("topic")) {
@@ -142,6 +145,7 @@ function ReactFlowApp({
         <JsonSidebar 
           nodeName={nodeName} 
           nodeType={nodeType} 
+          nodeId={nodeId}
         /> 
       </div>
     </> 

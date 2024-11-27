@@ -3,7 +3,6 @@ import { useState } from "react";
 import QuestionCount from "./QuestionCount" 
 import PropTypes from "prop-types";
 
-
 const questionToKeyMap = {
     "True/False": "trueFalse", 
     "Fill in the blanks": "fillInTheBlanks", 
@@ -17,32 +16,34 @@ const BookForm = (props) => {
     const [storageContent, setStorageContent] = useState({
         nodeName: props.bookName, 
         nodeType: "book", 
-        nodeContent: null, 
-    })
-
-    const [questionDetails, setQuestionDetails] = useState({
-        fillInTheBlanks: 0, 
-        trueFalse: 0, 
-        shortQuestionAnswer: 0, 
-        multipleChoice: 0, 
-        computationQuestion: 0, 
-        softwareCodeQuestion: 0, 
+        nodeId: props.nodeId, 
+        nodeContent: {
+            fillInTheBlanks: 0, 
+            trueFalse: 0, 
+            shortQuestionAnswer: 0, 
+            multipleChoice: 0, 
+            computationQuestion: 0, 
+            softwareCodeQuestion: 0, 
+        }, 
     })
 
     const onQuestionCountChange = (e) => {
         const questionType = questionToKeyMap[e.target.id]; 
         const questionCount = e.target.value; 
-        setQuestionDetails((prev) => {
-            return {...prev, [questionType]: parseInt(questionCount) }
-        })
 
         setStorageContent((prev) => {
-            return {...prev, [nodeContent]: questionDetails}
+            return {...prev, 
+                nodeName: props.bookName, 
+                nodeId: props.nodeId, 
+                nodeContent: {
+                ...prev.nodeContent, [questionType]: parseInt(questionCount)
+            }}
         })
     }
 
     const onSubmitBookData = (e) => {
         e.preventDefault(); 
+        localStorage.setItem(`book-${props.bookName}`, JSON.stringify(storageContent)); 
     }
 
     return (
@@ -76,6 +77,7 @@ const BookForm = (props) => {
 
 BookForm.propTypes = {
     bookName: PropTypes.string, 
+    nodeId: PropTypes.string, 
 }
 
 export default BookForm 

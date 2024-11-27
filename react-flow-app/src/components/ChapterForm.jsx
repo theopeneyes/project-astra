@@ -7,25 +7,29 @@ const ChapterForm = (props) => {
     const [storageNode, setStorageNode] = useState({
         nodeName: props.chapterName, 
         nodeType: "chapter", 
-        nodeContent: null,  
+        nodeId: props.nodeId, 
+        nodeContent: {
+            gliderValue: 0, 
+        },  
     }) 
 
-    const [nodeContent, setNodeContent] = useState({
-        gliderValue: null, 
-    })
 
     const onGliderSubmit = (e) => {
         e.preventDefault(); 
+        localStorage.setItem(`chapter-${props.chapterName}`, JSON.stringify(storageNode)); 
     }
 
     const onGliderChangeFunction = (e) => {
-        setNodeContent((prev) => {
-            return {...prev, gliderValue: parseInt(e.target.value)}
-        })
-
-        setStorageNode((prev) => {
-            return {...prev, nodeContent: nodeContent}
-        })
+        
+        setStorageNode((prev) => ({
+            ...prev, 
+            nodeName: props.chapterName, 
+            nodeId: props.nodeId, 
+            nodeContent: { 
+                ...prev.nodeContent, 
+                gliderValue: parseInt(e.target.value)  
+            },
+        }));
     }
 
     return (
@@ -50,6 +54,7 @@ const ChapterForm = (props) => {
 
 ChapterForm.propTypes = {
     chapterName: PropTypes.string, 
+    nodeId: PropTypes.string, 
 }
 
 export default ChapterForm 
