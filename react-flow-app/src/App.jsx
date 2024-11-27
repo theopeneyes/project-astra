@@ -120,7 +120,7 @@ function ReactFlowApp({
 
   return (
     <> 
-      <div className="Reactflow">
+      <div className="Reactflow-js">
         <ReactFlow
           fitView 
           nodes={animatedNodes}

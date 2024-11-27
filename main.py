@@ -30,6 +30,8 @@ from typing import Dict, List
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi import Request 
+
 from transformers import AutoTokenizer
 
 import PIL 
@@ -767,7 +769,27 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         time=time.time() - start_time, 
         token_count=token_count, 
     )
-    
+
+@app.post("/generation_data")
+async def generation_data(request: Request) -> JSONResponse: 
+    data = await request.json() 
+    emailId = data["emailId"]
+    fileName = data["fileName"]
+    try: 
+        blob = bucket.blob(os.path.join(
+            emailId, 
+            "generation_data", 
+            f"{fileName}.json", 
+        ))
+
+        with blob.open("w") as f: 
+            f.write(data["generationData"]) 
+
+    except Exception as er: 
+        print(er) 
+
+    return {"email_id": emailId, "filename": fileName} 
+
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     start_time: float = time.time()
