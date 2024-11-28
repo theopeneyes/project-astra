@@ -7,10 +7,11 @@ import PropTypes from "prop-types";
 const preferenceLevel = ["Ignore", "High", "Medium", "Low" ]; 
 
 const TopicForm = (props) => {
-
     const [storageContent, setStorageContent] = useState({
         nodeName: props.topicName, 
         nodeType: "topic", 
+        bookName: props.nodeId.split("=")[2].split(":")[0], 
+        chapterName: props.nodeId.split("=")[2].split(":")[1],  
         nodeId: props.nodeId, 
         nodeContent: {
             preferenceLevel: "Ignore", 
@@ -30,6 +31,8 @@ const TopicForm = (props) => {
         setStorageContent((prev) => {
             return {...prev, 
                 nodeName: props.topicName, 
+                bookName: props.nodeId.split("=")[2].split(":")[0], 
+                chapterName: props.nodeId.split("=")[2].split(":")[1],  
                 nodeId: props.nodeId, 
                 nodeContent: {
                 ...prev.nodeContent, 

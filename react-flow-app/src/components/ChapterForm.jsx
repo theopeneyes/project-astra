@@ -6,10 +6,11 @@ const ChapterForm = (props) => {
 
     const [storageNode, setStorageNode] = useState({
         nodeName: props.chapterName, 
+        bookName: props.nodeId.split("chapter=")[1].split(":")[0], 
         nodeType: "chapter", 
         nodeId: props.nodeId, 
         nodeContent: {
-            gliderValue: 0, 
+            gliderValue: 10, 
         },  
     }) 
 

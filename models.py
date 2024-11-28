@@ -102,5 +102,11 @@ class SynthesisContentOutputModel(AbsoluteBaseModel):
     branch_name: str 
     time: float 
     token_count: int 
+
+class MetaDataEditModel(AbsoluteBaseModel): 
+    pass 
+
+class MetaDataEditResponseModel(AbsoluteBaseModel): 
+    time: float 
     
  

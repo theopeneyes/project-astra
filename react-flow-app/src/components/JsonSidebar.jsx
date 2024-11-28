@@ -7,7 +7,6 @@ import SidebarTemplate from './SidebarTemplate'
 import PropTypes from 'prop-types'
 import BookForm from "./BookForm"
 import { useParams } from 'react-router-dom'
-import { useState } from "react"; 
 
 
 const JsonSidebar = (props) => {
@@ -17,16 +16,25 @@ const JsonSidebar = (props) => {
   const userEmail = params.emailId; 
 
   const handlePush = async () => {
-    let items = []; 
+    let bookContent = [];  
+    let chapterContent = []; 
+    let topicContent = []; 
     for(let i = 0; i < localStorage.length; i++) {
-      if (localStorage.key(i).startsWith("chapter") || 
-          localStorage.key(i).startsWith("book") || 
-          localStorage.key(i).startsWith("topic")) {
-            items.push(JSON.parse(localStorage
-              .getItem(
-                localStorage.key(i))  
-            )); 
-          } 
+      if(localStorage.key(i).startsWith("book")) {
+        // need to also check if we are using the correct book 
+        bookContent.push(JSON.parse(localStorage
+          .getItem(localStorage.key(i)))); 
+
+      }else if (localStorage.key(i).startsWith("chapter")) {
+        chapterContent.push(JSON.parse(localStorage
+          .getItem(localStorage.key(i)))); 
+
+      } else if (localStorage.key(i).startsWith("topic")) {
+        topicContent.push(JSON.parse(localStorage
+          .getItem(localStorage.key(i))
+        )); 
+
+      }
     }
 
     try {
@@ -38,14 +46,19 @@ const JsonSidebar = (props) => {
         body: JSON.stringify({
           emailId: userEmail, 
           fileName: fileName, 
-          generationData: items,  
+          generationData: {
+            book: bookContent, 
+            chapters: chapterContent, 
+            topics: topicContent, 
+          },  
         })
       })
 
       if(!response.ok) {
         throw new Error("Exception occured. Network didn't work."); 
+      } else {
+        localStorage.clear(); 
       }
-
     } catch (error) {
       console.log(error); 
     }
@@ -71,7 +84,6 @@ const JsonSidebar = (props) => {
       </SidebarTemplate>
       </>
     )
-
   }
   else if(props.nodeType == "Chapter") {
     return (

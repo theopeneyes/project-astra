@@ -24,6 +24,8 @@ from models import SynthesisContentInputModel
 from models import SynthesisContentOutputModel 
 from models import ModificationInputModel 
 from models import ModificationOutputModel 
+from models import MetaDataEditModel 
+from models import MetaDataEditResponseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -33,6 +35,7 @@ from fastapi.responses import JSONResponse
 from fastapi import Request 
 
 from transformers import AutoTokenizer
+from collections import defaultdict
 
 import PIL 
 import random 
@@ -56,6 +59,8 @@ from generation.prompts import prompts, qna_validation_prompt
 
 from summarizer.summarize import summarize_texts
 from summarizer.prompts import summarization_prompt
+
+from json_editor.editor import edit_metadata
 
 from language_detection.detector import detect_language
 from language_detection.prompts import language_detection_prompt
@@ -94,6 +99,14 @@ load_dotenv(override=True)
 # OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
 # HF_TOKEN: str = os.getenv("HF_TOKEN", None) # Huggingface token 
 
+question_type_map: Dict[str, str] = {
+    "True/False": "trueFalse", 
+    "Fill in the blanks": "fillInTheBlanks", 
+    "Short Question Answer": "shortQuestionAnswer", 
+    "Multiple Choice": "multipleChoice", 
+    "Computational Questions": "computationQuestion", 
+    "Software Code Questions": "softwareCodeQuestion", 
+}
 
 
 PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
@@ -703,7 +716,7 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     with final_json_blob.open("r") as f: 
         final_json = json.load(fp=f)
     
-    topics, headings, concepts = segregator(final_json)
+    topics, concepts, headings = segregator(final_json)
     
     topic_blob = bucket.blob(os.path.join(
         uploaded_file.email_id, 
@@ -770,6 +783,58 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         token_count=token_count, 
     )
 
+@app.post("/add_word_count") 
+async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEditResponseModel: 
+    start_time = time.time()
+    final_json_blob = bucket.blob(os.path.join(
+        edit_metadata_request.email_id, 
+        "final_json", 
+        f"{edit_metadata_request.filename.split('.pdf')[0]}.json", 
+    ))
+
+    with final_json_blob.open("r") as f:
+        final_json = json.load(fp=f)
+    
+    concept_blob = bucket.blob(os.path.join(
+        edit_metadata_request.email_id, 
+        "books", 
+        edit_metadata_request.filename, 
+        "concept.json"
+    ))
+
+    topic_blob = bucket.blob(os.path.join(
+        edit_metadata_request.email_id, 
+        "books", 
+        edit_metadata_request.filename, 
+        "topic.json"
+    ))
+
+    heading_text_blob = bucket.blob(os.path.join(
+        edit_metadata_request.email_id, 
+        "books", 
+        edit_metadata_request.filename, 
+        "heading_text.json"
+    ))
+
+    with concept_blob.open("r") as f: 
+        concept_json = json.load(fp=f) 
+
+    with topic_blob.open("r") as f: 
+        topic_json = json.load(fp=f) 
+
+    with heading_text_blob.open("r") as f: 
+        heading_json = json.load(fp=f)
+        
+    metadata_edited_final: List = edit_metadata(final_json, heading_json, concept_json, topic_json)
+    with final_json_blob.open("w") as f: 
+        json.dump(metadata_edited_final, fp=f)
+    
+    return MetaDataEditResponseModel(
+        filename=edit_metadata_request.filename, 
+        email_id=edit_metadata_request.email_id, 
+        time=time.time() - start_time, 
+    )
+
 @app.post("/generation_data")
 async def generation_data(request: Request) -> JSONResponse: 
     data = await request.json() 
@@ -783,12 +848,35 @@ async def generation_data(request: Request) -> JSONResponse:
         ))
 
         with blob.open("w") as f: 
-            f.write(data["generationData"]) 
+            json.dump(data["generationData"], fp=f)
 
     except Exception as er: 
         print(er) 
 
-    return {"email_id": emailId, "filename": fileName} 
+    generation_config: Dict = data["generationData"]
+    qna_book_level_data = generation_config["book"][0]["nodeContent"] 
+
+    mi = defaultdict(lambda: defaultdict(int))
+    for question_type, question_count in qna_book_level_data.items():  
+        for chapter_node in generation_config["chapters"]: 
+            mi[question_type][chapter_node["nodeName"]]= int((chapter_node["nodeContent"]["gliderValue"]  / 100) * question_count) 
+
+    mj = defaultdict(set)
+    for topic_node in generation_config["topics"]: 
+        question_type_key = question_type_map[topic_node["nodeContent"]["questionType"]]
+        mj[question_type_key].add(topic_node["chapterName"])
+
+    mk = defaultdict(lambda: defaultdict(int)) 
+    for question_type, question_count in qna_book_level_data.items(): 
+        weights = 0 
+
+        for chapter_name in mj[question_type]: 
+            weights += mi[question_type][chapter_name]
+
+        for chapter_name in mj[question_type]: 
+            mk[question_type][chapter_name] = int((mi[question_type][chapter_name] / weights) * question_count) 
+
+    return {"email_id": emailId, "filename": fileName, "computed_question_data": mk} 
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
