@@ -32,10 +32,10 @@ class SummarizationOutputModel(AbsoluteBaseModel):
     time: float 
 
 # generation context model 
-class GenerationContext(BaseModel): 
-    topics: List[str]
-    context: str
+class GenerationContext(AbsoluteBaseModel): 
     question_type: str
+    chapter_name: str 
+    topic_name: str 
     language: str
 
 # encoded images list 
@@ -109,4 +109,5 @@ class MetaDataEditModel(AbsoluteBaseModel):
 class MetaDataEditResponseModel(AbsoluteBaseModel): 
     time: float 
     
- 
+class LLMGenerationRequestModel(AbsoluteBaseModel):  
+    language: str

@@ -789,7 +789,7 @@ async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEd
     final_json_blob = bucket.blob(os.path.join(
         edit_metadata_request.email_id, 
         "final_json", 
-        f"{edit_metadata_request.filename.split('.pdf')[0]}.json", 
+        f"{edit_metadata_request.filename}.json", 
     ))
 
     with final_json_blob.open("r") as f:
@@ -840,54 +840,211 @@ async def generation_data(request: Request) -> JSONResponse:
     data = await request.json() 
     emailId = data["emailId"]
     fileName = data["fileName"]
+
+    degree_weights: Dict = {
+       5: 1, 
+       4: 0.8, 
+       3: 0.6, 
+       2: 0.4, 
+       1: 0.2,  
+    }
+    
+    assign_value_weights : Dict = {
+        1: 1, 
+        2: 0.5, 
+        3: 0.25, 
+    }
+
+    depth_value_weights: Dict = degree_weights.copy()
+
+    preference_weights = {
+        "High": 1, 
+        "Medium": 0.5, 
+        "Low": 0.25, 
+        "Ignore": 0, 
+    }
+
+    generation_config: Dict = data["generationData"]
+    qna_book_level_data = generation_config["book"][0]["nodeContent"]
+
+    mi = defaultdict(lambda: defaultdict(int))
+    for question_type, question_count in qna_book_level_data.items():
+        for chapter_node in generation_config["chapters"]:
+            mi[question_type][chapter_node["nodeName"]]= int((chapter_node["nodeContent"]["gliderValue"]  / 100) * question_count)
+
+    ms = defaultdict(lambda: defaultdict(list))
+    mj = defaultdict(lambda: defaultdict(str))
+    for topic_node in generation_config["topics"]:
+        question_type_key = question_type_map[topic_node["nodeContent"]["questionType"]]
+        mj[question_type_key][topic_node["chapterName"]] = {
+            "topic": topic_node["nodeName"],
+            "preferenceLevel": topic_node["nodeContent"]["preferenceLevel"]
+        }
+        
+        ms[question_type_key][topic_node["chapterName"]].append({
+            "topic": topic_node["nodeName"],
+            "preferenceLevel": topic_node["nodeContent"]["preferenceLevel"]
+        })
+
+    mk = defaultdict(lambda: defaultdict(int))
+    for question_type, question_count in qna_book_level_data.items():
+        weights = 0
+
+        for chapter_name in mj[question_type]:
+            weights += mi[question_type][chapter_name]
+
+        for chapter_name in mj[question_type]:
+            if weights != 0: 
+                mk[question_type][chapter_name] = int((mi[question_type][chapter_name] / weights) * question_count)
+
+    # now getting the topic weights 
+    preference_weights = {
+        "High": 1, 
+        "Medium": 0.5, 
+        "Low": 0.25, 
+        "Ignore": 0, 
+    }
+
+    question_distribution: Dict = defaultdict(
+        lambda : defaultdict(
+            lambda : defaultdict(int)
+        )
+    ) 
+    for question_type, associated_chapters in mk.items(): 
+
+        for chapter_name, chapter_question_count in associated_chapters.items(): 
+            net_weights = 0  
+            
+            for topic_data in ms[question_type][chapter_name]:
+                net_weights += preference_weights[topic_data["preferenceLevel"]]
+
+            for topic_node in ms[question_type][chapter_name]:
+                question_distribution[question_type][chapter_name][topic_node['topic']] =int(round(
+                    chapter_question_count * 
+                    (preference_weights[topic_node["preferenceLevel"]] / net_weights) 
+                , 0))
+
+    modified_final_json : List = []
+
     try: 
-        blob = bucket.blob(os.path.join(
+        final_json_blob = bucket.blob(os.path.join(
             emailId, 
-            "generation_data", 
+            "final_json", 
             f"{fileName}.json", 
         ))
 
-        with blob.open("w") as f: 
-            json.dump(data["generationData"], fp=f)
+        with final_json_blob.open("r") as f: 
+            final_json = json.load(fp=f)
+        
+        didnt_enter_count = 0  
+        for _, js_object in enumerate(final_json) :
+            if ("topic_strength" in js_object 
+                and "topic_representation_depth" in js_object 
+                and "topic_representation_strength" in js_object): 
 
-    except Exception as er: 
-        print(er) 
+                js_object["cumulative_strength"] = (degree_weights[js_object["topic_strength"]] + 
+                                depth_value_weights[js_object["topic_representation_depth"]] +
+                                assign_value_weights[js_object["topic_representation_strength"]]) 
 
-    generation_config: Dict = data["generationData"]
-    qna_book_level_data = generation_config["book"][0]["nodeContent"] 
+                modified_final_json.append(js_object)
+            else: 
+                js_object["cumulative_strength"] = 0
+                didnt_enter_count += 1
+                # print(json.dumps(js_object, indent=4))
+            
+        print("Error count ", didnt_enter_count) 
+        print("Net length ", len(final_json)) 
+        # modified_final_json = sorted(modified_final_json, key = lambda x: x["cumulative_strength"], reverse=True)
+        
+        # with final_json_blob.open("w") as f: 
+        #     json.dump(modified_final_json, fp=f)
 
-    mi = defaultdict(lambda: defaultdict(int))
-    for question_type, question_count in qna_book_level_data.items():  
-        for chapter_node in generation_config["chapters"]: 
-            mi[question_type][chapter_node["nodeName"]]= int((chapter_node["nodeContent"]["gliderValue"]  / 100) * question_count) 
+    except Exception as err: 
+        print("Error occured!")
+        print(err)
+    
+    question_list: Dict = defaultdict(
+        lambda : defaultdict(
+            lambda : defaultdict(lambda : {
+                "topic_question_count": 0, 
+                "topic_json": [] 
+            })
+        )
+    ) 
 
-    mj = defaultdict(set)
-    for topic_node in generation_config["topics"]: 
-        question_type_key = question_type_map[topic_node["nodeContent"]["questionType"]]
-        mj[question_type_key].add(topic_node["chapterName"])
+    if modified_final_json:
+        # print(json.dumps(modified_final_json, indent=4)) 
+        for question_type, chapter_map in question_distribution.items(): 
+            for chapter_name, topic_nodes in chapter_map.items(): 
+                for topic_name, question_count in topic_nodes.items(): 
+                    # print("topic name ", topic_name)
+                    # print("topics at home ", list(topic_nodes.keys())) 
+                    # print(list(filter(lambda mp: mp["topic"] == topic_name, modified_final_json))) 
 
-    mk = defaultdict(lambda: defaultdict(int)) 
-    for question_type, question_count in qna_book_level_data.items(): 
-        weights = 0 
+                    question_list[question_type][chapter_name][topic_name]["topic_question_count"] = question_count
+                    question_list[question_type][chapter_name][topic_name]["topic_json"] = (
+                        sorted(list(filter(lambda mp: mp["heading_text"] == topic_name, modified_final_json)),
+                        key = lambda x: x["cumulative_strength"], reverse=True) 
+                    )       
 
-        for chapter_name in mj[question_type]: 
-            weights += mi[question_type][chapter_name]
+        
+        qd_dict = {} 
+        for key, value in dict(question_list).items():
+            qd_dict[key] = dict(value)
+            for k, v in value.items():
+                qd_dict[key][k] = dict(v)
+         
+        # print(json.dumps(qd_dict, indent=4)) 
+        
+        try: 
+            generation_data_blob = bucket.blob(os.path.join(
+                emailId, 
+                "generation_data", 
+                f"{fileName}.json", 
+            ))
 
-        for chapter_name in mj[question_type]: 
-            mk[question_type][chapter_name] = int((mi[question_type][chapter_name] / weights) * question_count) 
+            with generation_data_blob.open("w") as f: 
+                json.dump(qd_dict, fp=f)
+
+        except Exception as e: 
+            print("No such object found")
+            print(e)
+    else: 
+        print("The list was empty ")
 
     return {"email_id": emailId, "filename": fileName, "computed_question_data": mk} 
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     start_time: float = time.time()
+
+    try: 
+        generation_metadata_blob = bucket.blob(os.path.join(
+            context.email_id, 
+            "generated_data", 
+            f"{context.filename}.json", 
+        ))
+    except Exception as e: 
+        print(f"The file {context.filename} has not been processed")
+        print(e)
+
+    with generation_metadata_blob.open("r") as f: 
+        generation_data = json.load(fp=f)
+    
+    associated_json: Dict = generation_data[context.question_type][context.chapter_name][context.topic_name]
+    question_count = associated_json["question_count"] 
+    text = ""
+
+    for paragraph_node in associated_json["topic_json"]: 
+        text += paragraph_node["text"]
+
     qna_prompt: str = prompts[context.question_type]
     qna, token_count = generate_response(
         messages=text_message, 
         prompt=qna_prompt, 
         validation_prompt=qna_validation_prompt, 
-        context=context.context, 
-        topics=context.topics, 
+        context=text,  
+        question_count=question_count, 
         language=context.language, 
         gpt4o_encoder=gpt4o_encoder, 
         gpt4o=gpt4o, 

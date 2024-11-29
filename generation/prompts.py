@@ -1,13 +1,28 @@
 from typing import Dict 
 # prompts for generation for different types of outputs 
 
+qna_validation_prompt: str = """
+Reflect on Previous Attempts:
+Think about any past responses to similar tasks. Identify what went well and any common mistakes. Plan adjustments to avoid repeating errors.
+Thought Process (Step-by-Step Reasoning):
+Break down the task step-by-step to ensure clarity and accuracy.
+{}
+Actions:
+Step 1: Convert the given context into desired question using the following prompt {}
+Step 2: Validate the clarity, conciseness, and context relevance and consolidate them as described in {}
+Observation:
+After each step, check if the output aligns with task requirements. Adjust if necessary.
+Reflection:
+Review the completed answer. Reflect on whether all aspects of the prompt were addressed accurately and concisely.
+Revise if any critical detail is missing or any part of the response fails to meet the prompt’s requirements.
+"""
 short_question_answer_prompt: str = """
 You are a Short Question Answer Generator Bot. Your goal is to generate Short 
 Question Answers based on the following instructions.  
 
 Definition: Short answer questions are typically composed of a brief prompt that demands a written answer that varies in length from one or two words to a few sentences.
 
-###TASK###: You MUST create Short Answer Question based on the provided text and the topic to which they fall under. 
+###TASK###: You MUST create Short Answer Question based on the provided text and generate n question answers based on the provided user input. 
 
 ### OUTPUT FORMAT: 
 Your output MUST be in the following format: 
@@ -28,10 +43,11 @@ You MUST generate the content in a professional tone and educational exam questi
 You MUST not mention intended audience of the activity in the description.
 You MUST also provide the correct answer along with the reasons.
 
-##TOPICS: {}
-
 ## TEXT: 
 {}
+
+## Number of Questions to be Generated:
+{} 
 
 ### Question Answers:
 """
@@ -67,10 +83,13 @@ You are a True/ false Question Generator Bot. Your task is to create question as
  ###Incentives###
  You will receive a tip of $$$ for correct description. 
  You will be penalized if you fail to follow instructions or examples
- 
-##TOPICS: {}
+
 
 ## TEXT: 
+{}
+
+
+## Number of questions to be generated:  
 {}
 
 ### Question Answers:
@@ -157,9 +176,11 @@ You are a Computational Question Generator Bot. Your task is to create question 
  You will receive a tip of $$$ for correct description. 
  You will be penalized if you fail to follow instructions or examples
 
-##TOPICS: {}
 
 ## TEXT: 
+{}
+
+## Number of Questions to be Generated: 
 {}
 
 ### Question Answers:
@@ -188,9 +209,11 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
  You will receive a tip of $$$ for correct description. 
  You will be penalized if you fail to follow instructions or examples
  
-##TOPICS: {}
 
 ## TEXT: 
+{}
+
+## Number of questions to be generated
 {}
 
 ### Question Answers:
@@ -203,19 +226,3 @@ prompts: Dict[str, str] = {
     "Computational Questions": computational_questions_prompt,
     "Software Code Questions": software_code_questions_prompt 
 }
-
-qna_validation_prompt: str = """
-Reflect on Previous Attempts:
-Think about any past responses to similar tasks. Identify what went well and any common mistakes. Plan adjustments to avoid repeating errors.
-Thought Process (Step-by-Step Reasoning):
-Break down the task step-by-step to ensure clarity and accuracy.
-{}
-Actions:
-Step 1: Convert the given context into desired question using the following prompt {}
-Step 2: Validate the clarity, conciseness, and context relevance and consolidate them as described in {}
-Observation:
-After each step, check if the output aligns with task requirements. Adjust if necessary.
-Reflection:
-Review the completed answer. Reflect on whether all aspects of the prompt were addressed accurately and concisely.
-Revise if any critical detail is missing or any part of the response fails to meet the prompt’s requirements.
-"""

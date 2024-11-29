@@ -57,11 +57,15 @@ const JsonSidebar = (props) => {
       if(!response.ok) {
         throw new Error("Exception occured. Network didn't work."); 
       } else {
-        localStorage.clear(); 
+        console.log("Clear localStorage")
+        // localStorage.clear(); 
       }
+
+      console.log(response.json())
     } catch (error) {
       console.log(error); 
     }
+
   }
 
   if (props.nodeType == "Book") {

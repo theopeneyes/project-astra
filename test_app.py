@@ -366,13 +366,7 @@ def intro():
     """)
 
 @st.fragment
-def generate_qna(json_df: pd.DataFrame, topics: List[str], language: str): 
-    selected_topics = st.multiselect("Topics", options=topics)
-
-    qna_type: str = st.selectbox(
-        "QNA Type", 
-        options = prompts, 
-    )
+def generate_qna(filename: str, language: str, email_id: str): 
 
     topic_clicked = st.button("Filter and Generate")
 
@@ -380,43 +374,31 @@ def generate_qna(json_df: pd.DataFrame, topics: List[str], language: str):
     # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
     # print(short_answer_prompt)
     if topic_clicked: 
-        with st.spinner("Generating Question Answers..."): 
-        # Using the sub domains obtained above to filter the dataframe  
-        # TODO: Use groq api for this generation  
-            json_df.dropna(inplace=True)
-            filtered_df: pd.DataFrame = json_df[json_df.apply(
-                lambda x: any([ topic in x["major_domains"] + x["concept"] + x["sub_domains"]
-                            for topic in selected_topics]), axis=1)]
+        response = requests.post(
+            URL + "/generate", 
+            json = {
+                "email_id": email_id, 
+                "filename": filename, 
+                # "question_type": qna_type, 
+                "language": language  
+            }
+        )
+        content = response.json()["output"]
+        # content: str = generate_response(
+        #     prompts[qna_type], 
+        #     topics=topics, 
+        #     context=texts, 
+        #     hf_token=HF_TOKEN, 
+        # )
 
-
-            texts: List[str] = filtered_df["text"].to_list()
-            topics = [topic for topic in topics if isinstance(topic, str)]
-
-            response = requests.post(
-                URL + "/generate", 
-                json = {
-                    "topics": topics, 
-                    "context": " ".join(texts), 
-                    "question_type": qna_type, 
-                    "language": language  
-                }
-            )
-            content = response.json()["output"]
-            # content: str = generate_response(
-            #     prompts[qna_type], 
-            #     topics=topics, 
-            #     context=texts, 
-            #     hf_token=HF_TOKEN, 
-            # )
-
-            # content = requests.post(
-            #     URL + "/generate", 
-            #     json = {
-            #         "context": " ".join(texts), 
-            #         "topics": topics, 
-            #         "question_type": qna_type, 
-            #     }
-            # ).json()
+        # content = requests.post(
+        #     URL + "/generate", 
+        #     json = {
+        #         "context": " ".join(texts), 
+        #         "topics": topics, 
+        #         "question_type": qna_type, 
+        #     }
+        # ).json()
 
         st.write(content, unsafe_allow_html=True)
 
@@ -552,7 +534,7 @@ def password_reset():
     Thank you for your patience!
     ''') 
 
-def create_user_folders(email: str):
+def create_user_folders(email: str): 
     """Create the necessary folders for the user in the GCS bucket."""
     user_folder = email  # Use the user's email as the folder name
 

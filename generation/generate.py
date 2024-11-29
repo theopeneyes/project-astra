@@ -5,15 +5,15 @@ def generate_response(
     messages: List[Dict], 
     prompt: str, 
     validation_prompt: str, 
-    topics: List[str], 
+    question_count: int, 
     context: List[str],
     language: str,  
     gpt4o_encoder, 
     gpt4o) -> str: 
 
     prompt = prompt.format(
-        str(topics), 
         context, 
+        question_count, 
     )
 
     messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
