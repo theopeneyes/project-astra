@@ -914,6 +914,7 @@ async def generation_data(request: Request) -> JSONResponse:
             lambda : defaultdict(int)
         )
     ) 
+
     for question_type, associated_chapters in mk.items(): 
 
         for chapter_name, chapter_question_count in associated_chapters.items(): 
@@ -977,14 +978,9 @@ async def generation_data(request: Request) -> JSONResponse:
     ) 
 
     if modified_final_json:
-        # print(json.dumps(modified_final_json, indent=4)) 
         for question_type, chapter_map in question_distribution.items(): 
             for chapter_name, topic_nodes in chapter_map.items(): 
                 for topic_name, question_count in topic_nodes.items(): 
-                    # print("topic name ", topic_name)
-                    # print("topics at home ", list(topic_nodes.keys())) 
-                    # print(list(filter(lambda mp: mp["topic"] == topic_name, modified_final_json))) 
-
                     question_list[question_type][chapter_name][topic_name]["topic_question_count"] = question_count
                     question_list[question_type][chapter_name][topic_name]["topic_json"] = (
                         sorted(list(filter(lambda mp: mp["heading_text"] == topic_name, modified_final_json)),
@@ -1017,6 +1013,7 @@ async def generation_data(request: Request) -> JSONResponse:
         print("The list was empty ")
 
     return {"email_id": emailId, "filename": fileName, "computed_question_data": mk} 
+
 
 @app.post("/generate")
 async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
@@ -1068,8 +1065,29 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
         with generated_dump_blob.open("w") as f: 
             f.write(qna)
 
-    except Exception as e: 
-        pass 
+    except Exception as err: 
+        print(err)
     
     return {"output": qna, "time": time.time() - start_time, "token_count": token_count}
      
+@app.get("/generation_output/{email_id}/{filename}/{question_type}/{chapter_name}/{topic_name}")
+async def generated_output(email_id: str, filename: str, question_type: str, chapter_name: str, topic_name: str) -> HTMLResponse:  
+    try: 
+        html_blob = bucket.blob(os.path.join(
+            email_id, 
+            "generated_content", 
+            filename, 
+            f"{question_type}_{chapter_name}_{topic_name}.html"
+        ))
+
+        with html_blob.open("r") as f: 
+            html_qna : str = f.read()
+        
+        return HTMLResponse(content = html_qna)
+
+    except Exception as e: 
+        print(e)
+        return HTMLResponse(
+            content = "<h1> No such file exists! Go back and select question types </h1>", 
+            status_code=404, 
+        )

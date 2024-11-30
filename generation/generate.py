@@ -10,7 +10,8 @@ def generate_response(
     context: List[str],
     language: str,  
     gpt4o_encoder, 
-    gpt4o) -> str: 
+    gpt4o
+) -> str: 
 
     prompt = prompt.format(
         context, 

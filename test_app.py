@@ -5,9 +5,7 @@ import json
 from google.cloud import storage
 from typing import Dict, List 
 
-import pandas as pd 
 from dotenv import load_dotenv
-from chart_utils.preprocess_chart import visualizer
 import requests
 import pyrebase
 import asyncio 
@@ -380,6 +378,8 @@ def generate_qna(filename: str, language: str,):
             with generation_recipe_blob.open("r") as f: 
                 generation_recipe: Dict = json.load(fp=f)
             
+            filepaths: List = []
+        
             for question_type, chapter_map in generation_recipe.items(): 
                 for chapter_name, topic_map in chapter_map.items(): 
                     for topic_name in topic_map.keys(): 
@@ -397,40 +397,13 @@ def generate_qna(filename: str, language: str,):
                         
                         if response.status_code != 200: 
                             print(f"Question Type: {question_type}, Chapter name: {chapter_name}, Topic Name: {topic_name}")
-
+                            filepaths.append(
+                                f"/generation_output/{st.session_state.email}/{question_type}/{chapter_name}/{topic_name}"
+                            )
+                        
         except Exception as e: 
             print(e)
             print("No such blob exists! Please select the question and answers within the generated book tree!")
-
-        # content: str = generate_response(
-        #     prompts[qna_type], 
-        #     topics=topics, 
-        #     context=texts, 
-        #     hf_token=HF_TOKEN, 
-        # )
-
-        # content = requests.post(
-        #     URL + "/generate", 
-        #     json = {
-        #         "context": " ".join(texts), 
-        #         "topics": topics, 
-        #         "question_type": qna_type, 
-        #     }
-        # ).json()
-
-        # st.write(content, unsafe_allow_html=True)
-
-        # st.download_button(label="Download QNA", data=content, file_name="qna.txt", mime="text/plain")
-
-# def generate_unique_values(items: List[str| List[str]]) -> List[str]: 
-#     unique_values: List[str] = [] 
-#     for item in items: 
-#         if isinstance(item, str): 
-#             unique_values.append(unique_values)
-#         elif isinstance(item, list): 
-#             unique_values = unique_values + item
-    
-#     return list(set(unique_values)) 
 
 @st.fragment
 def run_process(book_name: str): 
@@ -504,9 +477,6 @@ def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: s
 
     if book_name: 
         run_process(book_name)
-        # asyncio.run(run_async(
-        #     *[os.path.join(directory_path, pdf) for pdf in non_existent_pdfs], 
-        # ))
 
 @st.fragment
 def run_main(): 

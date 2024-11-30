@@ -926,21 +926,3 @@ with st.sidebar:
 
                 
 page_to_func[page]()
-# writing the code for login and redirection             
-
-# choice = st.selectbox("Login/Register", options=["Login", "Register"])
-# if choice == "Login": 
-#     status = login() # true, false or None 
-#     # if it is true, the user is authenticated and should be sent to the project-astra page
-
-#     if status:
-#         objective()
-
-#     # the user has clicked the register button 
-#     elif isinstance(status, bool): 
-#         if register(): 
-#             login()
-# else: 
-#     if register(): 
-#         login()
-# print(dict(cookies)) 
