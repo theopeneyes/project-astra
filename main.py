@@ -55,7 +55,11 @@ from openai import OpenAI
 # custom defined libraries 
 from json_trees.generate import JSONParser 
 from generation.generate import generate_response
-from generation.prompts import prompts, qna_validation_prompt
+from generation.prompts import (
+    prompts, 
+    qna_validation_prompt, 
+    convert_to_html_prompt
+) 
 
 from summarizer.summarize import summarize_texts
 from summarizer.prompts import summarization_prompt
@@ -1039,16 +1043,33 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
         text += paragraph_node["text"]
 
     qna_prompt: str = prompts[context.question_type]
+
     qna, token_count = generate_response(
         messages=text_message, 
         prompt=qna_prompt, 
         validation_prompt=qna_validation_prompt, 
+        convert_to_html_prompt=convert_to_html_prompt, 
         context=text,  
         question_count=question_count, 
         language=context.language, 
         gpt4o_encoder=gpt4o_encoder, 
         gpt4o=gpt4o, 
     )
+
+    # dump the output to gcp 
+    try: 
+        generated_dump_blob = bucket.blob(os.path.join(
+            context.email_id, 
+            "generated_content", 
+            context.filename, 
+            f"{context.question_type}_{context.chapter_name}_{context.topic_name}.html", 
+        ))
+
+        with generated_dump_blob.open("w") as f: 
+            f.write(qna)
+
+    except Exception as e: 
+        pass 
     
     return {"output": qna, "time": time.time() - start_time, "token_count": token_count}
      

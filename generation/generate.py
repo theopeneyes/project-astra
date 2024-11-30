@@ -5,6 +5,7 @@ def generate_response(
     messages: List[Dict], 
     prompt: str, 
     validation_prompt: str, 
+    convert_to_html_prompt: str, 
     question_count: int, 
     context: List[str],
     language: str,  
@@ -42,7 +43,20 @@ def generate_response(
     validated_llm_response = completion.choices[0].message.content
     token_count +=  len(gpt4o_encoder.encode(validated_llm_response)) 
 
-    return validated_llm_response, token_count 
+    # converting the doc to html 
+    messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
+    messages[1]["content"][0]["text"] = convert_to_html_prompt.format(validated_llm_response) 
+
+    completion = gpt4o.chat.completions.create(
+        messages=messages, 
+        model="gpt-4o-mini", 
+        temperature=0.1
+    )
+
+    html_llm_response = completion.choices[0].message.content
+    token_count += len(gpt4o_encoder.encode(html_llm_response)) 
+
+    return html_llm_response, token_count 
 
 
 

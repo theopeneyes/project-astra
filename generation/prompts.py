@@ -16,6 +16,35 @@ Reflection:
 Review the completed answer. Reflect on whether all aspects of the prompt were addressed accurately and concisely.
 Revise if any critical detail is missing or any part of the response fails to meet the prompt’s requirements.
 """
+
+convert_to_html_prompt: str = """
+You are a HTML converster bot. Your goal is to search a provided input document for question answers 
+and then convert them into an editable html document. 
+
+### TASK ### You MUST extract question-answers within a provided text document, and then convert it into an HTML page with questions
+and their respective answers, which MUST be editable by the user. 
+
+### INSTRUCTIONS 
+
+Step 1: Search the provided text for Question Answer pairs. 
+Step 2: After identifying all the question answer pairs, convert them all into one single html document. 
+Step 3: Discard everything else that is not a question answer pair. 
+
+###Incentives###
+You will receive a tip of $$$ for correct description. 
+You will be penalized if you fail to follow instructions or examples
+
+###Additional Guidance###
+You MUST ensure that your outcomes are unbiased and avoids relying on stereotypes.
+You MUST generate the content in a professional tone and educational exam question style.
+You MUST not mention intended audience of the activity in the description.
+You MUST also provide the correct answer along with the reasons.
+
+## QUESTION ANSWER DOCUMENT : 
+{}
+
+"""
+
 short_question_answer_prompt: str = """
 You are a Short Question Answer Generator Bot. Your goal is to generate Short 
 Question Answers based on the following instructions.  
@@ -100,7 +129,7 @@ fill_in_the_blanks_prompt = """
  
  Definition: Questions with blanks that can be filled in with one or two words in the sentence
  
- ###TASK###: You MUST create Fill in the blanks question based on the provided text
+ ###TASK###: You MUST create Fill in the blanks questions based on the provided text
  
  ### Instructions###: 
   - Your own words – not statements straight out of the textbook
@@ -115,12 +144,13 @@ fill_in_the_blanks_prompt = """
  ###Incentives###
  You will receive a tip of $$$ for correct description. 
  You will be penalized if you fail to follow instructions or examples
- 
-  
-##TOPICS: {}
 
 ## TEXT: 
 {}
+
+# Number of Questions to be generated: 
+{}
+
 ### Fill in the blanks:
 """
 multiple_choice_prompt: str = """
@@ -148,9 +178,11 @@ You are a Multiple Choice Question Generator Bot. Your task is to create questio
  You will receive a tip of $$$ for correct description. 
  You will be penalized if you fail to follow instructions or examples
  
-##TOPICS: {}
 
 ## TEXT: 
+{}
+
+# Number of Question answers to be generated: 
 {}
 
 ### Question Answers:
@@ -218,6 +250,7 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 
 ### Question Answers:
 """
+
 prompts: Dict[str, str] = {
     "True/False": true_false_prompt,
     "Fill in the blanks": fill_in_the_blanks_prompt,

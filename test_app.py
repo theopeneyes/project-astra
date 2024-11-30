@@ -366,24 +366,42 @@ def intro():
     """)
 
 @st.fragment
-def generate_qna(filename: str, language: str, email_id: str): 
+def generate_qna(filename: str, language: str,): 
+    generation_clicked = st.button("Generate selected Question Answers!")
+    if generation_clicked: 
+        # reach for the selected json by the user 
+        try: 
+            generation_recipe_blob = bucket.blob(os.path.join(
+                st.session_state.email, 
+                "generation_data",
+                f"{filename}.json", 
+            ))
 
-    topic_clicked = st.button("Filter and Generate")
+            with generation_recipe_blob.open("r") as f: 
+                generation_recipe: Dict = json.load(fp=f)
+            
+            for question_type, chapter_map in generation_recipe.items(): 
+                for chapter_name, topic_map in chapter_map.items(): 
+                    for topic_name in topic_map.keys(): 
+                        response = requests.post(
+                            URL + "/generate", 
+                            json = {
+                                "email_id": st.session_state.email, 
+                                "filename": filename, 
+                                "question_type": question_type,
+                                "topic_name": chapter_name,  
+                                "chapter_name": topic_name,  
+                                "language": language  
+                            }
+                        )
+                        
+                        if response.status_code != 200: 
+                            print(f"Question Type: {question_type}, Chapter name: {chapter_name}, Topic Name: {topic_name}")
 
-    # getting the prompt for qna generation 
-    # short_answer_prompt: str = prompts_repository["Short Answer Question"].to_list()[-2]
-    # print(short_answer_prompt)
-    if topic_clicked: 
-        response = requests.post(
-            URL + "/generate", 
-            json = {
-                "email_id": email_id, 
-                "filename": filename, 
-                # "question_type": qna_type, 
-                "language": language  
-            }
-        )
-        content = response.json()["output"]
+        except Exception as e: 
+            print(e)
+            print("No such blob exists! Please select the question and answers within the generated book tree!")
+
         # content: str = generate_response(
         #     prompts[qna_type], 
         #     topics=topics, 
@@ -400,9 +418,9 @@ def generate_qna(filename: str, language: str, email_id: str):
         #     }
         # ).json()
 
-        st.write(content, unsafe_allow_html=True)
+        # st.write(content, unsafe_allow_html=True)
 
-        st.download_button(label="Download QNA", data=content, file_name="qna.txt", mime="text/plain")
+        # st.download_button(label="Download QNA", data=content, file_name="qna.txt", mime="text/plain")
 
 # def generate_unique_values(items: List[str| List[str]]) -> List[str]: 
 #     unique_values: List[str] = [] 
@@ -417,40 +435,38 @@ def generate_qna(filename: str, language: str, email_id: str):
 @st.fragment
 def run_process(book_name: str): 
     if st.button("Select book"): 
-        with st.spinner("Loading data..."): 
-        # st.session_state.page = "pdf_project_page"
-            classifier_blob = bucket.blob(
-                f"{st.session_state.email}/final_json/{book_name}.json",
-            )
+        # with st.spinner("Loading data..."): 
+        # # st.session_state.page = "pdf_project_page"
+        #     classifier_blob = bucket.blob(
+        #         f"{st.session_state.email}/final_json/{book_name}.json",
+        #     )
 
-            with classifier_blob.open("r") as f: 
-                json_outputs = json.load(fp=f)
+        #     with classifier_blob.open("r") as f: 
+        #         json_outputs = json.load(fp=f)
             
-            json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
+        #     json_df: pd.DataFrame = pd.DataFrame.from_records(json_outputs)
     
-        # gets all unique sub-domains and then chooses three from it 
-        # essentially a for loop to sum a list of lists and then get unique sub_domains 
-        # out of it. Out of which we pick three at random. This code may be changed later.  
+        # # gets all unique sub-domains and then chooses three from it 
+        # # essentially a for loop to sum a list of lists and then get unique sub_domains 
+        # # out of it. Out of which we pick three at random. This code may be changed later.  
 
-        # let's also include major domains and concepts as well 
-        # st.json(json_outputs)
-        # st.dataframe(json_df)
-        # print(json_df["sub_domains"].to_list()) 
-        # print(type(json_df["sub_domains"].to_list())) 
-        json_df["sub_domains"] = json_df.sub_domains.apply(lambda x: str(x))
-        json_df["major_domains"] = json_df.sub_domains.apply(lambda x: str(x))
-        json_df["concept"] = json_df.sub_domains.apply(lambda x: str(x))
+        # # let's also include major domains and concepts as well 
+        # # st.json(json_outputs)
+        # # st.dataframe(json_df)
+        # # print(json_df["sub_domains"].to_list()) 
+        # # print(type(json_df["sub_domains"].to_list())) 
+        # json_df["sub_domains"] = json_df.sub_domains.apply(lambda x: str(x))
+        # json_df["major_domains"] = json_df.sub_domains.apply(lambda x: str(x))
+        # json_df["concept"] = json_df.sub_domains.apply(lambda x: str(x))
 
-        sub_domains: List[str] = list(set(json_df["sub_domains"].to_list()))   
-        major_domains: List[str] =  list(set(json_df["major_domains"].to_list())) 
-        concepts: List[str] = list(set(json_df["concept"].to_list()))         
+        # sub_domains: List[str] = list(set(json_df["sub_domains"].to_list()))   
+        # major_domains: List[str] =  list(set(json_df["major_domains"].to_list())) 
+        # concepts: List[str] = list(set(json_df["concept"].to_list()))         
         
-        topics: List[str] = sub_domains + major_domains + concepts 
+        # topics: List[str] = sub_domains + major_domains + concepts 
         
 
-        # Converting into embeddings  
-
-            
+        # # Converting into embeddings  
         with st.spinner("Detecting the lanugage within the book..."): 
             language_response = requests.post(
                 URL + "/detect_lang", 
@@ -467,7 +483,7 @@ def run_process(book_name: str):
         
         
         # running the endpoint asynchronously 
-        generate_qna(json_df, topics, text_language)
+        generate_qna(book_name, text_language)
 
 def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str): 
     asyncio.run(run_async(
