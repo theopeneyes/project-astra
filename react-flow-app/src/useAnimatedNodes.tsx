@@ -30,7 +30,7 @@ function useAnimatedNodes(
         return {
           ...node,
           position: {
-            x: from.x + (to.x - from.x) * s,
+            x: from.x + (to.x - from.x ) * s ,
             y: from.y + (to.y - from.y) * s,
           },
         };

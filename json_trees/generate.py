@@ -24,7 +24,19 @@ class JSONParser:
         
         return parent_map[search_key]
 
-    def to_tree(self, vector_book_json):
+    def to_tree(self, vector_book_json, category = "heading"):
+        main_text: str = ""
+        sub_text: str = ""
+        if category == "topic": 
+            main_text = "topic"
+            sub_text = "sub_topic"
+        elif category == "concept": 
+            main_text = "concept"
+            sub_text = "sub_concept"
+        else: 
+            main_text = "heading_text"
+            sub_text = "sub_heading_text"
+
         """
         Converts a list of vector book JSON objects into a hierarchical tree structure.
 
@@ -38,8 +50,8 @@ class JSONParser:
         book_tree = defaultdict(dict)
         for book_json in vector_book_json:
             heading_sub_tree = self._get_child_node(book_tree, book_json['heading_identifier'], defaultdict(set))
-            sub_heading_tree = self._get_child_node(heading_sub_tree, book_json['heading_text'], defaultdict(set))
-            text_list = self._get_child_node(sub_heading_tree, book_json['sub_heading_text'], set())
+            sub_heading_tree = self._get_child_node(heading_sub_tree, book_json[main_text], defaultdict(set))
+            text_list = self._get_child_node(sub_heading_tree, book_json[sub_text], set())
             text_list.add(book_json['text'])
         
         return book_tree 
@@ -93,6 +105,7 @@ class JSONParser:
                 "expanded": False 
             }
         }] 
+
         edges = []
 
         # creating nodes and edges that connect book name with chapter titles

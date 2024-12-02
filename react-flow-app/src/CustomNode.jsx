@@ -25,7 +25,7 @@ function CustomNode({ data, id, sourcePosition, targetPosition, positionAbsolute
       id: newNodeId,
       sourcePosition: sourcePosition, 
       targetPosition: targetPosition,  
-      position: { x: positionAbsoluteX, y: positionAbsoluteY + 200},
+      position: { x: positionAbsoluteX , y: positionAbsoluteY + 200 },
       data: { label: label },
     });
     addEdges({ id: `${id}->${newNodeId}`, source: id, target: newNodeId });
@@ -36,8 +36,8 @@ function CustomNode({ data, id, sourcePosition, targetPosition, positionAbsolute
   return (
     <div className="node">
       <div className="label">{label}</div>
-      <Handle position={Position.Top} type="target" />
-      <Handle position={Position.Bottom} type="source" />
+      <Handle position={Position.Left} type="target" />
+      <Handle position={Position.Right} type="source" />
       <div className="button" onClick={addChildNode} />
     </div>
   );

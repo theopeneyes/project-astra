@@ -58,7 +58,7 @@ const JsonSidebar = (props) => {
         throw new Error("Exception occured. Network didn't work."); 
       } else {
         console.log("Clear localStorage")
-        // localStorage.clear(); 
+        localStorage.clear(); 
       }
 
       console.log(response.json())

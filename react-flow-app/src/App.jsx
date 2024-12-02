@@ -20,7 +20,6 @@ import {
 import CustomNode from './CustomNode';
 import useAnimatedNodes from './useAnimatedNodes';
 import useExpandCollapse from './useExpandCollapse';
-import { useControls } from 'leva';
 import { useFetchNodes } from './useFetchNodes';
 
 
@@ -31,16 +30,18 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
-function ReactFlowApp({
-  treeWidth = 220,
-  treeHeight = 100,
-  animationDuration = 300,
-}) {
+
+const treeWidth = 220
+const treeHeight = 100
+const animationDuration = 300
+
+function ReactFlowApp() {
 
   const params = useParams(); 
   const emailId = params.emailId; 
   const fileName = params.fileName;  
-  const url = `http://127.0.0.1:8000/reactFlow/${emailId}/${fileName}` 
+  const topic = "topic"; 
+  const url = `http://127.0.0.1:8000/reactFlow/${topic}/${emailId}/${fileName}` 
   const proOptions = { account: 'paid-pro', hideAttribution: true };
   const { initialNodes, initialEdges } = useFetchNodes(url); 
   
@@ -154,28 +155,12 @@ function ReactFlowApp({
 }
 
 function App() {
-  const levaProps = useControls({
-    treeWidth: {
-      value: 220,
-      min: 0,
-      max: 440,
-    },
-    treeHeight: {
-      value: 100,
-      min: 0,
-      max: 200,
-    },
-    animationDuration: {
-      value: 300,
-      min: 0,
-      max: 600,
-    },
-  });
+
 
   return (
     <>
     <ReactFlowProvider>
-      <ReactFlowApp {...levaProps} /> 
+      <ReactFlowApp /> 
     </ReactFlowProvider>
     </>
   )

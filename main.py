@@ -562,8 +562,8 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
         content = content 
     ) 
 
-@app.get("/reactFlow/{emailId}/{fileName}")
-async def react_flow(emailId: str, fileName: str ) -> JSONResponse: 
+@app.get("/reactFlow/{category}/{emailId}/{fileName}")
+async def react_flow(category: str, emailId: str, fileName: str ) -> JSONResponse: 
     try: 
         processed_json_blob = bucket.blob(os.path.join(
             emailId, 
@@ -580,7 +580,7 @@ async def react_flow(emailId: str, fileName: str ) -> JSONResponse:
         processed_json = json.load(fp=processed_json_fp) 
 
         parser = JSONParser(book_name=fileName) 
-        concept_tree = parser.to_tree(processed_json)
+        concept_tree = parser.to_tree(processed_json, category=category)
         nodes, edges = parser.parse_tree(concept_tree)
 
     return JSONResponse(content = [nodes, edges])  
