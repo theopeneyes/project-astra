@@ -252,10 +252,10 @@ Definition: Software writing questions"" refers to a set of inquiries designed t
 """
 
 prompts: Dict[str, str] = {
-    "True/False": true_false_prompt,
-    "Fill in the blanks": fill_in_the_blanks_prompt,
-    "Short Question Answer": short_question_answer_prompt, 
-    "Multiple Choice": multiple_choice_prompt,
-    "Computational Questions": computational_questions_prompt,
-    "Software Code Questions": software_code_questions_prompt 
+    "trueFalse": true_false_prompt,
+    "fillInTheBlanks": fill_in_the_blanks_prompt,
+    "shortQuestionAnswer": short_question_answer_prompt, 
+    "multipleChoice": multiple_choice_prompt,
+    "computationQuestion": computational_questions_prompt,
+    "softwareCodeQuestion": software_code_questions_prompt 
 }

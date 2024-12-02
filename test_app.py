@@ -11,6 +11,8 @@ import pyrebase
 import asyncio 
 import threading 
 
+import pandas as pd 
+
 load_dotenv()
 
 BUCKET_NAME: str = os.getenv("BUCKET_NAME") # name of the bucket 
@@ -364,10 +366,9 @@ def intro():
     """)
 
 @st.fragment
-def generate_qna(filename: str, language: str,): 
+def generate_qna(filename: str, language: str): 
     generation_clicked = st.button("Generate selected Question Answers!")
     if generation_clicked: 
-        # reach for the selected json by the user 
         try: 
             generation_recipe_blob = bucket.blob(os.path.join(
                 st.session_state.email, 
@@ -378,32 +379,32 @@ def generate_qna(filename: str, language: str,):
             with generation_recipe_blob.open("r") as f: 
                 generation_recipe: Dict = json.load(fp=f)
             
-            filepaths: List = []
-        
             for question_type, chapter_map in generation_recipe.items(): 
-                for chapter_name, topic_map in chapter_map.items(): 
-                    for topic_name in topic_map.keys(): 
-                        response = requests.post(
-                            URL + "/generate", 
-                            json = {
-                                "email_id": st.session_state.email, 
-                                "filename": filename, 
-                                "question_type": question_type,
-                                "topic_name": chapter_name,  
-                                "chapter_name": topic_name,  
-                                "language": language  
-                            }
-                        )
-                        
-                        if response.status_code != 200: 
-                            print(f"Question Type: {question_type}, Chapter name: {chapter_name}, Topic Name: {topic_name}")
-                            filepaths.append(
-                                f"/generation_output/{st.session_state.email}/{question_type}/{chapter_name}/{topic_name}"
+                with st.spinner(f"Generating {question_type} Question Answers..."): 
+                    for chapter_name, topic_map in chapter_map.items(): 
+                        for topic_name in topic_map.keys(): 
+
+                            response = requests.post(
+                                URL + "/generate", 
+                                json = {
+                                    "email_id": st.session_state.email, 
+                                    "filename": filename, 
+                                    "question_type": question_type,
+                                    "topic_name": topic_name,  
+                                    "chapter_name": chapter_name,  
+                                    "language": language  
+                                }
                             )
+
+
                         
+                            if response.status_code != 200: 
+                                print(f"Question Type: {question_type}, Chapter name: {chapter_name}, Topic Name: {topic_name}")
+            
         except Exception as e: 
             print(e)
             print("No such blob exists! Please select the question and answers within the generated book tree!")
+        
 
 @st.fragment
 def run_process(book_name: str): 
@@ -454,7 +455,6 @@ def run_process(book_name: str):
         st.markdown(
             f"Click on this link to view the JSON Tree: [{book_name}]({NODE_SERVER_URL}/{st.session_state.email}/{book_name})")
         
-        
         # running the endpoint asynchronously 
         generate_qna(book_name, text_language)
 
@@ -465,7 +465,7 @@ def parse_pdfs(directory_path: str, pdfs: List[str], user_email: str):
     ))
 
 @st.fragment
-def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: str): 
+def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: str) -> str: 
     book_name = st.selectbox(
         label="Select one of the following pdfs...",
         options=blob_names)
@@ -475,8 +475,11 @@ def select_book(blob_names: List[str], directory_path: str, non_existent_pdfs: s
                                 non_existent_pdfs, st.session_state.email)) 
         thread.start()
 
+    st.session_state.book_name = book_name
     if book_name: 
         run_process(book_name)
+    
+    
 
 @st.fragment
 def run_main(): 
@@ -498,6 +501,33 @@ def run_main():
 
         # documents that are ready... 
         select_book(blob_names[1:], directory_path, non_existent_pdfs)
+
+        html_blobs: List = gcs_client.list_blobs(
+            BUCKET_NAME, 
+            prefix=f"{st.session_state.email}/generated_content/{st.session_state.book_name}/", 
+            delimiter="/"
+        )
+        
+        print(st.session_state.book_name)
+
+        filepaths: List = []
+        for html_blob in html_blobs: 
+            names: List[str] = html_blob.name.split("/")[-1].split("_")
+            names[1] = names[1].replace(" ", "_")
+            names[2] = names[2].replace(" ", "_")
+
+            filepaths.append(os.path.join(
+                URL, 
+                "generation_output",
+                st.session_state.email, 
+                st.session_state.book_name, 
+                names[0], 
+                names[1], 
+                names[2],  
+            ))
+
+        st.write(filepaths, unsafe_allow_html=True)
+            
 
 @st.fragment
 def password_reset():

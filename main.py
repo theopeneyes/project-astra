@@ -133,7 +133,6 @@ config = genai.GenerationConfig(
 
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
-phi_encoder = AutoTokenizer.from_pretrained("microsoft/Phi-3.5-mini-instruct")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -457,12 +456,13 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileO
 
     # classify the prompt 
     comprehensive_node, token_count = classify_about(
-        HF_TOKEN, 
         blob_json_content, 
         generated_list, 
+        text_message, 
         classification_prompt, 
         rewrite_target.language, 
-        phi_encoder,  
+        gpt4o, 
+        gpt4o_encoder, 
     )
 
     # write this onto intermediate_json directory 
@@ -924,7 +924,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 net_weights += preference_weights[topic_data["preferenceLevel"]]
 
             for topic_node in ms[question_type][chapter_name]:
-                question_distribution[question_type][chapter_name][topic_node['topic']] =int(round(
+                question_distribution[question_type][chapter_name][topic_node['topic']] = int(round(
                     chapter_question_count * 
                     (preference_weights[topic_node["preferenceLevel"]] / net_weights) 
                 , 0))
@@ -1022,7 +1022,7 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     try: 
         generation_metadata_blob = bucket.blob(os.path.join(
             context.email_id, 
-            "generated_data", 
+            "generation_data", 
             f"{context.filename}.json", 
         ))
     except Exception as e: 
@@ -1031,9 +1031,9 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
 
     with generation_metadata_blob.open("r") as f: 
         generation_data = json.load(fp=f)
-    
+
     associated_json: Dict = generation_data[context.question_type][context.chapter_name][context.topic_name]
-    question_count = associated_json["question_count"] 
+    question_count = associated_json["topic_question_count"] 
     text = ""
 
     for paragraph_node in associated_json["topic_json"]: 
@@ -1072,12 +1072,16 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
      
 @app.get("/generation_output/{email_id}/{filename}/{question_type}/{chapter_name}/{topic_name}")
 async def generated_output(email_id: str, filename: str, question_type: str, chapter_name: str, topic_name: str) -> HTMLResponse:  
+    chapter_name = chapter_name.replace("_", " ")
+    topic_name = topic_name.replace("_", " ")
+    topic_name = topic_name if topic_name.endswith(".html") else f"{topic_name}.html"
+
     try: 
         html_blob = bucket.blob(os.path.join(
             email_id, 
             "generated_content", 
             filename, 
-            f"{question_type}_{chapter_name}_{topic_name}.html"
+            f"{question_type}_{chapter_name}_{topic_name}"
         ))
 
         with html_blob.open("r") as f: 
