@@ -7,6 +7,6 @@ __pycache__
 ignore.py
 .env_bin
 .secrets
-.anam.py
 test_sample
 json_editor/ignoreme
+react-flow-app/node_modules
