@@ -8,4 +8,4 @@ RUN apt-get install -y poppler-utils
 
 RUN pip install -r requirements.txt 
 EXPOSE 8080 
-CMD ["uvicorn", "main:app", "--port", "8080"]
+ENTRYPOINT uvicorn main:app --port 8080 

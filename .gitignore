@@ -8,10 +8,12 @@ llm_server/ignore.py
 llm_server/.secrets
 llm_server/json_editor/ignoreme
 llm_server/.gitignore 
+llm_server/__pycache__
 
 # streamlit application 
 streamlit-app/.gitignore
 streamlit-app/.stapp
+streamlit-app/.secrets
 
 # reactflow application 
 react-flow-app/node_modules
@@ -40,8 +42,6 @@ react-flow-app/*.ntvs*
 react-flow-app/*.njsproj
 react-flow-app/*.sln
 react-flow-app/*.sw?
-
-
 
 # extras 
 .env

@@ -1,8 +1,22 @@
 name: "project-astra"
 services: 
-  api:
+  llm-server:
     platform: linux/amd64
-    build: .
-    env_file: .env
+    build: ./llm-server/
+    env_file: ./llm-server/.env
     ports:
       - 8080:8080
+  
+  react-flow-app: 
+    platform: linux/amd64
+    build: ./react-flow-app/
+    ports: 
+      - 4173:4174
+  
+  streamlit-app: 
+    platform: linux/amd64
+    build: ./streamlit-app 
+    env_file: ./streamlit-app/.env
+    ports: 
+      - 8051:8051
+    

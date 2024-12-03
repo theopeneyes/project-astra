@@ -1,0 +1,12 @@
+.env
+data_loader/__pycache__
+data_classifier/__pycache__
+ast
+__pycache__
+.pytest_cache 
+ignore.py
+.env_bin
+.secrets
+test_sample
+json_editor/ignoreme
+react-flow-app/node_modules
