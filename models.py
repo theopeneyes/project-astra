@@ -90,4 +90,7 @@ class SynthesisContentOutputModel(AbsoluteBaseModel):
     time: float 
     token_count: int 
     
- 
+ # Translation model- NLLB
+class TranslationRequest(BaseModel):
+    questions_generated: str
+    source_lang: str

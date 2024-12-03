@@ -21,7 +21,8 @@ from models import SummaryChapterOutputModel
 from models import RewriteJSONFileOutputModel 
 from models import PushToJSONModel
 from models import SynthesisContentInputModel 
-from models import SynthesisContentOutputModel 
+from models import SynthesisContentOutputModel
+from models import TranslationRequest
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -74,6 +75,9 @@ from synthesizers.prompts import representation_depth_prompt
 from synthesizers.prompts import representation_strength_prompt 
 from synthesizers.prompts import topic_strength_prompt 
 from synthesizers.synthesize import synthesizer 
+
+from tools.translation_nllb import detection_and_translation_nllb
+from tools.translation_nllb import detect_language
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -694,3 +698,14 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     
     return {"output": qna, "time": time.time() - start_time, "token_count": token_count}
      
+
+
+@app.post("/nllb_translate")
+async def nllb_translator(request: TranslationRequest):
+    start_time: float = time.time()
+    try:
+        translated_text = detection_and_translation_nllb(request.questions_generated, request.source_lang)
+        return {"questions": translated_text}
+    except Exception as e:
+        pass
+    
