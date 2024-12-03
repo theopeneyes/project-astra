@@ -1,12 +1,49 @@
+# llm server 
+llm_server/.env
+llm_server/data_loader/__pycache__
+llm_server/data_classifier/__pycache__
+llm_server/ast
+llm_server/.pytest_cache 
+llm_server/ignore.py
+llm_server/.secrets
+llm_server/json_editor/ignoreme
+llm_server/.gitignore 
+
+# streamlit application 
+streamlit-app/.gitignore
+streamlit-app/.stapp
+
+# reactflow application 
+react-flow-app/node_modules
+
+# Logs
+react-flow-app/logs
+react-flow-app/*.log
+react-flow-app/npm-debug.log*
+react-flow-app/yarn-debug.log*
+react-flow-app/yarn-error.log*
+react-flow-app/pnpm-debug.log*
+react-flow-app/lerna-debug.log*
+
+react-flow-app/node_modules
+react-flow-app/dist
+react-flow-app/dist-ssr
+react-flow-app/*.local
+
+# Editor directories and files
+react-flow-app/.vscode/*
+react-flow-app/!.vscode/extensions.json
+react-flow-app/.idea
+react-flow-app/.DS_Store
+react-flow-app/*.suo
+react-flow-app/*.ntvs*
+react-flow-app/*.njsproj
+react-flow-app/*.sln
+react-flow-app/*.sw?
+
+
+
+# extras 
 .env
-data_loader/__pycache__
-data_classifier/__pycache__
-ast
-__pycache__
-.pytest_cache 
-ignore.py
 .env_bin
 .secrets
-test_sample
-json_editor/ignoreme
-react-flow-app/node_modules
