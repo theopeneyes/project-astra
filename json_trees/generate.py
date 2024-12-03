@@ -1,4 +1,5 @@
 from collections import defaultdict
+import json 
 
 class JSONParser:
     def __init__(self, book_name): 
@@ -48,11 +49,14 @@ class JSONParser:
             dict: A nested dictionary representing the tree structure.
         """
         book_tree = defaultdict(dict)
+        # print(json.dumps(vector_book_json[0], indent=4))
         for book_json in vector_book_json:
-            heading_sub_tree = self._get_child_node(book_tree, book_json['heading_identifier'], defaultdict(set))
-            sub_heading_tree = self._get_child_node(heading_sub_tree, book_json[main_text], defaultdict(set))
-            text_list = self._get_child_node(sub_heading_tree, book_json[sub_text], set())
-            text_list.add(book_json['text'])
+            # print(json.dumps(book_json, indent=4))
+            if (main_text in book_json and sub_text in book_json):  
+                heading_sub_tree = self._get_child_node(book_tree, book_json['heading_identifier'], defaultdict(set))
+                sub_heading_tree = self._get_child_node(heading_sub_tree, book_json[main_text], defaultdict(set))
+                text_list = self._get_child_node(sub_heading_tree, book_json[sub_text], set())
+                text_list.add(book_json['text'])
         
         return book_tree 
     

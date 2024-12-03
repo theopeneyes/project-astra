@@ -844,6 +844,7 @@ async def generation_data(request: Request) -> JSONResponse:
     data = await request.json() 
     emailId = data["emailId"]
     fileName = data["fileName"]
+    category = data["category"] if data["category"] != "heading" else "heading_text"
 
     degree_weights: Dict = {
        5: 1, 
@@ -983,7 +984,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 for topic_name, question_count in topic_nodes.items(): 
                     question_list[question_type][chapter_name][topic_name]["topic_question_count"] = question_count
                     question_list[question_type][chapter_name][topic_name]["topic_json"] = (
-                        sorted(list(filter(lambda mp: mp["heading_text"] == topic_name, modified_final_json)),
+                        sorted(list(filter(lambda mp: mp[category] == topic_name, modified_final_json)),
                         key = lambda x: x["cumulative_strength"], reverse=True) 
                     )       
 
@@ -994,8 +995,6 @@ async def generation_data(request: Request) -> JSONResponse:
             for k, v in value.items():
                 qd_dict[key][k] = dict(v)
          
-        # print(json.dumps(qd_dict, indent=4)) 
-        
         try: 
             generation_data_blob = bucket.blob(os.path.join(
                 emailId, 

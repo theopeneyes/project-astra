@@ -6,6 +6,7 @@ import SidebarHeader from './SidebarHeader'
 import SidebarTemplate from './SidebarTemplate'
 import PropTypes from 'prop-types'
 import BookForm from "./BookForm"
+import HierarchyForm from './HierarchyForm'
 import { useParams } from 'react-router-dom'
 
 
@@ -13,12 +14,13 @@ const JsonSidebar = (props) => {
 
   const params = useParams(); 
   const fileName = params.fileName; 
-  const userEmail = params.emailId; 
+  const emailId = params.emailId; 
 
   const handlePush = async () => {
     let bookContent = [];  
     let chapterContent = []; 
     let topicContent = []; 
+
     for(let i = 0; i < localStorage.length; i++) {
       if(localStorage.key(i).startsWith("book")) {
         // need to also check if we are using the correct book 
@@ -33,7 +35,6 @@ const JsonSidebar = (props) => {
         topicContent.push(JSON.parse(localStorage
           .getItem(localStorage.key(i))
         )); 
-
       }
     }
 
@@ -44,8 +45,13 @@ const JsonSidebar = (props) => {
           'Content-Type': 'application/json'
         }, 
         body: JSON.stringify({
-          emailId: userEmail, 
+          emailId: emailId, 
           fileName: fileName, 
+          category: (document
+                    .getElementById("select-box-hierarchy")
+                    .value
+                    .split("-")
+                    .at(0)), 
           generationData: {
             book: bookContent, 
             chapters: chapterContent, 
@@ -57,7 +63,6 @@ const JsonSidebar = (props) => {
       if(!response.ok) {
         throw new Error("Exception occured. Network didn't work."); 
       } else {
-        console.log("Clear localStorage")
         localStorage.clear(); 
       }
 
@@ -75,6 +80,9 @@ const JsonSidebar = (props) => {
         <div className="mb-5">
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
+        </div>
+        <div className="mb-5">
+          <HierarchyForm updateNodes={props.updateNodesAndEdges} emailId={emailId} bookName={fileName}  />
         </div>
         <BookForm nodeId={props.nodeId} bookName={props.nodeName} />
         <div className="mt-auto">
@@ -138,7 +146,6 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementValue={props.nodeName} /> 
           <SidebarHeader ElementValue={props.nodeType} /> 
         </div>
-
         <div className="mt-auto">
           <button 
             className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"
@@ -158,6 +165,7 @@ JsonSidebar.propTypes = {
   nodeName: PropTypes.string,  
   nodeType: PropTypes.string, 
   nodeId: PropTypes.string, 
+  updateNodesAndEdges: PropTypes.func, 
 }
 
 export default JsonSidebar

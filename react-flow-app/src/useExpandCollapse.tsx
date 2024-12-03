@@ -41,26 +41,21 @@ function useExpandCollapse(
   {
     layoutNodes = true,
     treeWidth = 300,
-    treeHeight = 100,
+    treeHeight = 300,
   }: UseExpandCollapseOptions = {}
 ): { nodes: ExpandCollapseNode[]; edges: Edge[] } {
   return useMemo(() => {
     if (!layoutNodes) return { nodes, edges };
 
-    // 1. Create a new instance of `Dagre.graphlib.Graph` and set some default
-    // properties.
     const dagre = new Dagre.graphlib.Graph()
       .setDefaultEdgeLabel(() => ({}))
       .setGraph({ 
         rankdir: 'LR', 
-        nodesep: 200, 
-        edgesep: 10, 
+        nodesep: 50, 
+        edgesep: 50, 
         ranksep: 100,
       });
 
-    // 2. Add each node and edge to the dagre graph. Instead of using each node's
-    // intrinsic width and height, we tell dagre to use the `treeWidth` and
-    // `treeHeight` values. This lets you control the space between nodes.
     for (const node of nodes) {
       dagre.setNode(node.id, {
         width: treeWidth,

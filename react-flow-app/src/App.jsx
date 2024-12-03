@@ -40,8 +40,8 @@ function ReactFlowApp() {
   const params = useParams(); 
   const emailId = params.emailId; 
   const fileName = params.fileName;  
-  const topic = "topic"; 
-  const url = `http://127.0.0.1:8000/reactFlow/${topic}/${emailId}/${fileName}` 
+  const topicCategory = "topic"; 
+  const url = `http://127.0.0.1:8000/reactFlow/${topicCategory}/${emailId}/${fileName}` 
   const proOptions = { account: 'paid-pro', hideAttribution: true };
   const { initialNodes, initialEdges } = useFetchNodes(url); 
   
@@ -71,6 +71,12 @@ function ReactFlowApp() {
     animationDuration,
   });
 
+  const updateNodesAndEdges = (updatedNodes, updatedEdges) => {
+    if(updatedNodes && updatedEdges) {
+      setNodes(updatedNodes) 
+      setEdges(updatedEdges)
+    } 
+  }
 
   const onNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -80,7 +86,6 @@ function ReactFlowApp() {
     (changes) => setEdges((eds) => applyEdgeChanges(changes, eds)),
     []
   );
-
 
   const onNodeClick = useCallback(
       (_, node) => {
@@ -147,6 +152,7 @@ function ReactFlowApp() {
           nodeName={nodeName} 
           nodeType={nodeType} 
           nodeId={nodeId}
+          updateNodesAndEdges={updateNodesAndEdges}
         /> 
       </div>
     </> 
