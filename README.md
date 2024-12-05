@@ -4,7 +4,7 @@
 
 # APPLICATION ARCHITECTURE 
 
-![Application Architecture](architecture.jpg "Application Architecture")
+![Application Architecture](architecture.png "Application Architecture")
 
 
 
