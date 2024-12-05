@@ -8,6 +8,7 @@ def detect_language(img_encoding: str, messages: Dict, language_detection_prompt
     messages[1]["content"][1]["image_url"]["url"] = (
         f"data:image/jpeg;base64,{img_encoding}") 
 
+    print("Sending data to llm...")
     response = gpt4o.chat.completions.create(
         model="gpt-4o-mini",
         messages=[messages[1]],
@@ -27,6 +28,8 @@ def detect_language(img_encoding: str, messages: Dict, language_detection_prompt
             print("Unable to detect language.")
             print("View llm response down below")
             print(response_content)
+
+    print("Language %s detected!" % (language))
 
     return language.lower(), token_count 
     

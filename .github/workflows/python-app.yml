@@ -21,15 +21,22 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: "3.11"
-    - name: Install dependencies
+
+    - name: Install primary dependencies
       run: |
         python -m pip install --upgrade pip
         pip install pytest pylint 
         sudo apt install poppler-utils 
-        make install 
-    - name: Lint with Pylint
+
+    - name: Setting up the dependencies for llm-server application 
+      run: |  
+        pip install -r ./llm-server/requirements.txt
+        mkdir -p ./llm-server/.secrets
+        echo ${{ secrets.GCP_BUCKET }} > ./llm-server/gcp_bucket.json
+    
+    - name: Setting up the streamlit application 
       run: |
-        pylint --disable=R,C *.py || true 
-    - name: Intialize the Server 
-      run: |
-        fastapi run main.py & sleep 5
+        pip install -r ./streamlit-app/requirements.txt
+        mkdir -p ./streamlit-app/.secrets
+        echo ${{ secrets.GCP_BUCKET }} > ./streamlit-app/gcp_bucket.json
+        echo ${{ secrets.FIREBASE_CLIENT }} > ./streamlit-app/firebase_cleint.json

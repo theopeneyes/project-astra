@@ -63,7 +63,7 @@ const JsonSidebar = (props) => {
       if(!response.ok) {
         throw new Error("Exception occured. Network didn't work."); 
       } else {
-        localStorage.clear(); 
+        // localStorage.clear(); 
       }
 
       console.log(response.json())
@@ -105,6 +105,9 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
+        <div className="mb-5">
+          <HierarchyForm updateNodes={props.updateNodesAndEdges} emailId={emailId} bookName={fileName}  />
+        </div>
         <ChapterForm nodeId={props.nodeId} chapterName={props.nodeName} /> 
         <div className="mt-auto">
           <button 
@@ -125,6 +128,11 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementType="node_text" ElementValue={props.nodeName} /> 
           <SidebarHeader ElementType="node_type" ElementValue={props.nodeType} /> 
         </div>
+
+        <div className="mb-5">
+          <HierarchyForm updateNodes={props.updateNodesAndEdges} emailId={emailId} bookName={fileName}  />
+        </div>
+
         <TopicForm nodeId={props.nodeId} topicName={props.nodeName}/> 
         <div className="mt-auto">
           <button 
@@ -146,6 +154,7 @@ const JsonSidebar = (props) => {
           <SidebarHeader ElementValue={props.nodeName} /> 
           <SidebarHeader ElementValue={props.nodeType} /> 
         </div>
+
         <div className="mt-auto">
           <button 
             className="w-full bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 transition-colors"

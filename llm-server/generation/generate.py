@@ -1,4 +1,5 @@
 from typing import List, Dict 
+import re 
 
 
 def generate_response(
@@ -55,7 +56,9 @@ def generate_response(
     )
 
     html_llm_response = completion.choices[0].message.content
-    token_count += len(gpt4o_encoder.encode(html_llm_response)) 
+    if re.findall(r"```html(.*?)```", html_llm_response): 
+        html_llm_response = re.findall(r"```html(.*?)```", html_llm_response)[0]
+        token_count += len(gpt4o_encoder.encode(html_llm_response)) 
 
     return html_llm_response, token_count 
 

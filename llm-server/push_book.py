@@ -5,7 +5,6 @@ import os
 import requests 
 from typing import Dict
 
-
 load_dotenv(override=True)
 BUCKET_NAME: str = os.getenv("BUCKET_NAME")
 URL: str = "http://127.0.0.1:8000"
@@ -16,8 +15,8 @@ GROQ_API_KEY: str = os.getenv("GROQ_API_KEY")
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
 bucket = gcs_client.bucket(BUCKET_NAME)
 
-base_directory: str = "test_books"
-pdf_name: str = "Advanced-deep-learning.pdf"
+base_directory: str = "../streamlit-app/test_books"
+pdf_name: str = "algorithms.pdf"
 user_email: str = "test.second@yahoo.com"
 
 with open(os.path.join(base_directory, pdf_name), "rb") as fr: 
@@ -95,7 +94,7 @@ for blob in blobs:
             }
         )
 
-print("Classified our data and rewriting it within intermediate_json folder")
+print("Classify our data and rewriting it within intermediate_json folder")
 text_extract_blob = gcs_client.list_blobs(
     BUCKET_NAME, 
     prefix=f"{user_email}/text_extract/", 

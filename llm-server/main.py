@@ -9,8 +9,6 @@ from models import StructuredJSONModel
 from models import DataClassifierModel
 from models import SummarizationInputModel
 from models import SummarizationOutputModel
-from models import GeneratedImageModel 
-from models import DataMapPlotInputModel 
 from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
 from models import RewriteJSONFileModel
@@ -42,6 +40,7 @@ import os
 import json
 import time 
 import tiktoken 
+import traceback 
 
 import pdf2image as p2i 
 import numpy as np 
@@ -331,12 +330,15 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
 
 # segerates via chapter and summarizes the chapter  
 @app.post("/summarize")
-async def summarize(summarization: SummarizationInputModel) -> SummarizationOutputModel: 
+async def summarize(summarization: 
+    SummarizationInputModel) -> SummarizationOutputModel: 
+
     start_time = time.time()
     chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
     chapter_name: str = summarization.chapter_title.split("_content")[0]
     chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}_content.txt") 
     summary_blob = bucket.blob(f"{chapter_path}/{chapter_name}_summary.txt")
+
     with chapter_blob.open("r") as f: 
         content = f.read()
     
@@ -510,33 +512,6 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> PushToJSONModel:
 
 # @app.post("/divider")
 # async def json_divider(): 
-
-@app.post("/create_img")
-async def create_image(img_model: DataMapPlotInputModel) -> GeneratedImageModel: 
-    start_time: float = time.time()
-    with tempfile.TemporaryDirectory() as tmp_dir: 
-        data = np.hstack((np.array(img_model.X_col).reshape(-1, 1), 
-                   np.array(img_model.Y_col).reshape(-1, 1)))  
-
-        # scaling the data 
-        data = data * 50 
-        labels = np.array(img_model.labels).reshape(-1,)
-
-        fig, _ = datamapplot.create_plot(
-            data, labels, 
-            noise_label="Unimportant topics", 
-            title="Topic Map", 
-            sub_title="Visual representation of topics found within the book", 
-            label_font_size=11, 
-        )
-
-        fig.savefig(f"{tmp_dir}/saved_img.jpg")
-        matplotlib_fig = PIL.Image.open(f"{tmp_dir}/saved_img.jpg") 
-
-        return GeneratedImageModel(
-            encoded_image=encode_image(matplotlib_fig), 
-            time=time.time() - start_time
-        )
 
 @app.get("/interactive_plot/{email_id}/{filename}")
 async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
@@ -834,6 +809,7 @@ async def generation_data(request: Request) -> JSONResponse:
     emailId = data["emailId"]
     fileName = data["fileName"]
     category = data["category"] if data["category"] != "heading" else "heading_text"
+    print(category)
 
     degree_weights: Dict = {
        5: 1, 
@@ -859,6 +835,7 @@ async def generation_data(request: Request) -> JSONResponse:
     }
 
     generation_config: Dict = data["generationData"]
+    
     qna_book_level_data = generation_config["book"][0]["nodeContent"]
 
     mi = defaultdict(lambda: defaultdict(int))
@@ -937,6 +914,11 @@ async def generation_data(request: Request) -> JSONResponse:
                 and "topic_representation_depth" in js_object 
                 and "topic_representation_strength" in js_object): 
 
+                # print(degree_weights[js_object["topic_strength"]])
+                # print(depth_value_weights[js_object["topic_representation_depth"]])
+                # print(js_object["topic_representation_strength"])
+                # print(json.dumps(assign_value_weights, indent=4))
+
                 js_object["cumulative_strength"] = (degree_weights[js_object["topic_strength"]] + 
                                 depth_value_weights[js_object["topic_representation_depth"]] +
                                 assign_value_weights[js_object["topic_representation_strength"]]) 
@@ -956,7 +938,7 @@ async def generation_data(request: Request) -> JSONResponse:
 
     except Exception as err: 
         print("Error occured!")
-        print(err)
+        print("error: %s at line %s" % (type(err).__name__, err.__traceback__.tb_lineno))
     
     question_list: Dict = defaultdict(
         lambda : defaultdict(
@@ -973,7 +955,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 for topic_name, question_count in topic_nodes.items(): 
                     question_list[question_type][chapter_name][topic_name]["topic_question_count"] = question_count
                     question_list[question_type][chapter_name][topic_name]["topic_json"] = (
-                        sorted(list(filter(lambda mp: mp[category] == topic_name, modified_final_json)),
+                        sorted(list(filter(lambda mp: mp["topic"] == topic_name, modified_final_json)),
                         key = lambda x: x["cumulative_strength"], reverse=True) 
                     )       
 
@@ -994,9 +976,10 @@ async def generation_data(request: Request) -> JSONResponse:
             with generation_data_blob.open("w") as f: 
                 json.dump(qd_dict, fp=f)
 
-        except Exception as e: 
+        except Exception as err: 
             print("No such object found")
-            print(e)
+            print("error: %s at line %s" % (type(err).__name__, err.__traceback__.tb_lineno))
+
     else: 
         print("The list was empty ")
 
