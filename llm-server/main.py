@@ -31,6 +31,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import Request 
+from fastapi import HTTPException
+
 
 from collections import defaultdict
 
@@ -40,11 +42,9 @@ import os
 import json
 import time 
 import tiktoken 
-import traceback 
+import fasttext
 
 import pdf2image as p2i 
-import numpy as np 
-import tempfile 
 
 from openai import OpenAI 
 
@@ -63,7 +63,8 @@ from summarizer.prompts import summarization_prompt
 from json_editor.editor import edit_metadata
 
 from language_detection.detector import detect_language
-from language_detection.prompts import language_detection_prompt
+from language_detection.prompts import text_extraction_prompt
+from language_detection.format_converter import language_codes 
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -110,7 +111,6 @@ question_type_map: Dict[str, str] = {
 
 
 PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
-GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY") 
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY")
 GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY")
 HF_TOKEN: str = os.environ.get("HF_TOKEN")
@@ -121,6 +121,9 @@ ERROR_DIR: str = "error_dir"
 
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
+
+#facebook nllb 
+language_detection_model = fasttext.load_model("../bucket-gs/translation-model/model.bin")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -155,7 +158,8 @@ async def home() -> Dict[str, str]:
 # No LLM is used in this step. SO we are not charging tokens. 
 # we are however computing the amount of time this endpoint takes to run 
 @app.post("/convert_pdf")
-async def convert_pdf(pdf_file: ConvertPDFModel) -> ConvertPDFOutputModel: 
+async def convert_pdf(pdf_file: 
+    ConvertPDFModel) -> ConvertPDFOutputModel : 
     """
     Input: {
         filename: name of the book 
@@ -168,13 +172,25 @@ async def convert_pdf(pdf_file: ConvertPDFModel) -> ConvertPDFOutputModel:
     """
     # accessing the file blob from the URI 
     start_time = time.time()
-    pdf_blob = bucket.blob(pdf_file.uri)
+    try: 
+        pdf_blob = bucket.blob(pdf_file.uri)
+        
+        with pdf_blob.open("rb") as f:   
+            images: List[PIL.Image] = p2i.convert_from_bytes(
+                f.read(), 
+                dpi=200, 
+                fmt="jpg", 
+            )
+        
+        
+    except Exception as err: 
+        error_line: int = err.__traceback__.tb_lineno 
+        error_name: str = type(err).__name__
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error {error_name} at line {error_line}"
+        )
     
-    images: List[PIL.Image] = p2i.convert_from_bytes(
-        pdf_blob.open("rb").read(), 
-        dpi=200, 
-        fmt="jpg", 
-    )
 
     # encoding the images and saving the encoded json to a directory  
     encoded_images: List[Dict[str, str]] = []
@@ -219,11 +235,20 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     """
     
     start_time = time.time()  
-    image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
-    with image_blob.open("r") as f: 
-        images: List[Dict] = json.load(fp=f)
 
-    if len(images) > 5:  
+    try: 
+        image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
+        with image_blob.open("r") as f: 
+            images: List[Dict] = json.load(fp=f)
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+
+    if len(images) > 10:  
         chosen_images = random.sample(population=images, k=5)
     else: chosen_images = images 
 
@@ -232,8 +257,10 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
         encoded_image: str = image["img_b64"]
         language, token_count = detect_language(
             encoded_image, 
+            language_codes, 
             messages, 
-            language_detection_prompt,
+            text_extraction_prompt,
+            language_detection_model,
             gpt4o_encoder, 
             gpt4o)
 
@@ -244,7 +271,7 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     return DetectedLanguageModel(
         filename=lng_model.filename, 
         email_id=lng_model.email_id, 
-        detected_language=max(languages, key=languages.count),
+        detected_language=max(languages, key=languages.count).lower(),
         time=duration, 
         token_count=token_count, 
     ) 
@@ -254,11 +281,18 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
 async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel: 
     # reading the images from the bucket 
     start_time = time.time()
-    image_json_blob = bucket.blob(user_image_data.uri) 
-    with image_json_blob.open("r") as img_json: 
-        images: List[Dict[str, str]] = json.load(img_json)
+    try: 
+        image_json_blob = bucket.blob(user_image_data.uri) 
+        with image_json_blob.open("r") as img_json: 
+            images: List[Dict[str, str]] = json.load(img_json)
+    except Exception as err:
+        error_count: int = err.__traceback__.tb_lineno
+        error_name: str  = type(err).__name__
+        raise HTTPException(
+            status_code = 404, 
+            details = f"Error: {error_name} at {error_count}"
+        )
 
-    print(f"processing step here for pdf {user_image_data.filename}...")
     # sending images to the images function 
     html_pages, token_count = parse_images(
         gpt4o, 
@@ -272,7 +306,6 @@ async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel:
         language=user_image_data.language, 
     )
 
-    print(f"processing step is done for filename {user_image_data.filename}...")
 
     structured_json: List[Dict[str, str|int]] = structure_html(html_pages) 
     # writing data from each page into a json file to paralellize the rest of the code from out here 

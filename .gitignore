@@ -1,14 +1,15 @@
 # llm server 
-llm_server/.env
-llm_server/data_loader/__pycache__
-llm_server/data_classifier/__pycache__
-llm_server/ast
-llm_server/.pytest_cache 
-llm_server/ignore.py
-llm_server/.secrets
-llm_server/json_editor/ignoreme
-llm_server/.gitignore 
-llm_server/__pycache__
+llm-server/.env
+llm-server/data_loader/__pycache__
+llm-server/data_classifier/__pycache__
+llm-server/ast
+llm-server/.pytest_cache 
+llm-server/ignore.py
+llm-server/.secrets
+llm-server/json_editor/ignoreme
+llm-server/.gitignore 
+llm-server/__pycache__
+llm-server/tests/__pycache__
 
 # streamlit application 
 streamlit-app/.gitignore
@@ -47,3 +48,4 @@ react-flow-app/*.sw?
 .env
 .env_bin
 .secrets
+bucket_mount
