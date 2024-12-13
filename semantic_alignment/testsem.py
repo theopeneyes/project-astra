@@ -1,30 +1,42 @@
 from openai import OpenAI
 from prompts import semantic_normalization_prompt, snp, snp2
 import ast
+import os
+from dotenv import load_dotenv
+load_dotenv()
+openai_key = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(api_key="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")
-ylist = ['Deep Learning', 'DL', 'Deep learning (DL)']
-xlist = ['NLP', 'natural language processing', 'natural language processing (NLP)', 'Deep Learning', 'DL', 'Deep learning (DL)', 'activation functions', 'tanh']
+client = OpenAI(api_key=openai_key)
+# ylist = ['Deep Learning', 'DL', 'Deep learning (DL)']
+# xlist = ['NLP', 'natural language processing', 'natural language processing (NLP)', 'Deep Learning', 'DL', 'Deep learning (DL)', 'activation functions', 'tanh']
 # zlist = xlist.append(ylist)
-prompt = snp2.format(xlist)
+# prompt = snp2.format(xlist)
 
 
 
 
+def semantic_normalizer(value_list: list, prompt=snp2, client=client):
+    prompt = snp2.format(value_list)
+    
+    # get response from OpenAI API
+    completion = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": prompt}
+    ]
+    )
 
-completion = client.chat.completions.create(
-  model="gpt-4o",
-  messages=[
-    {"role": "system", "content": "You are a helpful assistant."},
-    {"role": "user", "content": prompt}
-  ]
-)
+    # extract the actual output from API response
+    y = completion.choices[0].message.content
 
-y = completion.choices[0].message.content
-z = ast.literal_eval(y)
-print(type(z))
-
-# temp = completion.choices[0].text
-# print(temp)
-
-# print(a.choices[0].text)
+    try:
+        # convert the result(A string of a list, hopefully) into the datatype list
+        z = ast.literal_eval(y)
+        if(type(z)==list):
+            return z
+        
+    except Exception as e:
+        print(f"{e} occured!!")
+        return 
+    
