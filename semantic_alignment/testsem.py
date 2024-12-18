@@ -1,7 +1,8 @@
 from openai import OpenAI
 from prompts import  snp2_revised
-import ast
+import json
 import os
+import re
 from dotenv import load_dotenv
 load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
@@ -12,14 +13,14 @@ print()
 xlist = ['NLP', 'natural language processing', 'natural language processing (NLP)', 'Deep Learning', 'DL', 'Deep learning (DL)', 'activation functions', 'tanh']
 # zlist = xlist.append(ylist)
 # prompt = snp2.format(xlist)
-def semantic_normalizer(value_list: list, ylist, prompt, client):
+def semantic_normalizer(value_list: list, prompt, client):
     # copy the list
     json_copy = value_list
 
     # de-duplicate it
     json_copy = list(dict.fromkeys(json_copy))
 
-    prompt = snp2_revised.format(ylist)
+    prompt = snp2_revised.format(value_list)
     
     # get response from OpenAI API
     completion = client.chat.completions.create(
@@ -34,15 +35,26 @@ def semantic_normalizer(value_list: list, ylist, prompt, client):
     try:
         # extract the actual output from API response
         y = completion.choices[0].message.content
+
+        # extract json from string of output using regex.
+        match = re.search(r'\{.*\}', y, re.DOTALL)
+        
+        if match:
+            json_string = match.group(0)
+        else:
+            print("Regex is stupid and couldnt do its job.")
+            return
+
+
         # convert the result(A string of a dict, hopefully) into the datatype dict
-        z = ast.literal_eval(y)
+        z = json.loads(json_string)
         print(type(z))
-        if(type(z)==dict):
-            return z
+        return z
         
     except Exception as e:
         print(e) # log the error
+        print("Error encountered from the result sent by OpenAI. cant do anything here")
         return 
     
-print(semantic_normalizer(xlist, xlist, snp2_revised, client=client))
+print(semantic_normalizer(xlist, snp2_revised, client=client))
     

@@ -78,7 +78,7 @@ You will be provided with a list of concepts. Follow the instructions given belo
 Step 1: Identify concepts within the list that have the same core idea behind it but the strings are different. 
 Step 2: Create a noun for the core idea and assign them to map the set of similar ideas to the noun you have created for the core idea. Your output should contain 1:1 (str:str) key-value pairs in a dictionary. One SAMPLE output could be as follows:  
 NOTE: Your result should contain the exact number of elements in the original list. You are not supposed to delete any element, but replace the duplicates/simialr ones with the most appropriate noun you decided in the early step.
-
+Property names in your JSON should be in Double Quotes("") ALWAYS.
 Machine Learning: Machine Learning,
 ML: Machine Learning,
 machine Learning (ml): Machine Learning,
