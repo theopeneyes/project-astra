@@ -30,19 +30,18 @@ def semantic_normalizer(value_list: list, ylist, prompt, client):
     ]
     )
 
-    # extract the actual output from API response
-    y = completion.choices[0].message.content
-    # print(y)
+    
     try:
+        # extract the actual output from API response
+        y = completion.choices[0].message.content
         # convert the result(A string of a dict, hopefully) into the datatype dict
         z = ast.literal_eval(y)
-        print(z)
         print(type(z))
         if(type(z)==dict):
             return z
         
     except Exception as e:
-        print(f"{e} occured!!")
+        print(e) # log the error
         return 
     
 print(semantic_normalizer(xlist, xlist, snp2_revised, client=client))
