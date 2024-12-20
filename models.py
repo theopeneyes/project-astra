@@ -94,3 +94,4 @@ class SynthesisContentOutputModel(AbsoluteBaseModel):
 class TranslationRequest(BaseModel):
     questions_generated: str
     source_lang: str
+

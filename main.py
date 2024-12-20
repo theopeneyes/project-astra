@@ -33,7 +33,8 @@ from transformers import AutoTokenizer
 
 import PIL 
 import random 
-import os 
+import os
+import re 
 import json
 import time 
 import tiktoken 
@@ -78,6 +79,8 @@ from synthesizers.synthesize import synthesizer
 
 from tools.translation_nllb import detection_and_translation_nllb
 from tools.translation_nllb import detect_language
+
+from semantic_alignment.prompts import snp2_revised
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -700,6 +703,7 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
      
 
 
+#incomplete
 @app.post("/nllb_translate")
 async def nllb_translator(request: TranslationRequest):
     start_time: float = time.time()
@@ -708,4 +712,80 @@ async def nllb_translator(request: TranslationRequest):
         return {"questions": translated_text}
     except Exception as e:
         pass
+
     
+@app.post("/normalizer")
+async def metadata_normalizer(norm: AbsoluteBaseModel):
+    """
+Takes a list of any metadata and normalizes it. Basically removes duplicares and terms that are written differntly, but mean the same thing.
+
+Input:
+User's email adress and the file name. 
+
+Returns: 
+The normalized list.
+
+    """
+ 
+    json_blob = bucket.blob(os.path.join(
+        norm.email_id, 
+        "final_json", 
+        f"{norm.filename}.json", 
+    ))
+    with json_blob.open("r") as f: 
+        json_content = json.load(fp=f)
+
+    value_list = []
+    for jason in json_content:
+        if('concept' in jason.keys()):
+            value_list.append(jason['concept'])
+        else:
+            continue
+    
+    # copy the list
+    base_json = value_list
+    
+    
+  
+    # de-duplicate it
+    base_json = list(dict.fromkeys(base_json))
+    prompt = snp2_revised
+    prompt = prompt.format(base_json)
+    
+    completion = gpt4o.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": prompt}
+    ]
+    )
+
+    
+    try:
+        y = completion.choices[0].message.content
+        match = re.search(r'\{.*\}', y, re.DOTALL)
+        
+        if match:
+            json_string = match.group(0)
+        else:
+            print("Regex is stupid and couldnt do its job.")
+            return
+
+
+        # convert the result(A string of a dict, hopefully) into the datatype dict
+        z = json.loads(json_string)
+        
+        updated_list = []
+        for item in value_list:
+            normalized_value = z.get(item, item)
+            updated_list.append(normalized_value)
+
+        return updated_list
+        
+    except Exception as e:
+        print(e) # log the error
+        print("Error encountered from the result sent by OpenAI. cant do anything here")
+        return
+
+
+

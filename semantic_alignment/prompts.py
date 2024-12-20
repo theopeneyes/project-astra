@@ -46,7 +46,7 @@ nlp: Natural Language Processing,
 random shit 1: Random Concept,
 random shit 2: Random Concept,
 random shit 3: Random Concept
-}
+
 
 '''
 snp2 = """

@@ -8,9 +8,10 @@ load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=openai_key)
 
-print() 
+
+
 # ylist = ['Deep Learning', 'DL', 'Deep learning (DL)']
-xlist = ['NLP', 'natural language processing', 'natural language processing (NLP)', 'Deep Learning', 'DL', 'Deep learning (DL)', 'activation functions', 'tanh']
+xlist = ['Machine learning', 'Machine Learning (ML)', 'ML', 'neurons']
 # zlist = xlist.append(ylist)
 # prompt = snp2.format(xlist)
 def semantic_normalizer(value_list: list, prompt, client):
@@ -48,7 +49,6 @@ def semantic_normalizer(value_list: list, prompt, client):
 
         # convert the result(A string of a dict, hopefully) into the datatype dict
         z = json.loads(json_string)
-        print(type(z))
         return z
         
     except Exception as e:
@@ -56,5 +56,10 @@ def semantic_normalizer(value_list: list, prompt, client):
         print("Error encountered from the result sent by OpenAI. cant do anything here")
         return 
     
-print(semantic_normalizer(xlist, snp2_revised, client=client))
+
+updated_list = []
+for item in xlist:
+    normalized_value = abs.get(item, item)  # Get normalized value or keep the original if not in the map
+    updated_list.append(normalized_value)
     
+# print(updated_list)
