@@ -24,6 +24,8 @@ from models import ModificationInputModel
 from models import ModificationOutputModel 
 from models import MetaDataEditModel 
 from models import MetaDataEditResponseModel
+from models import ContentsRequestModel
+from models import ContentsResponseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -42,9 +44,9 @@ import os
 import json
 import time 
 import tiktoken 
-import fasttext
 
 import pdf2image as p2i 
+import pandas as pd 
 
 from openai import OpenAI 
 
@@ -63,8 +65,7 @@ from summarizer.prompts import summarization_prompt
 from json_editor.editor import edit_metadata
 
 from language_detection.detector import detect_language
-from language_detection.prompts import text_extraction_prompt
-from language_detection.format_converter import language_codes 
+from language_detection.prompts import language_detection_prompt
 
 from data_loader.image_parser import parse_images 
 from data_loader.structure import structure_html 
@@ -88,6 +89,9 @@ from synthesizers.synthesize import synthesizer
 from segregator.segregation import segregator
 from segregator.prompts import counting_prompt 
 from segregator.modifier import get_relevant_count
+
+from contents_parser.parse_index import parse_index
+from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -122,8 +126,7 @@ ERROR_DIR: str = "error_dir"
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 
-#facebook nllb 
-language_detection_model = fasttext.load_model("../bucket-gs/translation-model/model.bin")
+#facebook nllbs
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -220,7 +223,60 @@ async def convert_pdf(pdf_file:
         uri=json_path, 
         time=duration,  
     ) 
+
+@app.post("/extract_contents_page")
+async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
+    start_time: float = time.time()
+    try: 
+        images_blob = bucket.blob(f"{contents_request.email_id}/processed_image/{contents_request.filename.split('.pdf')[0]}.json")
+
+        with images_blob.open("r") as f: 
+            images: list = json.load(fp=f)  
         
+        first_page, last_page, index_contents, token_count = parse_index(images, contents_request.number_of_pages, gpt4o, gpt4o_encoder)
+        df = pd.DataFrame(index_contents, columns=["sectionName", "title", "headingType", "pageNo"])
+
+        contents_page_blob = bucket.blob(os.path.join(
+            contents_request.email_id, 
+            "contents_page", 
+            f"{contents_request.filename.split('.pdf')[0]}.csv", 
+        ))
+
+        with contents_page_blob.open("w") as fp: 
+            df.to_csv(fp, index=False)
+
+    except LLMTooDUMBException as tooDumb: 
+        error_name: str = type(tooDumb).__name__
+        error_line: int  = tooDumb.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
+        )
+
+    except IndexPageNotFoundException as notFound: 
+        error_name: str = type(notFound).__name__
+        error_line: int  = notFound.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}. Number of pages: {notFound.number_of_pages}"
+        )
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return ContentsResponseModel(
+        email_id=contents_request.email_id, 
+        filename=contents_request.filename, 
+        time=time.time() - start_time, 
+        token_count = token_count, 
+        first_page=first_page, 
+        last_page=last_page, 
+    )
 
 @app.post("/detect_lang") 
 async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
@@ -257,10 +313,8 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
         encoded_image: str = image["img_b64"]
         language, token_count = detect_language(
             encoded_image, 
-            language_codes, 
             messages, 
-            text_extraction_prompt,
-            language_detection_model,
+            language_detection_prompt,
             gpt4o_encoder, 
             gpt4o)
 

@@ -111,3 +111,12 @@ class MetaDataEditResponseModel(AbsoluteBaseModel):
     
 class LLMGenerationRequestModel(AbsoluteBaseModel):  
     language: str
+
+class ContentsRequestModel(AbsoluteBaseModel): 
+    number_of_pages: int 
+
+class ContentsResponseModel(AbsoluteBaseModel): 
+    first_page: int
+    last_page: int 
+    time: float
+    token_count: int
