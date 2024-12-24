@@ -1,4 +1,5 @@
 from pydantic import BaseModel 
+from fastapi import UploadFile
 from typing import List 
 
 #Absolute underlying base model 
@@ -134,3 +135,6 @@ class ReformRequestModel(AbsoluteBaseModel):
 
 class ReformResponseModel(AbsoluteBaseModel): 
     time : float
+
+class PDFUploadResponseModel(AbsoluteBaseModel): 
+    time: float 

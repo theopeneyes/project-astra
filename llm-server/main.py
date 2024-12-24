@@ -2,6 +2,10 @@
 
 # FastAPI imports 
 from fastapi import FastAPI 
+from fastapi import Form 
+from fastapi import UploadFile
+from fastapi import File 
+
 
 from models import DataLoaderModel 
 from models import GenerationContext
@@ -30,6 +34,7 @@ from models import ChapterIdentificationRequestModel
 from models import ChapterIdentificationResponseModel
 from models import ReformRequestModel
 from models import ReformResponseModel
+from models import PDFUploadResponseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -162,6 +167,40 @@ async def home() -> Dict[str, str]:
 # # login trigger 
 # @app.post("/trigger")
 # async def login_trigger()
+
+@app.post("/upload_pdf") 
+async def upload_pdf(
+    email_id: str = Form(...), 
+    filename: str = Form(...), 
+    pdf: UploadFile = File(...),  
+) -> PDFUploadResponseModel: 
+
+    # leadtime conversion 
+    start_time: int = time.time()
+    content = await pdf.read() 
+    try: 
+        upload_pdf_blob = bucket.blob(os.path.join(
+            email_id, 
+            "uploaded_document", 
+            filename, 
+        ))
+
+        with upload_pdf_blob.open("wb") as fp: 
+            fp.write(content)
+
+    except Exception as err: 
+        error_line: int = err.__traceback__.tb_lineno 
+        error_name: str = type(err).__name__
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error {error_name} at line {error_line}"
+        )
+    
+    return PDFUploadResponseModel(
+        email_id = email_id, 
+        filename=filename, 
+        time=time.time() - start_time, 
+    )
 
 
 # No LLM is used in this step. SO we are not charging tokens. 
@@ -307,7 +346,7 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             images: list[str] = json.load(fp=fp)
         
         
-        content_csv, content_dict, token_count = segment_breakdown(
+        content_csv, content_dict, chapter_to_heading_map, token_count = segment_breakdown(
             images, index_content_csv, 
             identification_request.last_page, 
             identification_request.first_page, 
@@ -357,6 +396,13 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             "sections.json"
         ))
 
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "chapter_to_heading.json"
+        ))
+
         with chapter_pages_csv_blob.open("w") as fp: 
             chapters.to_csv(fp, index=False)
 
@@ -368,6 +414,9 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
         
         with heading_sections_blob.open("w") as fp: 
             json.dump(content_dict, fp=fp)
+
+        with chapter_to_heading_map_blob.open("w") as fp: 
+            json.dump(chapter_to_heading_map, fp=fp)
 
     except LLMTooDUMBException as tooDumb: 
         error_name: str = type(tooDumb).__name__
@@ -440,7 +489,7 @@ async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseMod
 
         with chapter_image_blob.open("w") as fp: 
             json.dump(images[last_index:], fp=fp)
-        
+    
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
