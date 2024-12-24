@@ -15,8 +15,8 @@ def parse_index(images: list, number_of_pages: int, gpt4o, gpt4o_encoder):
 
     Finds the index page and parses it for content of the book  
     """
-    first_page: int | None = None
-    last_page: int | None = None 
+    first_page: int  = 0 
+    last_page: int = number_of_pages 
     contents_detected: bool = False
     token_count: int = 0 
     index_contents: list = []

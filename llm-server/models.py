@@ -120,3 +120,17 @@ class ContentsResponseModel(AbsoluteBaseModel):
     last_page: int 
     time: float
     token_count: int
+
+class ChapterIdentificationRequestModel(AbsoluteBaseModel): 
+    last_page: int 
+    first_page: int 
+
+class ChapterIdentificationResponseModel(AbsoluteBaseModel): 
+    token_count: int 
+    time: float 
+
+class ReformRequestModel(AbsoluteBaseModel): 
+    pass 
+
+class ReformResponseModel(AbsoluteBaseModel): 
+    time : float

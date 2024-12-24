@@ -17,15 +17,13 @@ bucket = gcs_client.bucket(BUCKET_NAME)
 
 base_directory: str = "../streamlit-app/test_books"
 pdf_names: str = [
-    "Advanced-deep-learning.pdf", 
-    "algorithms.pdf", 
     "Machine-Learning-For-Absolute-Beginners.pdf", 
     "lbdl.pdf", 
 ]
 
 user_email: str = "test.second@yahoo.com"
 
-pdf_name = pdf_names[-1]
+pdf_name = pdf_names[0]
 # pdf_name = "machine-learning-algorithms.pdf"
 convert_response = requests.post(
     URL + "/convert_pdf", json = {
@@ -40,6 +38,29 @@ response = requests.post(
         "email_id": user_email, 
         "filename": pdf_name, 
         "number_of_pages": 20, 
+    }
+)
+
+response_content = response.json()
+last_page: int = response_content.get("last_page")
+first_page: int = response_content.get("first_page")
+
+response = requests.post(
+    URL + "/identify/chapter_pages", 
+    json = {
+        "email_id": user_email, 
+        "filename": pdf_name, 
+        "last_page": last_page, 
+        "first_page": first_page
+    }
+)
+
+
+response = requests.post(
+    URL + "/reform/chapter_pages", 
+    json = {
+        "email_id": user_email, 
+        "filename": pdf_name, 
     }
 )
 

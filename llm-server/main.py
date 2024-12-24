@@ -26,6 +26,10 @@ from models import MetaDataEditModel
 from models import MetaDataEditResponseModel
 from models import ContentsRequestModel
 from models import ContentsResponseModel
+from models import ChapterIdentificationRequestModel
+from models import ChapterIdentificationResponseModel
+from models import ReformRequestModel
+from models import ReformResponseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -92,6 +96,8 @@ from segregator.modifier import get_relevant_count
 
 from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
+
+from chapter_broker.breakdown import segment_breakdown
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -277,6 +283,178 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
         first_page=first_page, 
         last_page=last_page, 
     )
+
+@app.post("/identify/chapter_pages")
+async def identify_chapters(identification_request: ChapterIdentificationRequestModel) -> ChapterIdentificationResponseModel: 
+    start_time: int = time.time()
+    try: 
+        csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "contents_page", 
+            identification_request.filename.split(".pdf")[0] + ".csv", 
+        ))
+
+        image_blob = bucket.blob(os.path.join(
+            identification_request.email_id,  
+            "processed_image", 
+            identification_request.filename.split(".pdf")[0] + ".json", 
+        ))
+
+        with csv_blob.open("r") as fp: 
+            index_content_csv: pd.DataFrame = pd.read_csv(fp).values.tolist()
+        
+        with image_blob.open("r") as fp: 
+            images: list[str] = json.load(fp=fp)
+        
+        
+        content_csv, content_dict, token_count = segment_breakdown(
+            images, index_content_csv, 
+            identification_request.last_page, 
+            identification_request.first_page, 
+            gpt4o, gpt4o_encoder
+        )
+
+
+        df: pd.DataFrame = pd.DataFrame(
+            content_csv, 
+            columns = [
+                "title", 
+                "section_number", 
+                "index", 
+                "heading_type" 
+            ]
+        )
+
+
+        chapters: pd.DataFrame = df.loc[df.heading_type == "h1"]
+        headings: pd.DataFrame = df.loc[df.heading_type == "h2"] 
+
+        chapter_pages_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "chapters.csv"
+        ))
+
+        pages_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "all_pages.csv"
+        ))
+
+        headings_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "headings.csv"
+        ))
+
+        heading_sections_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "sections.json"
+        ))
+
+        with chapter_pages_csv_blob.open("w") as fp: 
+            chapters.to_csv(fp, index=False)
+
+        with pages_csv_blob.open("w") as fp: 
+            df.to_csv(fp, index=False)
+
+        with headings_csv_blob.open("w") as fp: 
+            headings.to_csv(fp, index=False)
+        
+        with heading_sections_blob.open("w") as fp: 
+            json.dump(content_dict, fp=fp)
+
+    except LLMTooDUMBException as tooDumb: 
+        error_name: str = type(tooDumb).__name__
+        error_line: int  = tooDumb.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
+        )
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+
+    return ChapterIdentificationResponseModel(
+        email_id=identification_request.email_id, 
+        filename = identification_request.filename, 
+        time= time.time() - start_time, 
+        token_count = token_count,  
+    )
+
+@app.post("/reform/chapter_pages")
+async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseModel: 
+    start_time: float = time.time()
+    try: 
+        chapter_csv_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".pdf")[0], 
+            "chapters.csv"
+        ))
+
+        images_blob  = bucket.blob(os.path.join(
+            request.email_id, 
+            "processed_image", 
+            request.filename.split(".pdf")[0] + ".json", 
+        ))
+
+        with images_blob.open("r") as fp: 
+            images: list = json.load(fp=fp)
+
+        with chapter_csv_blob.open("r") as fp: 
+            chapters: list[list[str]] = pd.read_csv(fp).values.tolist()
+        
+        for idx, chapter in enumerate(chapters[1:], 1):
+            _, _, next_index, _ = chapter  
+            curr_title, curr_section, curr_index, _ = chapters[idx-1]
+            chapter_images: list = images[curr_index:next_index]
+
+            chapter_image_blob = bucket.blob(os.path.join(
+                request.email_id, 
+                "chapter_processed_images", 
+                request.filename.split(".pdf")[0], 
+                f"{curr_section}_{curr_title}.json" 
+            ))
+
+            with chapter_image_blob.open("w") as fp: 
+                json.dump(chapter_images, fp=fp)
+                
+        last_chapter, last_section, last_index, _ = chapters[len(chapters) - 1]
+        chapter_image_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_processed_images", 
+            request.filename.split(".pdf")[0], 
+            f"{last_section}_{last_chapter}.json" 
+        ))
+
+        with chapter_image_blob.open("w") as fp: 
+            json.dump(images[last_index:], fp=fp)
+        
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return ReformResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        time=time.time() - start_time
+    )
+        
 
 @app.post("/detect_lang") 
 async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
