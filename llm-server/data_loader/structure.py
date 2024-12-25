@@ -1,6 +1,5 @@
 from typing import List, Dict 
 
-
 def structure_html(output: List[str]) ->List[Dict[str, str|int]]: 
     """
     output: List[str] 

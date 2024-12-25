@@ -138,3 +138,11 @@ class ReformResponseModel(AbsoluteBaseModel):
 
 class PDFUploadResponseModel(AbsoluteBaseModel): 
     time: float 
+
+class ChapterLoaderRequestModel(AbsoluteBaseModel): 
+    chapter_name: str 
+
+class ChapterLoaderResponseModel(AbsoluteBaseModel): 
+    chapter_name: str 
+    time: float
+    token_count: int 

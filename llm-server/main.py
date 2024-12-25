@@ -7,9 +7,9 @@ from fastapi import UploadFile
 from fastapi import File 
 
 
-from models import DataLoaderModel 
+from models import ChapterLoaderRequestModel
+from models import ChapterLoaderResponseModel
 from models import GenerationContext
-from models import StructuredJSONModel
 from models import DataClassifierModel
 from models import SummarizationInputModel
 from models import SummarizationOutputModel
@@ -76,9 +76,6 @@ from json_editor.editor import edit_metadata
 from language_detection.detector import detect_language
 from language_detection.prompts import language_detection_prompt
 
-from data_loader.image_parser import parse_images 
-from data_loader.structure import structure_html 
-from data_loader.prompts import generation_prompt, clause_prompt, validation_prompt 
 from data_loader.opeanai_formatters import image_message as messages, text_message  
 
 from data_classifier.classification_pipeline import get_json
@@ -103,6 +100,8 @@ from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
 from chapter_broker.breakdown import segment_breakdown
+from chapter_loader.structure import structure_html
+from chapter_loader.loader import load_chapters 
 
 # loads the variables in the .env file 
 load_dotenv(override=True)
@@ -503,8 +502,95 @@ async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseMod
         email_id=request.email_id, 
         time=time.time() - start_time
     )
-        
 
+@app.get("/book_chapters/{email_id}/{filename}")
+async def get_book_chapters(email_id: str, filename: str) -> JSONResponse: 
+    try: 
+        blobs = gcs_client.list_blobs(
+            BUCKET_NAME, 
+            prefix = os.path.join(
+                email_id, 
+                "chapter_processed_images", 
+                f"{filename.split('.')[0]}/", 
+            ), 
+            delimiter = "/"
+        ) 
+
+        chapter_titles: list[str] = [blob.name.split("/")[-1] for blob in blobs]
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+
+    return dict(
+        titles=chapter_titles, 
+    ) 
+
+@app.post("/chapter_loader")
+async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
+    start_time = time.time()
+    try: 
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapter_to_heading_map.json"
+        ))
+
+        chapters_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapters.csv"
+        ))
+
+        chapter_image_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_processed_images", 
+            request.filename.split(".")[0], 
+            request.chapter_name, 
+        ))
+
+        with chapter_to_heading_map_blob.open("r") as f:
+            chapter_json: dict = json.load(f)
+        
+        with chapters_blob.open("r") as f:
+            df: pd.DataFrame = pd.read_csv(f)
+        
+        with chapter_image_blob.open("r") as f: 
+            chapter_images: list[dict]  = json.load(f) 
+        
+        responses, token_count = load_chapters(chapter_json, df, chapter_images, gpt4o, gpt4o_encoder)
+        structured_chapter: list[dict] = structure_html(responses)
+
+        chapter_processed_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name + ".json"
+        ))
+
+        with chapter_processed_json_blob.open("w") as fp: 
+            json.dump(structured_chapter, fp)
+        
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return ChapterLoaderResponseModel(
+        email_id = request.email_id, 
+        filename = request.filename, 
+        time = time.time() - start_time, 
+        token_count = token_count,  
+    )
+        
 @app.post("/detect_lang") 
 async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
     """
@@ -557,92 +643,6 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
         token_count=token_count, 
     ) 
 
-# the data loading endpoint 
-@app.post("/data_loader")
-async def data_loader(user_image_data: DataLoaderModel) -> StructuredJSONModel: 
-    # reading the images from the bucket 
-    start_time = time.time()
-    try: 
-        image_json_blob = bucket.blob(user_image_data.uri) 
-        with image_json_blob.open("r") as img_json: 
-            images: List[Dict[str, str]] = json.load(img_json)
-    except Exception as err:
-        error_count: int = err.__traceback__.tb_lineno
-        error_name: str  = type(err).__name__
-        raise HTTPException(
-            status_code = 404, 
-            details = f"Error: {error_name} at {error_count}"
-        )
-
-    # sending images to the images function 
-    html_pages, token_count = parse_images(
-        gpt4o, 
-        images=images, 
-        prompt=generation_prompt, 
-        clause_prompt=clause_prompt, 
-        validation_prompt=validation_prompt, 
-        messages=messages,  
-        text_messages=text_message, 
-        gpt4o_encoder=gpt4o_encoder, 
-        language=user_image_data.language, 
-    )
-
-
-    structured_json: List[Dict[str, str|int]] = structure_html(html_pages) 
-    # writing data from each page into a json file to paralellize the rest of the code from out here 
-    title: str | None = None 
-    chapter_texts : List[str] = []
-
-    # creating a folder with the name of the pdf file in the summaries directory  
-    (bucket
-        .blob(f'{user_image_data.email_id}/summaries/{user_image_data.filename}/')
-        .upload_from_string(''))
-
-    for idx, json_page in enumerate(structured_json):
-        blob_path: str = f"{user_image_data.email_id}/text_extract/{user_image_data.filename}_{idx}.json"
-        # if title is None or if it is unequal to json_page != title  
-        if title and title != json_page["heading_identifier"]: 
-
-            content_blob = (bucket
-                            .blob(
-                f"{user_image_data.email_id}/summaries/{user_image_data.filename}/{title}_content.txt")
-            )
-
-            with content_blob.open("w") as f:
-                f.write(" ".join(chapter_texts).strip())
-
-            chapter_texts.clear()
-
-        title = json_page["heading_identifier"]
-
-        json_blob = bucket.blob(blob_path)
-        with json_blob.open("w") as f:
-            json.dump(json_page, fp=f)
-            chapter_texts.append(json_page["text"])
-    
-    if chapter_texts: 
-        content_blob = (bucket
-                        .blob(
-            f"{user_image_data.email_id}/summaries/{user_image_data.filename}/{title}_content.txt")
-        )
-
-        with content_blob.open("w") as f:
-            f.write(" ".join(chapter_texts).strip())
-
-        chapter_texts.clear()
-    
-    duration = time.time() - start_time
-    
-    return StructuredJSONModel(
-        email_id=user_image_data.email_id, 
-        filename=user_image_data.filename, 
-        page_count=len(structured_json), 
-        time=duration, 
-        token_count=token_count, 
-    ) 
-
-
-# segerates via chapter and summarizes the chapter  
 @app.post("/summarize")
 async def summarize(summarization: 
     SummarizationInputModel) -> SummarizationOutputModel: 
