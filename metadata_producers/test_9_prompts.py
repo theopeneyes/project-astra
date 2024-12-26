@@ -55,7 +55,7 @@ subtopic list = {}
 give your output in a JSON that contains a key-value of 'subtopic': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <subtopic> and </subtopic> tags.
+You MUST encapsulate the JSON within <sub_topic> and </sub_topic> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 
 '''
@@ -80,7 +80,7 @@ subconcept list = {}
 give your output in a JSON that contains a key-value of 'subconcept': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <subconcept> and </subconcept> tags.
+You MUST encapsulate the JSON within <sub_concept> and </sub_concept> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 
 '''
@@ -102,7 +102,7 @@ rootconcept list = {}
 give your output in a JSON that contains a key-value of 'rootconcept': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <rootconcept> and </rootconcept> tags.
+You MUST encapsulate the JSON within <root_concept> and </root_concept> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 
 '''
@@ -122,7 +122,7 @@ majordomain list = {}
 give your output in a JSON that contains a key-value of 'major_domain': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <majordomain> and </majordomain> tags.
+You MUST encapsulate the JSON within <major_domains> and </major_domains> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 '''
 
@@ -145,10 +145,8 @@ subdomain list = {}
 give your output in a JSON that contains a key-value of 'sub_domains': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <subdomains> and </subdomains> tags.
+You MUST encapsulate the JSON within <sub_domains> and </sub_domains> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
-
-
 '''
 
 
@@ -177,7 +175,7 @@ Give your output in a JSON that contains only the key-value pair for the chosen 
   }}
 }}
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <aandcs> and </aandcs> tags.
+You MUST encapsulate the JSON within <Attributes and connections> and </Attributes and connections> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 
 '''
@@ -200,7 +198,7 @@ formal_representations list = {}
 give your output in a JSON that contains a key-value of 'formal_representations': 'your_answer_here'
 
 ### INSTRUCTION ###
-You MUST encapsulate the JSON within <formal> and </formal> tags.
+You MUST encapsulate the JSON within <formal_representations> and </formal_representations> tags.
 Use the reasoning to better formulate your answer. If no reasoning is provided, ignore this instruction. 
 
 
@@ -351,15 +349,5 @@ ENCLOSE your answer in <validator> and </validator> tags.
 
 json = {}
 summary = {}
-
-'''
-
-
-reiterator_prompt = '''
-
-
-
-
-
 
 '''
