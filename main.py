@@ -23,6 +23,8 @@ from models import PushToJSONModel
 from models import SynthesisContentInputModel 
 from models import SynthesisContentOutputModel
 from models import TranslationRequest
+from models import ValidatorModel
+
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -789,3 +791,61 @@ The normalized list.
 
 
 
+@app.get("/validate")
+async def json_validator(valid: ValidatorModel):
+    starting_time: float = time.time()
+    '''
+    Functionality: Takes a json, classifies it, and verifies it, and if wrongly classified, re classifies it.
+
+    Input: the JSON, the metadata to be classified, prompt, gpt encoder, gpt4o
+
+    returns: the JSON itself after processing it.
+    '''
+    agent_type = valid.agent_type
+    prompt = valid.prompt
+    language = valid.language
+    single_json = valid.single_json
+    reason = None
+    text_message[0]["content"][0]["text"] = text_message[0]["content"][0]["text"].format(language)
+    text_message[1]["content"][0]["text"] = prompt.format(language, reason, single_json["text"], single_json[agent_type])
+    completion = gpt4o.chat.completions.create(
+        messages=text_message,
+        model="gpt-4o-mini",
+        temperature=0.1
+    )
+    ans=None
+    llm_response = completion.choices[0].message.content
+    token_count = len(gpt4o_encoder.encode(llm_response))
+    print(llm_response)
+    if re.findall(rf"<{agent_type}>(.*?)</{agent_type}>", llm_response, re.DOTALL):
+        summary = re.findall(rf"<{agent_type}>(.*?)</{agent_type}>", llm_response, re.DOTALL)[0]
+        ans = json.loads(summary)
+        count: int = 0
+        status: bool = False
+        print(ans)
+        while(count < 3 and not status):
+
+            isValid = json_validator(ans, "English", gpt4o_encoder, gpt4o)
+            print(isValid)
+            if isValid["status"] == "True":
+                status = True
+            else:
+                text_message[0]["content"][0]["text"] = text_message[0]["content"][0]["text"].format(language)
+                text_message[1]["content"][0]["text"] = prompt.format(language, reason, single_json["text"], single_json[agent_type])
+                completion = gpt4o.chat.completions.create(
+                    messages=text_message,
+                    model="gpt-4o-mini",
+                    temperature=0.1
+                )
+
+                llm_response = completion.choices[0].message.content
+                token_count += len(gpt4o_encoder.encode(llm_response))
+
+                if re.findall(rf"<{agent_type}>(.*?)</{agent_type}>", llm_response, re.DOTALL):
+                    summary = re.findall(rf"<{agent_type}>(.*?)</{agent_type}>", llm_response, re.DOTALL)[0]
+                    ans = json.loads(summary)
+
+            count += 1
+
+    return ans, token_count
+     

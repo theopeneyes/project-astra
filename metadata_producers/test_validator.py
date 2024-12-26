@@ -56,4 +56,3 @@ def json_validator(single_json: dict,
 #         # x = {status: True/False,
 #         #      reason: "blah blah blah"
 #         #}
-    
