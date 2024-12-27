@@ -50,3 +50,4 @@ react-flow-app/*.sw?
 .secrets
 bucket_mount
 ast
+.vscode 
