@@ -2,14 +2,19 @@ import pandas as pd
 from .prompts import text_extraction_prompt
 from .skeleton import messages 
 
-def load_chapters(chapter_json: dict[list], df: pd.DataFrame, content: list[dict], gpt4o, gpt4o_encoder) -> list[str]: 
-    title, _, origin, _ = df.loc[df.title == title].values.tolist()[0]
+def load_chapters(chapter_name: str, chapter_json: dict[list], df: pd.DataFrame, content: list[dict], gpt4o, gpt4o_encoder) -> list[str]: 
+    chapter_name = chapter_name.split(".json")[0].split("_")[1]
+    title, _, origin, _ = df.loc[df.title == chapter_name].values.tolist()[0]
 
     headings: list = chapter_json[title]
-    headings_df = pd.DataFrame(sorted(
-        headings, key = lambda heading: heading[2]), 
-        columns = ["title", "section_number", "idx", "heading_type"]
-    )
+
+    if headings: 
+        headings_df = pd.DataFrame(sorted(
+            headings, key = lambda heading: heading[2]), 
+            columns = ["title", "section_number", "idx", "heading_type"]
+        )
+    else: 
+        headings_df: pd.DataFrame = pd.DataFrame(columns=["title", "section_number", "idx", "heading_type"])
 
     token_count: int = 0
     responses: list = []

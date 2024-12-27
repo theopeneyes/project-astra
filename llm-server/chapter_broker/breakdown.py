@@ -49,7 +49,9 @@ def segment_breakdown(images: list, index_content: list[list[str]], last_page: i
 
                     if (heading_type == "h1" and not previous_title) or (
                         previous_title and title != previous_title and heading_type == "h1"
-                    ): previous_title = title 
+                    ): 
+                        previous_title = title 
+                        chapter_to_heading_maps[previous_title] = []
 
                     elif heading_type == "h2": 
                         chapter_to_heading_maps[previous_title].append([title, section, index, heading_type])

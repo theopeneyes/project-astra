@@ -6,21 +6,20 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi import File 
 
-
 from models import ChapterLoaderRequestModel
 from models import ChapterLoaderResponseModel
 from models import GenerationContext
-from models import DataClassifierModel
-from models import SummarizationInputModel
-from models import SummarizationOutputModel
+from models import SummarizationRequestModel 
+from models import SummarizationResponseModel 
 from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
-from models import RewriteJSONFileModel
-from models import SummaryChapterModel
+from models import RewriteJSONRequestModel
+from models import SummaryChapterRequestModel
 from models import ConvertPDFModel
 from models import ConvertPDFOutputModel
-from models import SummaryChapterOutputModel
-from models import RewriteJSONFileOutputModel 
+from models import SummaryChapterRequestModel
+from models import SummaryChapterResponseModel
+from models import RewriteJSONResponseModel 
 from models import PushToJSONModel
 from models import SynthesisContentInputModel 
 from models import SynthesisContentOutputModel 
@@ -43,7 +42,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import Request 
 from fastapi import HTTPException
-
 
 from collections import defaultdict
 
@@ -69,7 +67,6 @@ from generation.prompts import (
 ) 
 
 from summarizer.summarize import summarize_texts
-from summarizer.prompts import summarization_prompt
 
 from json_editor.editor import edit_metadata
 
@@ -78,14 +75,13 @@ from language_detection.prompts import language_detection_prompt
 
 from data_loader.opeanai_formatters import image_message as messages, text_message  
 
-from data_classifier.classification_pipeline import get_json
 from google.cloud import storage 
 from image_utils.encoder import encode_image 
 
-from metadata_producers.generate_list import generateList
-from metadata_producers.prompts import about_list_generation_prompt, depth_list_generation_prompt
-from metadata_producers.append_about_data import classify_about
+from metadata_producers.summaries import generate_chapter_metadata 
+from metadata_producers.nodes import classify_about
 from metadata_producers.prompts import classification_prompt
+from metadata_producers.exceptions import AboutListNotGeneratedException, DepthListNotGeneratedException
 
 from synthesizers.prompts import representation_depth_prompt
 from synthesizers.prompts import representation_strength_prompt 
@@ -99,20 +95,15 @@ from segregator.modifier import get_relevant_count
 from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
+from summarizer.exceptions import SummaryNotFoundException
+
 from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
 
-# loads the variables in the .env file 
-load_dotenv(override=True)
+from json import JSONDecodeError
 
-# environment variables: configured in .env file
-# these variables will be instantiated once the server starts and 
-# the value won't be updated until you restart the server 
-# PROMPT_FILE_ID: str = os.getenv("FILE_ID", None) # file_id to fetch remote prompt design sheet
-# GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", None) # gemini api key 
-# OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", None) # openai api key 
-# HF_TOKEN: str = os.getenv("HF_TOKEN", None) # Huggingface token 
+load_dotenv(override=True)
 
 question_type_map: Dict[str, str] = {
     "True/False": "trueFalse", 
@@ -153,19 +144,11 @@ app.add_middleware(
     allow_methods=["*"],              
     allow_headers=["*"],              
 )
-# logger 
-# def logger(response: Dict[str, str] | Exception):
-#     # posts this response or exception to a database that is meant to store logs 
-#     pass 
 
 #Endpoints 
 @app.get("/")
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
-
-# # login trigger 
-# @app.post("/trigger")
-# async def login_trigger()
 
 @app.post("/upload_pdf") 
 async def upload_pdf(
@@ -537,7 +520,7 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
             request.email_id, 
             "book_sections", 
             request.filename.split(".")[0], 
-            "chapter_to_heading_map.json"
+            "chapter_to_heading.json"
         ))
 
         chapters_blob = bucket.blob(os.path.join(
@@ -563,19 +546,19 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
         with chapter_image_blob.open("r") as f: 
             chapter_images: list[dict]  = json.load(f) 
         
-        responses, token_count = load_chapters(chapter_json, df, chapter_images, gpt4o, gpt4o_encoder)
+        responses, token_count = load_chapters(request.chapter_name, chapter_json, df, chapter_images, gpt4o, gpt4o_encoder)
         structured_chapter: list[dict] = structure_html(responses)
 
         chapter_processed_json_blob = bucket.blob(os.path.join(
             request.email_id, 
             "chapterwise_processed_json", 
             request.filename.split(".")[0], 
-            request.chapter_name + ".json"
+            request.chapter_name 
         ))
 
         with chapter_processed_json_blob.open("w") as fp: 
             json.dump(structured_chapter, fp)
-        
+    
     except Exception as err:
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
@@ -589,6 +572,7 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
         filename = request.filename, 
         time = time.time() - start_time, 
         token_count = token_count,  
+        chapter_name = request.chapter_name 
     )
         
 @app.post("/detect_lang") 
@@ -644,104 +628,159 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     ) 
 
 @app.post("/summarize")
-async def summarize(summarization: 
-    SummarizationInputModel) -> SummarizationOutputModel: 
-
+async def summarize(request: 
+    SummarizationRequestModel) -> SummarizationResponseModel: 
     start_time = time.time()
-    chapter_path : str =  f"{summarization.email_id}/summaries/{summarization.filename}"
-    chapter_name: str = summarization.chapter_title.split("_content")[0]
-    chapter_blob = bucket.blob(f"{chapter_path}/{summarization.chapter_title}_content.txt") 
-    summary_blob = bucket.blob(f"{chapter_path}/{chapter_name}_summary.txt")
+    try: 
+        chapter_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name
+        ))
 
-    with chapter_blob.open("r") as f: 
-        content = f.read()
-    
-    if content:  
-        status, summary, token_count = summarize_texts(
-            content, 
-            summarization.language, 
-            summarization_prompt, 
-            text_message, gpt4o_encoder, gpt4o)
 
-        if status: 
-            with summary_blob.open("w") as f: 
-                f.write(summary)
+        with chapter_json_blob.open("r") as fp: 
+            chapter_content = json.load(fp)
+        
+        summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip() 
+        if summary_content:  
+            status, summary, token_count = summarize_texts(
+                summary_content, 
+                request.language, 
+                gpt4o_encoder, gpt4o
+            )
+
+            summary_blob = bucket.blob(os.path.join(
+                request.email_id, 
+                "chapter_summary_metadata", 
+                request.filename.split(".")[0], 
+                request.chapter_name.split(".")[0], 
+                "summary_content.txt"
+            ))
+
+            if status: 
+                with summary_blob.open("w") as f: 
+                    f.write(summary)
+            else: 
+                print("Empty summary here. Bad summarization output from llm")
+                print(summary)
         else: 
-            print("Empty summary here. Bad summarization output from llm")
-            print(summary)
-    else: 
-        print(f"Empty text in chapter identified! content: {content}")
+            token_count: int = 0 
+            raise HTTPException(
+               status_code=404,  
+               details = f"""
+               No text content extracted for chapter: {request.chapter_name}
+               Empty text in chapter identified! content: {summary_content}
+               """
+            )
+    
+    except SummaryNotFoundException as summNotFound: 
+        error_name: str = type(summNotFound).__name__
+        error_line: int  = summNotFound.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
+        )
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
     duration = time.time() - start_time 
-    return SummarizationOutputModel(
-        filename=summarization.filename, 
-        email_id=summarization.email_id, 
+    return SummarizationResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
         time=duration, 
         token_count=token_count, 
         status=True
     )
 
-# data classifier endpoint  
-@app.post("/data_classifier")
-async def data_classifier(text_json: DataClassifierModel) -> DataClassifierModel: 
-    # getting the specific page data from the classifier model 
-    json_path: str = f"{text_json.email_id}/text_extract/{text_json.filename}_{text_json.page_number}.json"
-    blob_path = bucket.blob(json_path) 
-    with blob_path.open("r") as f: 
-        t_json = json.load(f)
-
-    op: Dict[str, Dict|str|None|int|List[str]]|str = get_json(t_json, HF_TOKEN) 
-    if op != "": 
-       # write into gcp 
-        classified_blob_path: str = f"{text_json.email_id}/final_json/{text_json.filename}_{text_json.page_number}.json" 
-        cls_blob = bucket.blob(classified_blob_path)
-        with cls_blob.open("w") as f:
-            json.dump(op, fp=f)
-       
-    return text_json
-
 @app.post("/summary_classifier")
-async def classify_summary(summ_input: SummaryChapterModel) -> SummaryChapterOutputModel: 
+async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapterResponseModel: 
     start_time = time.time()
-    summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_summary.txt"
-    summary_blob = bucket.blob(summary_path)
-    with summary_blob.open("r") as f: 
-        summary_content: str = f.read()
-    
-    content, token_count = generateList(summary_content, 
-                           about_list_generation_prompt, 
-                           depth_list_generation_prompt, 
-                           summ_input.language, 
-                           text_message, 
-                           gpt4o_encoder, 
-                           gpt4o)
+    # try: 
 
-    classified_summary_path: str = f"{summ_input.email_id}/summaries/{summ_input.filename}/{summ_input.chapter_name}_classified_summary.json"
-    classified_summary_blob = bucket.blob(classified_summary_path)
+    summary_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_summary_metadata", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".")[0], 
+        "summary_content.txt"
+    ))
+
+    with summary_blob.open("r") as fp: 
+        summary_content: str = fp.read()
+
+    content, token_count = generate_chapter_metadata(
+        summary_content, 
+        request.language, 
+        gpt4o_encoder, 
+        gpt4o)
+    
+    classified_summary_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_summary_metadata", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".")[0], 
+        "classified_summary_content.json" 
+    ))
+
     with classified_summary_blob.open("w") as f: 
-        f.write(json.dumps(content))
-    
-    duration = float(time.time() - start_time) 
+        json.dump(content, fp=f)
 
-    return SummaryChapterOutputModel(
-        filename=summ_input.filename, 
-        email_id=summ_input.email_id, 
-        chapter_name=summ_input.chapter_name, 
-        language=summ_input.language, 
-        time=duration, 
+    # except JSONDecodeError as decodingError: 
+    #     error_name: str = type(decodingError).__name__
+    #     error_line: int  = decodingError.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
+
+    # except AboutListNotGeneratedException as aboutNotGenerated:  
+    #     error_name: str = type(aboutNotGenerated).__name__
+    #     error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
+   
+    # except DepthListNotGeneratedException as depthNotGenerated: 
+    #     error_name: str = type(depthNotGenerated).__name__
+    #     error_line: int  = depthNotGenerated.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
+
+    # except Exception as err: 
+    #     error_name: str = type(err).__name__
+    #     error_line: int  = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
+        
+    return SummaryChapterResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        chapter_name=request.chapter_name, 
+        language=request.language, 
+        time=time.time() - start_time, 
         token_count = token_count
     ) 
 
-# always executed after the summary has been classified 
-# the input is a rewrite_target which is a paragraph node to be rewritten with more attributes  
 @app.post("/rewrite_json")
-async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileOutputModel: 
+async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseModel: 
     start_time = time.time()
-    # picking the relevant book 
     blob = bucket.blob(os.path.join(
-        rewrite_target.email_id, 
+        request.email_id, 
         "text_extract", 
-        f"{rewrite_target.filename}_{rewrite_target.node_id}.json"
+        f"{request.filename}_{request.node_id}.json"
     ))
     
     # after reading this json content you process it with the metadata_generators
@@ -750,9 +789,9 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileO
 
     # open the classified summary blob from the summaries section 
     classified_summary_blob = bucket.blob(os.path.join(
-        rewrite_target.email_id, 
+        request.email_id, 
         "summaries", 
-        rewrite_target.filename, 
+        request.filename, 
         f"{blob_json_content['heading_identifier']}_classified_summary.json"
     )) 
 
@@ -765,16 +804,16 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileO
         generated_list, 
         text_message, 
         classification_prompt, 
-        rewrite_target.language, 
+        request.language, 
         gpt4o, 
         gpt4o_encoder, 
     )
 
     # write this onto intermediate_json directory 
     intermediate_json_blob = bucket.blob(os.path.join(
-        rewrite_target.email_id, 
+        request.email_id, 
         "intermediate_json", 
-        f"{rewrite_target.filename}_{rewrite_target.node_id}.json"
+        f"{request.filename}_{request.node_id}.json"
     ))
 
     with intermediate_json_blob.open("w") as f: 
@@ -782,11 +821,11 @@ async def rewrite_json(rewrite_target: RewriteJSONFileModel) -> RewriteJSONFileO
     
     duration = time.time() - start_time
     # process complete 
-    return RewriteJSONFileOutputModel(
-        filename=rewrite_target.filename, 
-        email_id=rewrite_target.email_id, 
-        node_id=rewrite_target.node_id, 
-        language=rewrite_target.language, 
+    return RewriteJSONResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        node_id=request.node_id, 
+        language=request.language, 
         time=duration, 
         token_count=token_count, 
     )
@@ -823,9 +862,6 @@ async def push_to_json(base_model: AbsoluteBaseModel) -> PushToJSONModel:
         email_id=base_model.email_id, 
         time=time.time() - start_time
     ) 
-
-# @app.post("/divider")
-# async def json_divider(): 
 
 @app.get("/interactive_plot/{email_id}/{filename}")
 async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:

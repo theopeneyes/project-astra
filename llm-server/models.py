@@ -7,6 +7,13 @@ class AbsoluteBaseModel(BaseModel):
     filename: str 
     email_id: str 
 
+class RequestModel(AbsoluteBaseModel):
+    pass 
+
+class ResponseModel(BaseModel): 
+    time: float 
+    token_count: int
+
 # sending uri's along with user email 
 class DataLoaderModel(AbsoluteBaseModel): 
     uri: str 
@@ -23,14 +30,12 @@ class DataClassifierModel(AbsoluteBaseModel):
     page_number: int 
 
 # summarization model 
-class SummarizationInputModel(AbsoluteBaseModel): 
-    chapter_title: str 
+class SummarizationRequestModel(RequestModel): 
+    chapter_name: str 
     language: str 
 
-class SummarizationOutputModel(AbsoluteBaseModel): 
+class SummarizationResponseModel(AbsoluteBaseModel, ResponseModel): 
     status: bool 
-    token_count: int
-    time: float 
 
 # generation context model 
 class GenerationContext(AbsoluteBaseModel): 
@@ -57,21 +62,19 @@ class DetectedLanguageModel(AbsoluteBaseModel):
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
 
-class SummaryChapterModel(AbsoluteBaseModel): 
+class SummaryChapterRequestModel(RequestModel): 
     chapter_name: str 
     language: str 
 
-class SummaryChapterOutputModel(SummaryChapterModel): 
-    time: float 
-    token_count: int 
+class SummaryChapterResponseModel(AbsoluteBaseModel, ResponseModel): 
+    pass 
 
-class RewriteJSONFileModel(AbsoluteBaseModel):
+class RewriteJSONRequestModel(AbsoluteBaseModel):
     node_id: int  
     language: str 
 
-class RewriteJSONFileOutputModel(RewriteJSONFileModel):
-    time: float 
-    token_count: int  
+class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
+    pass 
 
 class ConvertPDFModel(AbsoluteBaseModel): 
     uri: str 
@@ -92,7 +95,6 @@ class ModificationInputModel(AbsoluteBaseModel):
 class ModificationOutputModel(ModificationInputModel):
     time: float 
     token_count: int 
-
 
 class SynthesisContentInputModel(AbsoluteBaseModel): 
     node_id: int 

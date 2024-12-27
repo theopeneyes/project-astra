@@ -20,23 +20,24 @@ pdf_names: str = [
     "lbdl.pdf", 
 ]
 
-user_email: str = "test.second@yahoo.com"
+user_email: str = "test.fourth@yahoo.com"
 BASE_LOCATION: str = "../streamlit-app/test_books/"
-pdf_name = pdf_names[0] 
+pdf_name = pdf_names[1] 
 
 # with open(os.path.join(BASE_LOCATION, pdf_name), "rb") as fp: 
-    # requests.post(
-    #     URL + "/upload_pdf", 
-    #     data = {
-    #         "email_id": user_email, 
-    #         "filename" : pdf_name, 
-    #     }, 
-    #     files = {
-    #         "pdf": fp, 
-    #     }, 
-    #     timeout=3000, 
-    # )
-# pdf_name = "machine-learning-algorithms.pdf"
+#     requests.post(
+#         URL + "/upload_pdf", 
+#         data = {
+#             "email_id": user_email, 
+#             "filename" : pdf_name, 
+#         }, 
+#         files = {
+#             "pdf": fp, 
+#         }, 
+#         timeout=3000, 
+#     )
+# # pdf_name = "machine-learning-algorithms.pdf"
+
 # convert_response = requests.post(
 #     URL + "/convert_pdf", json = {
 #         "email_id": user_email, 
@@ -44,42 +45,78 @@ pdf_name = pdf_names[0]
 #         "filename": pdf_name,  
 # })
 
-response = requests.post(
-    URL + "/extract_contents_page", 
-    json = {
-        "email_id": user_email, 
-        "filename": pdf_name, 
-        "number_of_pages": 20, 
-    }
-)
+# response = requests.post(
+#     URL + "/extract_contents_page", 
+#     json = {
+#         "email_id": user_email, 
+#         "filename": pdf_name, 
+#         "number_of_pages": 20, 
+#     }
+# )
 
-response_content = response.json()
-last_page: int = response_content.get("last_page")
-first_page: int = response_content.get("first_page")
+# response_content = response.json()
+# last_page: int = response_content.get("last_page")
+# first_page: int = response_content.get("first_page")
 
-response = requests.post(
-    URL + "/identify/chapter_pages", 
-    json = {
-        "email_id": user_email, 
-        "filename": pdf_name, 
-        "last_page": last_page, 
-        "first_page": first_page
-    }
-)
+# response = requests.post(
+#     URL + "/identify/chapter_pages", 
+#     json = {
+#         "email_id": user_email, 
+#         "filename": pdf_name, 
+#         "last_page": last_page, 
+#         "first_page": first_page
+#     }
+# )
 
 
-response = requests.post(
-    URL + "/reform/chapter_pages", 
-    json = {
-        "email_id": user_email, 
-        "filename": pdf_name, 
-    }
-)
+# response = requests.post(
+#     URL + "/reform/chapter_pages", 
+#     json = {
+#         "email_id": user_email, 
+#         "filename": pdf_name, 
+#     }
+# )
 
-try: 
-    if response.status_code != 200: 
+response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
+chapters = response.json()
+
+for chapter in chapters["titles"]: 
+    # response = requests.post(
+    #     URL + "/chapter_loader", 
+    #     json = {
+    #         "email_id": user_email, 
+    #         "filename": pdf_name,         
+    #         "chapter_name": chapter, 
+    #     }
+    # )
+
+    response = requests.post(
+        URL + "/summarize", 
+        json = {
+            "email_id": user_email, 
+            "filename": pdf_name,         
+            "chapter_name": chapter, 
+            "language": "English", 
+        }
+    )
+
+    if response.status_code == 200:
+
+        response = requests.post(
+            URL + "/summary_classifier", 
+            json = {
+                "email_id": user_email, 
+                "filename": pdf_name,         
+                "chapter_name": chapter, 
+                "language": "English", 
+            }
+        )
+
+
+    try: 
+        if response.status_code != 200: 
+            print(response.content)
+        content = response.json()
+
+    except JSONDecodeError as err: 
         print(response.content)
-    content = response.json()
-
-except JSONDecodeError as err: 
-    print(response.content)
