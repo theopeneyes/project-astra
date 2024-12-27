@@ -51,6 +51,7 @@ import os
 import json
 import time 
 import tiktoken 
+import urllib.error
 
 import pdf2image as p2i 
 import pandas as pd 
@@ -95,6 +96,8 @@ from segregator.modifier import get_relevant_count
 from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
+
+from exceptions import EmptyPDFException
 from summarizer.exceptions import SummaryNotFoundException
 
 from chapter_broker.breakdown import segment_breakdown
@@ -160,7 +163,11 @@ async def upload_pdf(
     # leadtime conversion 
     start_time: int = time.time()
     content = await pdf.read() 
-    try: 
+    try:
+        if len(content)==0:
+            raise EmptyPDFException()
+        
+        
         upload_pdf_blob = bucket.blob(os.path.join(
             email_id, 
             "uploaded_document", 
@@ -170,6 +177,26 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb") as fp: 
             fp.write(content)
 
+        
+    
+    except EmptyPDFException as emptyPDF:
+        error_line: int = emptyPDF.__traceback__.tb_lineno 
+        error_name: str = type(emptyPDF).__name__
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error {error_name} at line {error_line}"
+        )
+        
+
+    except urllib.error.URLError as e:
+        if isinstance(e.reason, ConnectionError):
+            error_line: int = e.__traceback__.tb_lineno 
+            error_name: str = type(e).__name__
+            raise HTTPException(
+                status_code=404, 
+                detail = f"Error {error_name} at line {error_line}"
+            )
+
     except Exception as err: 
         error_line: int = err.__traceback__.tb_lineno 
         error_name: str = type(err).__name__
@@ -177,6 +204,7 @@ async def upload_pdf(
             status_code=404, 
             detail = f"Error {error_name} at line {error_line}"
         )
+    
     
     return PDFUploadResponseModel(
         email_id = email_id, 
