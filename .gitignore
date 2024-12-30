@@ -50,3 +50,5 @@ react-flow-app/*.sw?
 .env_bin
 .secrets
 bucket_mount
+ast
+.vscode 
