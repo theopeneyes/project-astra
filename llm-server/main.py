@@ -1,4 +1,5 @@
 # this file will contain all the fastapi endpoints 
+from google.api_core.retry import Retry
 
 # FastAPI imports 
 from fastapi import FastAPI 
@@ -13,6 +14,7 @@ from models import SummarizationRequestModel
 from models import SummarizationResponseModel 
 from models import DetectedLanguageModel
 from models import AbsoluteBaseModel
+from models import RequestModel 
 from models import RewriteJSONRequestModel
 from models import SummaryChapterRequestModel
 from models import ConvertPDFModel
@@ -20,9 +22,9 @@ from models import ConvertPDFOutputModel
 from models import SummaryChapterRequestModel
 from models import SummaryChapterResponseModel
 from models import RewriteJSONResponseModel 
-from models import PushToJSONModel
-from models import SynthesisContentInputModel 
-from models import SynthesisContentOutputModel 
+from models import SynthesisContentRequestModel 
+from models import SynthesisContentResponseModel
+from models import PushToJsonResponseModel 
 from models import ModificationInputModel 
 from models import ModificationOutputModel 
 from models import MetaDataEditModel 
@@ -80,7 +82,6 @@ from image_utils.encoder import encode_image
 
 from metadata_producers.summaries import generate_chapter_metadata 
 from metadata_producers.nodes import classify_about
-from metadata_producers.prompts import classification_prompt
 from metadata_producers.exceptions import AboutListNotGeneratedException, DepthListNotGeneratedException
 
 from synthesizers.prompts import representation_depth_prompt
@@ -100,6 +101,8 @@ from summarizer.exceptions import SummaryNotFoundException
 from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
+
+from google.cloud.storage.retry import DEFAULT_RETRY
 
 from json import JSONDecodeError
 
@@ -145,6 +148,10 @@ app.add_middleware(
     allow_headers=["*"],              
 )
 
+retry = DEFAULT_RETRY.with_deadline(500.0)
+retry = retry.with_delay(initial=1.5, multiplier=1.2, maximum=45.0)
+
+
 #Endpoints 
 @app.get("/")
 async def home() -> Dict[str, str]: 
@@ -167,7 +174,7 @@ async def upload_pdf(
             filename, 
         ))
 
-        with upload_pdf_blob.open("wb") as fp: 
+        with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
     except Exception as err: 
@@ -177,7 +184,7 @@ async def upload_pdf(
             status_code=404, 
             detail = f"Error {error_name} at line {error_line}"
         )
-    
+
     return PDFUploadResponseModel(
         email_id = email_id, 
         filename=filename, 
@@ -236,8 +243,9 @@ async def convert_pdf(pdf_file:
 
     json_path: str = f"{pdf_file.email_id}/processed_image/{pdf_file.filename.split('.pdf')[0]}.json"
     json_blob = bucket.blob(json_path)
+    json_blob.chunk_size = 10 * 1024 * 1024 
     
-    with json_blob.open("w") as f: 
+    with json_blob.open("w", retry=retry) as f: 
         f.write(
             json.dumps(encoded_images, ensure_ascii=True)
         )
@@ -269,7 +277,8 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
             f"{contents_request.filename.split('.pdf')[0]}.csv", 
         ))
 
-        with contents_page_blob.open("w") as fp: 
+
+        with contents_page_blob.open("w", retry=retry) as fp: 
             df.to_csv(fp, index=False)
 
     except LLMTooDUMBException as tooDumb: 
@@ -385,19 +394,19 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             "chapter_to_heading.json"
         ))
 
-        with chapter_pages_csv_blob.open("w") as fp: 
+        with chapter_pages_csv_blob.open("w", retry=retry) as fp: 
             chapters.to_csv(fp, index=False)
 
-        with pages_csv_blob.open("w") as fp: 
+        with pages_csv_blob.open("w", retry=retry) as fp: 
             df.to_csv(fp, index=False)
 
-        with headings_csv_blob.open("w") as fp: 
+        with headings_csv_blob.open("w", retry=retry) as fp: 
             headings.to_csv(fp, index=False)
         
-        with heading_sections_blob.open("w") as fp: 
+        with heading_sections_blob.open("w", retry=retry) as fp: 
             json.dump(content_dict, fp=fp)
 
-        with chapter_to_heading_map_blob.open("w") as fp: 
+        with chapter_to_heading_map_blob.open("w", retry=retry) as fp: 
             json.dump(chapter_to_heading_map, fp=fp)
 
     except LLMTooDUMBException as tooDumb: 
@@ -458,7 +467,7 @@ async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseMod
                 f"{curr_section}_{curr_title}.json" 
             ))
 
-            with chapter_image_blob.open("w") as fp: 
+            with chapter_image_blob.open("w", retry=retry) as fp: 
                 json.dump(chapter_images, fp=fp)
                 
         last_chapter, last_section, last_index, _ = chapters[len(chapters) - 1]
@@ -469,7 +478,7 @@ async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseMod
             f"{last_section}_{last_chapter}.json" 
         ))
 
-        with chapter_image_blob.open("w") as fp: 
+        with chapter_image_blob.open("w", retry=retry) as fp: 
             json.dump(images[last_index:], fp=fp)
     
     except Exception as err: 
@@ -553,10 +562,11 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
             request.email_id, 
             "chapterwise_processed_json", 
             request.filename.split(".")[0], 
-            request.chapter_name 
+            request.chapter_name.split(".")[0], 
+            "inherent_metadata.json" 
         ))
 
-        with chapter_processed_json_blob.open("w") as fp: 
+        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
             json.dump(structured_chapter, fp)
     
     except Exception as err:
@@ -636,9 +646,9 @@ async def summarize(request:
             request.email_id, 
             "chapterwise_processed_json", 
             request.filename.split(".")[0], 
-            request.chapter_name
+            request.chapter_name.split(".")[0], 
+            "inherent_metadata.json" 
         ))
-
 
         with chapter_json_blob.open("r") as fp: 
             chapter_content = json.load(fp)
@@ -660,7 +670,7 @@ async def summarize(request:
             ))
 
             if status: 
-                with summary_blob.open("w") as f: 
+                with summary_blob.open("w", retry=retry) as f: 
                     f.write(summary)
             else: 
                 print("Empty summary here. Bad summarization output from llm")
@@ -668,13 +678,13 @@ async def summarize(request:
         else: 
             token_count: int = 0 
             raise HTTPException(
-               status_code=404,  
-               details = f"""
-               No text content extracted for chapter: {request.chapter_name}
-               Empty text in chapter identified! content: {summary_content}
-               """
+                status_code=404,  
+                details = f"""
+                No text content extracted for chapter: {request.chapter_name}
+                Empty text in chapter identified! content: {summary_content}
+                """
             )
-    
+        
     except SummaryNotFoundException as summNotFound: 
         error_name: str = type(summNotFound).__name__
         error_line: int  = summNotFound.__traceback__.tb_lineno
@@ -703,67 +713,66 @@ async def summarize(request:
 @app.post("/summary_classifier")
 async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapterResponseModel: 
     start_time = time.time()
-    # try: 
+    try: 
+        summary_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "summary_content.txt"
+        ))
 
-    summary_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_summary_metadata", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".")[0], 
-        "summary_content.txt"
-    ))
+        with summary_blob.open("r") as fp: 
+            summary_content: str = fp.read()
 
-    with summary_blob.open("r") as fp: 
-        summary_content: str = fp.read()
+        content, token_count = generate_chapter_metadata(
+            summary_content, 
+            request.language, 
+            gpt4o_encoder, 
+            gpt4o)
+        
+        classified_summary_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "classified_summary_content.json" 
+        ))
 
-    content, token_count = generate_chapter_metadata(
-        summary_content, 
-        request.language, 
-        gpt4o_encoder, 
-        gpt4o)
-    
-    classified_summary_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_summary_metadata", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".")[0], 
-        "classified_summary_content.json" 
-    ))
+        with classified_summary_blob.open("w", retry=retry) as f: 
+            json.dump(content, fp=f)
 
-    with classified_summary_blob.open("w") as f: 
-        json.dump(content, fp=f)
+    except JSONDecodeError as decodingError: 
+        error_name: str = type(decodingError).__name__
+        error_line: int  = decodingError.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
-    # except JSONDecodeError as decodingError: 
-    #     error_name: str = type(decodingError).__name__
-    #     error_line: int  = decodingError.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
-
-    # except AboutListNotGeneratedException as aboutNotGenerated:  
-    #     error_name: str = type(aboutNotGenerated).__name__
-    #     error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except AboutListNotGeneratedException as aboutNotGenerated:  
+        error_name: str = type(aboutNotGenerated).__name__
+        error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
    
-    # except DepthListNotGeneratedException as depthNotGenerated: 
-    #     error_name: str = type(depthNotGenerated).__name__
-    #     error_line: int  = depthNotGenerated.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except DepthListNotGeneratedException as depthNotGenerated: 
+        error_name: str = type(depthNotGenerated).__name__
+        error_line: int  = depthNotGenerated.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
-    # except Exception as err: 
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
         
     return SummaryChapterResponseModel(
         filename=request.filename, 
@@ -774,51 +783,96 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
         token_count = token_count
     ) 
 
+@app.get("/get_node_count/{email_id}/{filename}/{chapter_name}")
+async def get_node_count(email_id: str, filename: str, chapter_name: str) -> JSONResponse: 
+    try: 
+        if not chapter_name.endswith(".json"): 
+            chapter_name += "?.json"
+
+        chapter_processed_json_blob = bucket.blob(os.path.join(
+            email_id, 
+            "chapterwise_processed_json", 
+            filename.split(".")[0], 
+            chapter_name.split(".")[0], 
+            "inherent_metadata.json"
+        ))
+
+        with chapter_processed_json_blob.open("r") as fp: 
+            processed_json: dict = json.load(fp=fp)
+        
+        node_count: int = len(processed_json)
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return {
+        "chapter_name": chapter_name.split(".")[0], 
+        "node_count": node_count, 
+        "email_id": email_id, 
+        "filename": filename, 
+    }
+
 @app.post("/rewrite_json")
 async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseModel: 
     start_time = time.time()
-    blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "text_extract", 
-        f"{request.filename}_{request.node_id}.json"
-    ))
-    
-    # after reading this json content you process it with the metadata_generators
-    with blob.open("r") as f:  
-        blob_json_content = json.load(fp=f)
+    try: 
+        extracted_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "inherent_metadata.json"
+        ))
+        
+        # after reading this json content you process it with the metadata_generators
+        with extracted_json_blob.open("r") as f:  
+            extracted_json = json.load(fp=f)[request.node_id]
 
-    # open the classified summary blob from the summaries section 
-    classified_summary_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "summaries", 
-        request.filename, 
-        f"{blob_json_content['heading_identifier']}_classified_summary.json"
-    )) 
+        # open the classified summary blob from the summaries section 
+        classified_summary_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "classified_summary_content.json"
+        )) 
+        
+        with classified_summary_blob.open("r") as f:   
+            generated_list = json.load(fp=f)
+        
+        generated_metadata_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "intermediate_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            f"modified_processed_json_NODE_ID:{request.node_id}.json"
+        ))
 
-    with classified_summary_blob.open("r") as f:   
-        generated_list = json.load(fp=f)
+        # classify the prompt 
+        comprehensive_node, token_count = classify_about(
+            extracted_json, 
+            generated_list, 
+            request.language, 
+            gpt4o, 
+            gpt4o_encoder, 
+        )
 
-    # classify the prompt 
-    comprehensive_node, token_count = classify_about(
-        blob_json_content, 
-        generated_list, 
-        text_message, 
-        classification_prompt, 
-        request.language, 
-        gpt4o, 
-        gpt4o_encoder, 
-    )
+        with generated_metadata_blob.open("w", retry=retry) as fp: 
+            json.dump(comprehensive_node, fp=fp) 
 
-    # write this onto intermediate_json directory 
-    intermediate_json_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "intermediate_json", 
-        f"{request.filename}_{request.node_id}.json"
-    ))
-
-    with intermediate_json_blob.open("w") as f: 
-        json.dump(comprehensive_node, fp = f) 
-    
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+            
     duration = time.time() - start_time
     # process complete 
     return RewriteJSONResponseModel(
@@ -831,35 +885,45 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
     )
 
 @app.post("/preprocess_for_graph")
-async def push_to_json(base_model: AbsoluteBaseModel) -> PushToJSONModel: 
+async def push_to_json(request: RequestModel) -> PushToJsonResponseModel: 
     start_time: float = time.time()
-    blobs = gcs_client.list_blobs(
-        BUCKET_NAME, 
-        prefix=os.path.join(
-            base_model.email_id, 
-            "intermediate_json/", 
-        ), 
-        delimiter="/"
-    )
+    try: 
+        blobs = gcs_client.list_blobs(
+            BUCKET_NAME, 
+            prefix=os.path.join(
+                request.email_id, 
+                "intermediate_json", 
+                request.filename.split(".")[0], 
+            )
+        )
 
-    json_blob = bucket.blob(os.path.join(
-        base_model.email_id, 
-        "final_json", 
-        f"{base_model.filename}.json", 
-    ))
+        json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "final_json", 
+            f"{request.filename.split('.')[0]}.json", 
+        ))
 
-    all_jsons: List = []
-    for blob in blobs: 
-        if base_model.filename in blob.name: 
-            with blob.open("r") as jason: 
-                all_jsons.append(json.load(fp=jason)) 
-    
-    with json_blob.open("w") as all_in_one: 
-        json.dump(all_jsons, fp=all_in_one)
-    
-    return PushToJSONModel(
-        filename=base_model.filename, 
-        email_id=base_model.email_id, 
+        book_associated_json = []
+
+        for blob in blobs: 
+            with blob.open("r") as fp: 
+                chapter_associated_processed_json = json.load(fp=fp)
+                book_associated_json.append(chapter_associated_processed_json)
+                
+        with json_blob.open("w", retry=retry) as fp: 
+            json.dump(book_associated_json, fp=fp)    
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+
+    return PushToJsonResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
         time=time.time() - start_time
     ) 
 
@@ -900,135 +964,159 @@ async def react_flow(category: str, emailId: str, fileName: str ) -> JSONRespons
     return JSONResponse(content = [nodes, edges])  
 
 @app.post("/synthesize/strength/relational")
-async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+async def synthesize_relative_strength(request: SynthesisContentRequestModel) -> SynthesisContentResponseModel: 
     starting_time: float = time.time()
-    intermediate_json_blob = bucket.blob(os.path.join(
-        content.email_id, 
-        "intermediate_json", 
-        f"{content.filename}_{content.node_id}.json"
-    ))
+    try: 
+        classified_metadata_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "intermediate_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            f"modified_processed_json_NODE_ID:{request.node_id}.json"
+        ))
 
-    with intermediate_json_blob.open("r") as f: 
-        json_content = json.load(fp=f)
+        with classified_metadata_blob.open("r") as f: 
+            json_to_be_modified = json.load(fp=f)
+        
+        status, score, token_count = synthesizer(
+            json_to_be_modified[request.branch_name], 
+            json_to_be_modified["text"],
+            gpt4o, 
+            gpt4o_encoder, 
+        )
 
-    status, score, token_count = synthesizer(
-        json_content[content.branch_name], 
-        json_content["text"],
-        strength_prompt, 
-        text_message, 
-        gpt4o, 
-        gpt4o_encoder, 
-    )
+        if not status: 
+            score = 0
+        
+        json_to_be_modified[f"{request.branch_name}_strength"] = score
 
-    if not status: 
-        score = 0
-    
-    json_content[f"{content.branch_name}_strength"] = score
+        with classified_metadata_blob.open("w", retry=retry) as f: 
+            json.dump(json_to_be_modified, fp=f)
 
-    with intermediate_json_blob.open("w") as f: 
-        json.dump(json_content, fp=f)
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     duration = time.time() - starting_time
-    
-    return SynthesisContentOutputModel(
-        filename=content.filename, 
-        email_id=content.email_id, 
-        node_id=content.node_id, 
-        branch_name=content.branch_name, 
+    return SynthesisContentResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        node_id=request.node_id, 
+        branch_name=request.branch_name, 
         time=duration, 
         token_count=token_count
     )
 
 
 @app.post("/synthesize/strength/representational")
-async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+async def synthesize_relative_strength(request: SynthesisContentRequestModel) -> SynthesisContentResponseModel: 
     starting_time: float = time.time()
-    intermediate_json_blob = bucket.blob(os.path.join(
-        content.email_id, 
-        "intermediate_json", 
-        f"{content.filename}_{content.node_id}.json"
-    ))
+    try: 
+        classified_metadata_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "intermediate_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            f"modified_processed_json_NODE_ID:{request.node_id}.json"
+        ))
 
-    with intermediate_json_blob.open("r") as f: 
-        json_content = json.load(fp=f)
+        with classified_metadata_blob.open("r") as f: 
+            json_to_be_modified = json.load(fp=f)
+        
+        status, score, token_count = synthesizer(
+            json_to_be_modified[request.branch_name], 
+            json_to_be_modified["text"],
+            gpt4o, 
+            gpt4o_encoder, 
+        )
 
-    status, score, token_count = synthesizer(
-        json_content[content.branch_name], 
-        json_content["text"],
-        representation_strength_prompt, 
-        text_message, 
-        gpt4o, 
-        gpt4o_encoder, 
-    )
+        if not status: 
+            score = 0
+        
+        json_to_be_modified[f"{request.branch_name}_representation_strength"] = score
 
-    if not status: 
-        score = 0
-    
-    json_content[f"{content.branch_name}_representation_strength"] = score
+        with classified_metadata_blob.open("w", retry=retry) as f: 
+            json.dump(json_to_be_modified, fp=f)
 
-    with intermediate_json_blob.open("w") as f: 
-        json.dump(json_content, fp=f)
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     duration = time.time() - starting_time
-    
-    return SynthesisContentOutputModel(
-        filename=content.filename, 
-        email_id=content.email_id, 
-        node_id=content.node_id, 
-        branch_name=content.branch_name, 
+    return SynthesisContentResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        node_id=request.node_id, 
+        branch_name=request.branch_name, 
         time=duration, 
         token_count=token_count
     )
 
 
 @app.post("/synthesize/depth/representational")
-async def synthesize_relative_strength(content: SynthesisContentInputModel) -> SynthesisContentOutputModel: 
+async def synthesize_relative_strength(request: SynthesisContentRequestModel) -> SynthesisContentResponseModel: 
     starting_time: float = time.time()
-    intermediate_json_blob = bucket.blob(os.path.join(
-        content.email_id, 
-        "intermediate_json", 
-        f"{content.filename}_{content.node_id}.json"
-    ))
+    try: 
+        classified_metadata_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "intermediate_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            f"modified_processed_json_NODE_ID:{request.node_id}.json"
+        ))
 
-    with intermediate_json_blob.open("r") as f: 
-        json_content = json.load(fp=f)
+        with classified_metadata_blob.open("r") as f: 
+            json_to_be_modified = json.load(fp=f)
+        
+        status, score, token_count = synthesizer(
+            json_to_be_modified[request.branch_name], 
+            json_to_be_modified["text"],
+            gpt4o, 
+            gpt4o_encoder, 
+        )
 
-    status, score, token_count = synthesizer(
-        json_content[content.branch_name], 
-        json_content["text"],
-        representation_depth_prompt, 
-        text_message, 
-        gpt4o, 
-        gpt4o_encoder, 
-    )
+        if not status: 
+            score = 0
+        
+        json_to_be_modified[f"{request.branch_name}_representation_depth"] = score
+        classified_metadata_blob.chunk_size = 10 * 1024 * 1024
 
-    if not status: 
-        score = 0
+        with classified_metadata_blob.open("w", retry=retry) as f: 
+            json.dump(json_to_be_modified, fp=f)
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
-    json_content[f"{content.branch_name}_representation_depth"] = score
-
-    with intermediate_json_blob.open("w") as f: 
-        json.dump(json_content, fp=f)
     
     duration = time.time() - starting_time
-    
-    return SynthesisContentOutputModel(
-        filename=content.filename, 
-        email_id=content.email_id, 
-        branch_name=content.branch_name, 
-        node_id=content.node_id, 
+    return SynthesisContentResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
+        branch_name=request.branch_name, 
+        node_id=request.node_id, 
         time=duration, 
         token_count=token_count
     )
-
-
 
 @app.post("/segregate")
 async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel: 
     final_json_blob = bucket.blob(os.path.join(
         uploaded_file.email_id, 
         "final_json", 
-        f"{uploaded_file.filename}.json"
+        f"{uploaded_file.filename.split('.')[0]}.json"
     ))
 
     with final_json_blob.open("r") as f: 
@@ -1039,7 +1127,7 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     topic_blob = bucket.blob(os.path.join(
         uploaded_file.email_id, 
         "books", 
-        uploaded_file.filename, 
+        uploaded_file.filename.split(".")[0], 
         "topic.json"
     ))
 
@@ -1047,7 +1135,7 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     concept_blob = bucket.blob(os.path.join(
         uploaded_file.email_id, 
         "books", 
-        uploaded_file.filename, 
+        uploaded_file.filename.split(".")[0], 
         "concept.json"
     ))
 
@@ -1055,19 +1143,19 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     headings_blob = bucket.blob(os.path.join(
         uploaded_file.email_id, 
         "books", 
-        uploaded_file.filename, 
+        uploaded_file.filename.split(".")[0], 
         "heading_text.json"
     ))
 
-    with topic_blob.open("w") as f: 
+    with topic_blob.open("w", retry=retry) as f: 
         json.dump(topics, fp=f)
 
     
-    with headings_blob.open("w") as f: 
+    with headings_blob.open("w", retry=retry) as f: 
         json.dump(headings, fp=f)
 
 
-    with concept_blob.open("w") as f: 
+    with concept_blob.open("w", retry=retry) as f: 
         json.dump(concepts, fp=f)
     
     return uploaded_file 
@@ -1078,7 +1166,7 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
     branch_blob = bucket.blob(os.path.join(
         branch_data.email_id, 
         "books", 
-        branch_data.filename, 
+        branch_data.filename.split(".")[0], 
         f"{branch_data.branch_name}.json", 
     ))
 
@@ -1090,7 +1178,7 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         counting_prompt, gpt4o, gpt4o_encoder
     )
 
-    with branch_blob.open("w") as f: 
+    with branch_blob.open("w", retry=retry) as f: 
         json.dump(branch_modified, fp=f)
     
     return ModificationOutputModel(
@@ -1107,7 +1195,7 @@ async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEd
     final_json_blob = bucket.blob(os.path.join(
         edit_metadata_request.email_id, 
         "final_json", 
-        f"{edit_metadata_request.filename}.json", 
+        f"{edit_metadata_request.filename.split('.')[0]}.json", 
     ))
 
     with final_json_blob.open("r") as f:
@@ -1116,21 +1204,21 @@ async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEd
     concept_blob = bucket.blob(os.path.join(
         edit_metadata_request.email_id, 
         "books", 
-        edit_metadata_request.filename, 
+        edit_metadata_request.filename.split(".")[0], 
         "concept.json"
     ))
 
     topic_blob = bucket.blob(os.path.join(
         edit_metadata_request.email_id, 
         "books", 
-        edit_metadata_request.filename, 
+        edit_metadata_request.filename.split(".")[0], 
         "topic.json"
     ))
 
     heading_text_blob = bucket.blob(os.path.join(
         edit_metadata_request.email_id, 
         "books", 
-        edit_metadata_request.filename, 
+        edit_metadata_request.filename.split(".")[0], 
         "heading_text.json"
     ))
 
@@ -1144,7 +1232,7 @@ async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEd
         heading_json = json.load(fp=f)
         
     metadata_edited_final: List = edit_metadata(final_json, heading_json, concept_json, topic_json)
-    with final_json_blob.open("w") as f: 
+    with final_json_blob.open("w", retry=retry) as f: 
         json.dump(metadata_edited_final, fp=f)
     
     return MetaDataEditResponseModel(
@@ -1159,7 +1247,6 @@ async def generation_data(request: Request) -> JSONResponse:
     emailId = data["emailId"]
     fileName = data["fileName"]
     category = data["category"] if data["category"] != "heading" else "heading_text"
-    print(category)
 
     degree_weights: Dict = {
        5: 1, 
@@ -1241,7 +1328,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 net_weights += preference_weights[topic_data["preferenceLevel"]]
 
             for topic_node in ms[question_type][chapter_name]:
-                question_distribution[question_type][chapter_name][topic_node['topic']] = int(round(
+                question_distribution[question_type][chapter_name][topic_node[category]] = int(round(
                     chapter_question_count * 
                     (preference_weights[topic_node["preferenceLevel"]] / net_weights) 
                 , 0))
@@ -1252,7 +1339,7 @@ async def generation_data(request: Request) -> JSONResponse:
         final_json_blob = bucket.blob(os.path.join(
             emailId, 
             "final_json", 
-            f"{fileName}.json", 
+            f"{fileName.split('.')[0]}.json", 
         ))
 
         with final_json_blob.open("r") as f: 
@@ -1260,31 +1347,22 @@ async def generation_data(request: Request) -> JSONResponse:
         
         didnt_enter_count = 0  
         for _, js_object in enumerate(final_json) :
-            if ("topic_strength" in js_object 
-                and "topic_representation_depth" in js_object 
-                and "topic_representation_strength" in js_object): 
+            if (f"{category}_strength" in js_object 
+                and f"{category}_representation_depth" in js_object 
+                and f"{category}_representation_strength" in js_object): 
 
-                # print(degree_weights[js_object["topic_strength"]])
-                # print(depth_value_weights[js_object["topic_representation_depth"]])
-                # print(js_object["topic_representation_strength"])
-                # print(json.dumps(assign_value_weights, indent=4))
 
-                js_object["cumulative_strength"] = (degree_weights[js_object["topic_strength"]] + 
-                                depth_value_weights[js_object["topic_representation_depth"]] +
-                                assign_value_weights[js_object["topic_representation_strength"]]) 
+                js_object["cumulative_strength"] = (degree_weights[js_object[f"{category}_strength"]] + 
+                                depth_value_weights[js_object[f"{category}_representation_depth"]] +
+                                assign_value_weights[js_object[f"{category}_representation_strength"]]) 
 
                 modified_final_json.append(js_object)
             else: 
                 js_object["cumulative_strength"] = 0
                 didnt_enter_count += 1
-                # print(json.dumps(js_object, indent=4))
             
         print("Error count ", didnt_enter_count) 
         print("Net length ", len(final_json)) 
-        # modified_final_json = sorted(modified_final_json, key = lambda x: x["cumulative_strength"], reverse=True)
-        
-        # with final_json_blob.open("w") as f: 
-        #     json.dump(modified_final_json, fp=f)
 
     except Exception as err: 
         print("Error occured!")
@@ -1305,7 +1383,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 for topic_name, question_count in topic_nodes.items(): 
                     question_list[question_type][chapter_name][topic_name]["topic_question_count"] = question_count
                     question_list[question_type][chapter_name][topic_name]["topic_json"] = (
-                        sorted(list(filter(lambda mp: mp["topic"] == topic_name, modified_final_json)),
+                        sorted(list(filter(lambda mp: mp[category] == topic_name, modified_final_json)),
                         key = lambda x: x["cumulative_strength"], reverse=True) 
                     )       
 
@@ -1323,7 +1401,7 @@ async def generation_data(request: Request) -> JSONResponse:
                 f"{fileName}.json", 
             ))
 
-            with generation_data_blob.open("w") as f: 
+            with generation_data_blob.open("w", retry=retry) as f: 
                 json.dump(qd_dict, fp=f)
 
         except Exception as err: 
@@ -1383,7 +1461,7 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
             f"{context.question_type}_{context.chapter_name}_{context.topic_name}.html", 
         ))
 
-        with generated_dump_blob.open("w") as f: 
+        with generated_dump_blob.open("w", retry=retry) as f: 
             f.write(qna)
 
     except Exception as err: 

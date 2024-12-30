@@ -35,7 +35,7 @@ def segment_breakdown(images: list, index_content: list[list[str]], last_page: i
 
             completions = gpt4o.chat.completions.create(
                 messages = messages,
-                model = "gpt-4o",
+                model = "gpt-4o-mini",
                 temperature=0.01
             )
 

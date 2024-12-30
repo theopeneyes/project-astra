@@ -22,7 +22,7 @@ def extract_index(image, gpt4o, gpt4o_encoder) -> list[list[str]]:
 
     completions = gpt4o.chat.completions.create(
         messages = messages,
-        model = "gpt-4o",
+        model = "gpt-4o-mini",
         temperature=0.01
     )
 

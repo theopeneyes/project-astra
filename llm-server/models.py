@@ -69,9 +69,10 @@ class SummaryChapterRequestModel(RequestModel):
 class SummaryChapterResponseModel(AbsoluteBaseModel, ResponseModel): 
     pass 
 
-class RewriteJSONRequestModel(AbsoluteBaseModel):
+class RewriteJSONRequestModel(RequestModel):
     node_id: int  
     language: str 
+    chapter_name: str 
 
 class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
     pass 
@@ -83,7 +84,7 @@ class ConvertPDFOutputModel(AbsoluteBaseModel):
     uri: str 
     time: float # in seconds 
 
-class PushToJSONModel(AbsoluteBaseModel): 
+class PushToJsonResponseModel(AbsoluteBaseModel): 
     time: float 
 
 class SynthesisContentInputModel(AbsoluteBaseModel): 
@@ -96,15 +97,14 @@ class ModificationOutputModel(ModificationInputModel):
     time: float 
     token_count: int 
 
-class SynthesisContentInputModel(AbsoluteBaseModel): 
+class SynthesisContentRequestModel(RequestModel): 
     node_id: int 
     branch_name: str
+    chapter_name: str 
 
-class SynthesisContentOutputModel(AbsoluteBaseModel): 
+class SynthesisContentResponseModel(AbsoluteBaseModel, ResponseModel): 
     node_id: int
     branch_name: str 
-    time: float 
-    token_count: int 
 
 class MetaDataEditModel(AbsoluteBaseModel): 
     pass 

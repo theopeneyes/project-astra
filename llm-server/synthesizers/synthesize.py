@@ -1,11 +1,11 @@
 from typing import Dict, Tuple
+from .prompts import strength_prompt 
+from .skeleton import text_messages as text_message 
 import re 
 
 def synthesizer(
         topic: str, 
         text: str, 
-        strength_prompt: str, 
-        text_message: Dict, 
         gpt4o, 
         gpt4o_encoder, 
     ) -> Tuple[str| None, str | int, int]: 
@@ -24,7 +24,8 @@ def synthesizer(
         "weakly related": 2,
         "moderately related": 3,
         "strongly related": 4,
-        "directly and fully related": 5
+        "directly and fully related": 5, 
+        "": 0, 
     }
 
     score: str = ""

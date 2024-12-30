@@ -20,9 +20,9 @@ pdf_names: str = [
     "lbdl.pdf", 
 ]
 
-user_email: str = "test.fourth@yahoo.com"
+user_email: str = "test.fifth@yahoo.com"
 BASE_LOCATION: str = "../streamlit-app/test_books/"
-pdf_name = pdf_names[1] 
+pdf_name = pdf_names[0] 
 
 # with open(os.path.join(BASE_LOCATION, pdf_name), "rb") as fp: 
 #     requests.post(
@@ -77,46 +77,243 @@ pdf_name = pdf_names[1]
 #     }
 # )
 
-response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
-chapters = response.json()
+# response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
+# chapters = response.json()
 
-for chapter in chapters["titles"]: 
-    # response = requests.post(
-    #     URL + "/chapter_loader", 
-    #     json = {
-    #         "email_id": user_email, 
-    #         "filename": pdf_name,         
-    #         "chapter_name": chapter, 
-    #     }
-    # )
+# for chapter in chapters["titles"]: 
+#     response = requests.post(
+#         URL + "/chapter_loader", 
+#         json = {
+#             "email_id": user_email, 
+#             "filename": pdf_name,         
+#             "chapter_name": chapter, 
+#         }
+#     )
 
-    response = requests.post(
-        URL + "/summarize", 
-        json = {
-            "email_id": user_email, 
-            "filename": pdf_name,         
-            "chapter_name": chapter, 
-            "language": "English", 
-        }
-    )
+#     response = requests.post(
+#         URL + "/summarize", 
+#         json = {
+#             "email_id": user_email, 
+#             "filename": pdf_name,         
+#             "chapter_name": chapter, 
+#             "language": "English", 
+#         }
+#     )
 
-    if response.status_code == 200:
+#     if response.status_code == 200:
 
-        response = requests.post(
-            URL + "/summary_classifier", 
-            json = {
-                "email_id": user_email, 
-                "filename": pdf_name,         
-                "chapter_name": chapter, 
-                "language": "English", 
-            }
-        )
+#         response = requests.post(
+#             URL + "/summary_classifier", 
+#             json = {
+#                 "email_id": user_email, 
+#                 "filename": pdf_name,         
+#                 "chapter_name": chapter, 
+#                 "language": "English", 
+#             }
+#         )
+    
+
+# response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
+# chapters = response.json()
 
 
-    try: 
-        if response.status_code != 200: 
-            print(response.content)
-        content = response.json()
+# print("The chapter name is : " , chapters["titles"])
 
-    except JSONDecodeError as err: 
+# for chapter in chapters["titles"]: 
+#     # print(chapter)
+#     response = requests.get(
+#         URL + f"/get_node_count/{user_email}/{pdf_name}/{chapter}", 
+#     )
+
+#     if response.status_code == 200: 
+#         count: int =  response.json()["node_count"]
+#         print("The chapter name is : " , chapter)
+    
+#         for idx in range(count):
+#             requests.post(
+#                 URL + "/rewrite_json",
+#                 json = {
+#                     "chapter_name": chapter, 
+#                     "email_id": user_email,  
+#                     "filename": pdf_name,
+#                     "language": "English", 
+#                     "node_id": idx, 
+#                 }
+#             )
+        
+#             # topic extraction 
+#             requests.post(
+#                 URL + "/synthesize/strength/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "topic",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+
+#             requests.post(
+#                 URL + "/synthesize/strength/relational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx,  
+#                     "branch_name": "topic",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+#             requests.post(
+#                 URL + "/synthesize/depth/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "topic" , 
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+#             requests.post(
+#                 URL + "/synthesize/strength/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "heading_text",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+
+#             requests.post(
+#                 URL + "/synthesize/strength/relational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx,  
+#                     "branch_name": "heading_text",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+#             requests.post(
+#                 URL + "/synthesize/depth/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "heading_text" , 
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+#             requests.post(
+#                 URL + "/synthesize/strength/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "concept",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+
+#             requests.post(
+#                 URL + "/synthesize/strength/relational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx,  
+#                     "branch_name": "concept",  
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+#             requests.post(
+#                 URL + "/synthesize/depth/representational", 
+#                 json = {
+#                     "email_id": user_email, 
+#                     "filename": pdf_name, 
+#                     "node_id": idx, 
+#                     "branch_name": "concept" , 
+#                     "chapter_name": chapter, 
+#                 }
+#             )
+
+
+
+
+
+# print("Preprocessing the data for the graph...")    
+# # putting it all in one directory  
+# requests.post(
+#     URL + "/preprocess_for_graph", 
+#     json = {
+#         "filename": pdf_name, 
+#         "email_id": user_email, 
+#     } 
+# )
+
+print("Segregating the json by topics, headings and concepts....")
+requests.post(
+    URL + "/segregate", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email, 
+    } 
+)
+
+print("Getting topic relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "topic"
+    }
+    
+)
+
+
+print("Getting concept relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "concept"
+    }
+    
+)
+
+print("Getting heading relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "heading_text"
+    }
+)
+
+
+print("Relevant Count edit") 
+response =  requests.post(
+    URL + "/add_word_count", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+    }
+)
+        
+try: 
+    if response.status_code != 200: 
         print(response.content)
+    content = response.json()
+
+except JSONDecodeError as err: 
+    print(response.content)

@@ -1,10 +1,11 @@
 import json 
 import re 
 
+from .skeleton import text_messages as messages
+from .prompts import classification_prompt
+
 def classify_about(single_json: dict, 
                    generated_list: dict,
-                   messages: dict,  
-                   classification_prompt: str, 
                    language: str, gpt4o, gpt4o_encoder):
 
     token_count : int = 0 
