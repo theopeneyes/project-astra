@@ -1,5 +1,4 @@
 # this file will contain all the fastapi endpoints 
-from google.api_core.retry import Retry
 
 # FastAPI imports 
 from fastapi import FastAPI 
@@ -12,8 +11,7 @@ from models import ChapterLoaderResponseModel
 from models import GenerationContext
 from models import SummarizationRequestModel 
 from models import SummarizationResponseModel 
-from models import DetectedLanguageModel
-from models import AbsoluteBaseModel
+from models import DetectedLanguageResponseModel
 from models import RequestModel 
 from models import RewriteJSONRequestModel
 from models import SummaryChapterRequestModel
@@ -36,6 +34,7 @@ from models import ChapterIdentificationResponseModel
 from models import ReformRequestModel
 from models import ReformResponseModel
 from models import PDFUploadResponseModel
+from models import ResponseModel
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -74,20 +73,17 @@ from summarizer.summarize import summarize_texts
 from json_editor.editor import edit_metadata
 
 from language_detection.detector import detect_language
-from language_detection.prompts import language_detection_prompt
 
-from data_loader.opeanai_formatters import image_message as messages, text_message  
+from data_loader.opeanai_formatters import text_message  
 
 from google.cloud import storage 
+from google.cloud import translate_v2
 from image_utils.encoder import encode_image 
 
 from metadata_producers.summaries import generate_chapter_metadata 
 from metadata_producers.nodes import classify_about
 from metadata_producers.exceptions import AboutListNotGeneratedException, DepthListNotGeneratedException
 
-from synthesizers.prompts import representation_depth_prompt
-from synthesizers.prompts import representation_strength_prompt 
-from synthesizers.prompts import strength_prompt 
 from synthesizers.synthesize import synthesizer 
 
 from segregator.segregation import segregator
@@ -137,11 +133,11 @@ gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
+translator = translate_v2.Client.from_service_account_json(".secrets/translate_api.json")
 bucket = gcs_client.bucket(BUCKET_NAME)
 
 # testing phase therefore `debug=True`
 app = FastAPI(debug=True, title="project-astra")
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -184,8 +180,6 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
-        
-    
     except EmptyPDFException as emptyPDF:
         error_line: int = emptyPDF.__traceback__.tb_lineno 
         error_name: str = type(emptyPDF).__name__
@@ -211,7 +205,6 @@ async def upload_pdf(
             status_code=404, 
             detail = f"Error {error_name} at line {error_line}"
         )
-
     
     
     return PDFUploadResponseModel(
@@ -292,12 +285,22 @@ async def convert_pdf(pdf_file:
 async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
     start_time: float = time.time()
     try: 
-        images_blob = bucket.blob(f"{contents_request.email_id}/processed_image/{contents_request.filename.split('.pdf')[0]}.json")
+        images_blob = bucket.blob(os.path.join(
+            contents_request.email_id, 
+            "processed_image", 
+            contents_request.filename.split('.pdf')[0] + ".json", 
+        ))
 
         with images_blob.open("r") as f: 
             images: list = json.load(fp=f)  
         
-        first_page, last_page, index_contents, token_count = parse_index(images, contents_request.number_of_pages, gpt4o, gpt4o_encoder)
+        first_page, last_page, index_contents, token_count = parse_index(
+            images, 
+            contents_request.number_of_pages, 
+            contents_request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
+
         df = pd.DataFrame(index_contents, columns=["sectionName", "title", "headingType", "pageNo"])
 
         contents_page_blob = bucket.blob(os.path.join(
@@ -370,9 +373,9 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             images, index_content_csv, 
             identification_request.last_page, 
             identification_request.first_page, 
+            identification_request.language_code, 
             gpt4o, gpt4o_encoder
         )
-
 
         df: pd.DataFrame = pd.DataFrame(
             content_csv, 
@@ -584,7 +587,14 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
         with chapter_image_blob.open("r") as f: 
             chapter_images: list[dict]  = json.load(f) 
         
-        responses, token_count = load_chapters(request.chapter_name, chapter_json, df, chapter_images, gpt4o, gpt4o_encoder)
+        responses, token_count = load_chapters(
+            request.chapter_name, 
+            chapter_json, 
+            df, chapter_images, 
+            request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
+
         structured_chapter: list[dict] = structure_html(responses)
 
         chapter_processed_json_blob = bucket.blob(os.path.join(
@@ -615,7 +625,7 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
     )
         
 @app.post("/detect_lang") 
-async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel: 
+async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel: 
     """
     Input: {
         filename: Name of the file to detect the language of 
@@ -629,9 +639,10 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     start_time = time.time()  
 
     try: 
-        image_blob = bucket.blob(f"{lng_model.email_id}/processed_image/{lng_model.filename.split('.pdf')[0]}.json")
+        image_blob = bucket.blob(f"{request.email_id}/processed_image/{request.filename.split('.pdf')[0]}.json")
         with image_blob.open("r") as f: 
             images: List[Dict] = json.load(fp=f)
+
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
@@ -645,25 +656,28 @@ async def detect_lang(lng_model: AbsoluteBaseModel) -> DetectedLanguageModel:
     else: chosen_images = images 
 
     languages : List[str] = []
+    confidii: list[str] = []
     for image in chosen_images: 
         encoded_image: str = image["img_b64"]
-        language, token_count = detect_language(
+        confidence, language, token_count = detect_language(
             encoded_image, 
-            messages, 
-            language_detection_prompt,
+            translator,
             gpt4o_encoder, 
-            gpt4o)
+            gpt4o  
+        )
 
         languages.append(language) 
+        confidii.append(confidence)
     
     duration = time.time() - start_time
     
-    return DetectedLanguageModel(
-        filename=lng_model.filename, 
-        email_id=lng_model.email_id, 
+    return DetectedLanguageResponseModel(
+        filename=request.filename, 
+        email_id=request.email_id, 
         detected_language=max(languages, key=languages.count).lower(),
         time=duration, 
         token_count=token_count, 
+        confidence=float(sum(confidii) / len(confidii)) 
     ) 
 
 @app.post("/summarize")
@@ -686,7 +700,7 @@ async def summarize(request:
         if summary_content:  
             status, summary, token_count = summarize_texts(
                 summary_content, 
-                request.language, 
+                request.language_code, 
                 gpt4o_encoder, gpt4o
             )
 
@@ -756,7 +770,7 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
 
         content, token_count = generate_chapter_metadata(
             summary_content, 
-            request.language, 
+            request.language_code, 
             gpt4o_encoder, 
             gpt4o)
         
@@ -886,7 +900,7 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
         comprehensive_node, token_count = classify_about(
             extracted_json, 
             generated_list, 
-            request.language, 
+            request.language_code, 
             gpt4o, 
             gpt4o_encoder, 
         )
@@ -1141,11 +1155,12 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
     )
 
 @app.post("/segregate")
-async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel: 
+async def segregate_json(request: RequestModel) -> ResponseModel: 
+    start_time: float = time.time()
     final_json_blob = bucket.blob(os.path.join(
-        uploaded_file.email_id, 
+        request.email_id, 
         "final_json", 
-        f"{uploaded_file.filename.split('.')[0]}.json"
+        f"{request.filename.split('.')[0]}.json"
     ))
 
     with final_json_blob.open("r") as f: 
@@ -1154,25 +1169,25 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     topics, concepts, headings = segregator(final_json)
     
     topic_blob = bucket.blob(os.path.join(
-        uploaded_file.email_id, 
+        request.email_id, 
         "books", 
-        uploaded_file.filename.split(".")[0], 
+        request.filename.split(".")[0], 
         "topic.json"
     ))
 
 
     concept_blob = bucket.blob(os.path.join(
-        uploaded_file.email_id, 
+        request.email_id, 
         "books", 
-        uploaded_file.filename.split(".")[0], 
+        request.filename.split(".")[0], 
         "concept.json"
     ))
 
 
     headings_blob = bucket.blob(os.path.join(
-        uploaded_file.email_id, 
+        request.email_id, 
         "books", 
-        uploaded_file.filename.split(".")[0], 
+        request.filename.split(".")[0], 
         "heading_text.json"
     ))
 
@@ -1187,28 +1202,40 @@ async def segregate_json(uploaded_file: AbsoluteBaseModel) -> AbsoluteBaseModel:
     with concept_blob.open("w", retry=retry) as f: 
         json.dump(concepts, fp=f)
     
-    return uploaded_file 
+    return ResponseModel(
+        time=time.time() - start_time, 
+        token_count = 0
+    ) 
 
 @app.post("/modify_branch") 
 async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutputModel: 
     start_time = time.time()
-    branch_blob = bucket.blob(os.path.join(
-        branch_data.email_id, 
-        "books", 
-        branch_data.filename.split(".")[0], 
-        f"{branch_data.branch_name}.json", 
-    ))
+    try: 
+        branch_blob = bucket.blob(os.path.join(
+            branch_data.email_id, 
+            "books", 
+            branch_data.filename.split(".")[0], 
+            f"{branch_data.branch_name}.json", 
+        ))
 
-    with branch_blob.open("r") as f:
-        js_object = json.load(fp=f)
-    
-    branch_modified, token_count = get_relevant_count(
-        js_object, [text_message[1]], 
-        counting_prompt, gpt4o, gpt4o_encoder
-    )
+        with branch_blob.open("r") as f:
+            js_object = json.load(fp=f)
+        
+        branch_modified, token_count = get_relevant_count(
+            js_object, [text_message[1]], 
+            counting_prompt, gpt4o, gpt4o_encoder
+        )
 
-    with branch_blob.open("w", retry=retry) as f: 
-        json.dump(branch_modified, fp=f)
+        with branch_blob.open("w", retry=retry) as f: 
+            json.dump(branch_modified, fp=f)
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     return ModificationOutputModel(
         filename=branch_data.filename, 
@@ -1444,30 +1471,30 @@ async def generation_data(request: Request) -> JSONResponse:
 
 
 @app.post("/generate")
-async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
+async def generate(request: GenerationContext) -> Dict[str, str | int| float]:
     start_time: float = time.time()
 
     try: 
         generation_metadata_blob = bucket.blob(os.path.join(
-            context.email_id, 
+            request.email_id, 
             "generation_data", 
-            f"{context.filename}.json", 
+            f"{request.filename}.json", 
         ))
     except Exception as e: 
-        print(f"The file {context.filename} has not been processed")
+        print(f"The file {request.filename} has not been processed")
         print(e)
 
     with generation_metadata_blob.open("r") as f: 
         generation_data = json.load(fp=f)
 
-    associated_json: Dict = generation_data[context.question_type][context.chapter_name][context.topic_name]
+    associated_json: Dict = generation_data[request.question_type][request.chapter_name][request.topic_name]
     question_count = associated_json["topic_question_count"] 
     text = ""
 
     for paragraph_node in associated_json["topic_json"]: 
         text += paragraph_node["text"]
 
-    qna_prompt: str = prompts[context.question_type]
+    qna_prompt: str = prompts[request.question_type]
 
     qna, token_count = generate_response(
         messages=text_message, 
@@ -1476,7 +1503,7 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
         convert_to_html_prompt=convert_to_html_prompt, 
         context=text,  
         question_count=question_count, 
-        language=context.language, 
+        language=request.language, 
         gpt4o_encoder=gpt4o_encoder, 
         gpt4o=gpt4o, 
     )
@@ -1484,10 +1511,10 @@ async def generate(context: GenerationContext) -> Dict[str, str | int| float]:
     # dump the output to gcp 
     try: 
         generated_dump_blob = bucket.blob(os.path.join(
-            context.email_id, 
+            request.email_id, 
             "generated_content", 
-            context.filename, 
-            f"{context.question_type}_{context.chapter_name}_{context.topic_name}.html", 
+            request.filename, 
+            f"{request.question_type}_{request.chapter_name}_{request.topic_name}.html", 
         ))
 
         with generated_dump_blob.open("w", retry=retry) as f: 

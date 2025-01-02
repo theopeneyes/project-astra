@@ -32,7 +32,7 @@ class DataClassifierModel(AbsoluteBaseModel):
 # summarization model 
 class SummarizationRequestModel(RequestModel): 
     chapter_name: str 
-    language: str 
+    language_code: str 
 
 class SummarizationResponseModel(AbsoluteBaseModel, ResponseModel): 
     status: bool 
@@ -54,10 +54,11 @@ class DataMapPlotInputModel(BaseModel):
     Y_col: List[float] 
     labels: List[str]
     
-class DetectedLanguageModel(AbsoluteBaseModel): 
+class DetectedLanguageResponseModel(AbsoluteBaseModel, ResponseModel): 
     detected_language: str
     time: float
     token_count: int
+    confidence: float 
     
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
@@ -71,7 +72,7 @@ class SummaryChapterResponseModel(AbsoluteBaseModel, ResponseModel):
 
 class RewriteJSONRequestModel(RequestModel):
     node_id: int  
-    language: str 
+    language_code: str 
     chapter_name: str 
 
 class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
@@ -117,6 +118,7 @@ class LLMGenerationRequestModel(AbsoluteBaseModel):
 
 class ContentsRequestModel(AbsoluteBaseModel): 
     number_of_pages: int 
+    language_code: str 
 
 class ContentsResponseModel(AbsoluteBaseModel): 
     first_page: int
@@ -143,6 +145,7 @@ class PDFUploadResponseModel(AbsoluteBaseModel):
 
 class ChapterLoaderRequestModel(AbsoluteBaseModel): 
     chapter_name: str 
+    language_code: str 
 
 class ChapterLoaderResponseModel(AbsoluteBaseModel): 
     chapter_name: str 

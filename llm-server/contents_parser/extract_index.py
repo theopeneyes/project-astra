@@ -5,7 +5,7 @@ from .prompts import index_breakdown_prompt
 from .skeleton import content_parser_message as messages 
 from html_table_parser import HTMLTableParser
 
-def extract_index(image, gpt4o, gpt4o_encoder) -> list[list[str]]: 
+def extract_index(image, language_code: str, gpt4o, gpt4o_encoder) -> list[list[str]]: 
     """
     Input: 
     image: Image of the contents page  
@@ -15,6 +15,8 @@ def extract_index(image, gpt4o, gpt4o_encoder) -> list[list[str]]:
     Convert all the identified index pages into a table of contents with identified chapter/sections/headings 
     as individual line items within the table. 
     """
+
+    messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}" 
 
     messages[1]["content"][0]["text"] = index_breakdown_prompt
     messages[1]["content"][1]["image_url"]["url"] = (

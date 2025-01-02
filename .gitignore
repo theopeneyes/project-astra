@@ -16,6 +16,7 @@ llm-server/find_issue_introduction.py
 streamlit-app/.gitignore
 streamlit-app/.stapp
 streamlit-app/.secrets
+streamlit-app/test_books
 
 # reactflow application 
 react-flow-app/node_modules

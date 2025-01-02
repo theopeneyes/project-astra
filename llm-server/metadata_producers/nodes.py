@@ -6,14 +6,14 @@ from .prompts import classification_prompt
 
 def classify_about(single_json: dict, 
                    generated_list: dict,
-                   language: str, gpt4o, gpt4o_encoder):
+                   language_code: str, gpt4o, gpt4o_encoder):
 
     token_count : int = 0 
     try: 
 
-        messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
+        messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}"  
         messages[1]["content"][0]["text"] = classification_prompt.format(
-            language, 
+            language_code, 
             single_json["text"], 
             generated_list[0]["concept"], 
             generated_list[0]["sub_concept"], generated_list[0]["concept"], 
@@ -39,6 +39,7 @@ def classify_about(single_json: dict,
         print("The generated list is as follows: ")
         print(json.dumps(generated_list, indent=4)) 
         llm_response = ""
+        raise E
 
     token_count: int = len(gpt4o_encoder.encode(llm_response)) 
 

@@ -1,10 +1,10 @@
-content_parser_message: list[dict] = [
+messages: list[dict] = [
     {
       "role": "system",
       "content": [
         {
           "type": "text",
-          "text": "",
+          "text": "Generate your answer in English language.",
         },
       ]
     },
@@ -21,19 +21,6 @@ content_parser_message: list[dict] = [
             "url": "data:image/jpeg;base64,{}",
           }
         }
-      ]
-    }
-]
-
-
-content_parser_text_message: list[dict] = [
-    {
-      "role": "user",
-      "content": [
-        {
-          "type": "text",
-          "text": "",
-        },
       ]
     }
 ]
