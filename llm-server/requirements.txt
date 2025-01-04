@@ -1,6 +1,6 @@
 annotated-types==0.7.0
 anyio==4.6.2.post1
-cachetools==5.5.0
+cachetools==4.2.4
 certifi==2024.8.30
 charset-normalizer==3.4.0
 click==8.1.7
@@ -12,13 +12,16 @@ fastapi==0.115.5
 filelock==3.16.1
 fonttools==4.55.1
 fsspec==2024.10.0
-google-api-core==2.23.0
-google-auth==2.36.0
-google-cloud-core==2.4.1
+google-api-core==1.34.1
+google-auth==1.35.0
+google-cloud-core==1.7.3
 google-cloud-storage==2.18.2
+google-cloud-translate==2.0.2
 google-crc32c==1.6.0
 google-resumable-media==2.7.2
 googleapis-common-protos==1.66.0
+grpcio==1.68.1
+grpcio-status==1.48.2
 h11==0.14.0
 html-table-parser-python3==0.3.1
 httpcore==1.0.7
@@ -37,7 +40,7 @@ pdf2image==1.17.0
 pillow==11.0.0
 pluggy==1.5.0
 proto-plus==1.25.0
-protobuf==5.29.0
+protobuf==3.20.3
 pyasn1==0.6.1
 pyasn1_modules==0.4.1
 pybind11==2.13.6
