@@ -556,65 +556,65 @@ async def get_book_chapters(email_id: str, filename: str) -> JSONResponse:
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
     start_time = time.time()
-    try: 
-        chapter_to_heading_map_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "book_sections", 
-            request.filename.split(".")[0], 
-            "chapter_to_heading.json"
-        ))
+    # try: 
+    chapter_to_heading_map_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "book_sections", 
+        request.filename.split(".")[0], 
+        "chapter_to_heading.json"
+    ))
 
-        chapters_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "book_sections", 
-            request.filename.split(".")[0], 
-            "chapters.csv"
-        ))
+    chapters_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "book_sections", 
+        request.filename.split(".")[0], 
+        "chapters.csv"
+    ))
 
-        chapter_image_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_processed_images", 
-            request.filename.split(".")[0], 
-            request.chapter_name, 
-        ))
+    chapter_image_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_processed_images", 
+        request.filename.split(".")[0], 
+        request.chapter_name, 
+    ))
 
-        with chapter_to_heading_map_blob.open("r") as f:
-            chapter_json: dict = json.load(f)
-        
-        with chapters_blob.open("r") as f:
-            df: pd.DataFrame = pd.read_csv(f)
-        
-        with chapter_image_blob.open("r") as f: 
-            chapter_images: list[dict]  = json.load(f) 
-        
-        responses, token_count = load_chapters(
-            request.chapter_name, 
-            chapter_json, 
-            df, chapter_images, 
-            request.language_code, 
-            gpt4o, gpt4o_encoder
-        )
-
-        structured_chapter: list[dict] = structure_html(responses)
-
-        chapter_processed_json_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapterwise_processed_json", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            "inherent_metadata.json" 
-        ))
-
-        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
-            json.dump(structured_chapter, fp)
+    with chapter_to_heading_map_blob.open("r") as f:
+        chapter_json: dict = json.load(f)
     
-    except Exception as err:
-        error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    with chapters_blob.open("r") as f:
+        df: pd.DataFrame = pd.read_csv(f)
+    
+    with chapter_image_blob.open("r") as f: 
+        chapter_images: list[dict]  = json.load(f) 
+    
+    responses, token_count = load_chapters(
+        request.chapter_name, 
+        chapter_json, 
+        df, chapter_images, 
+        request.language_code, 
+        gpt4o, gpt4o_encoder
+    )
+
+    structured_chapter: list[dict] = structure_html(responses)
+
+    chapter_processed_json_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapterwise_processed_json", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".")[0], 
+        "inherent_metadata.json" 
+    ))
+
+    with chapter_processed_json_blob.open("w", retry=retry) as fp: 
+        json.dump(structured_chapter, fp)
+    
+    # except Exception as err:
+    #     error_name: str = type(err).__name__
+    #     error_line: int  = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
     
     return ChapterLoaderResponseModel(
         email_id = request.email_id, 
@@ -662,8 +662,8 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
         confidence, language, token_count = detect_language(
             encoded_image, 
             translator,
+            gpt4o,   
             gpt4o_encoder, 
-            gpt4o  
         )
 
         languages.append(language) 
@@ -821,7 +821,7 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
         filename=request.filename, 
         email_id=request.email_id, 
         chapter_name=request.chapter_name, 
-        language=request.language, 
+        language_code=request.language_code, 
         time=time.time() - start_time, 
         token_count = token_count
     ) 
@@ -922,7 +922,7 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
         filename=request.filename, 
         email_id=request.email_id, 
         node_id=request.node_id, 
-        language=request.language, 
+        language_code=request.language_code, 
         time=duration, 
         token_count=token_count, 
     )

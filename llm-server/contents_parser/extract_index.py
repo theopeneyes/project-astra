@@ -16,7 +16,7 @@ def extract_index(image, language_code: str, gpt4o, gpt4o_encoder) -> list[list[
     as individual line items within the table. 
     """
 
-    messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}" 
+    messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language {language_code}" 
 
     messages[1]["content"][0]["text"] = index_breakdown_prompt
     messages[1]["content"][1]["image_url"]["url"] = (

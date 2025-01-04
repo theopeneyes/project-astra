@@ -65,10 +65,11 @@ class GeneratedImageModel(BaseModel):
 
 class SummaryChapterRequestModel(RequestModel): 
     chapter_name: str 
-    language: str 
+    language_code: str 
 
 class SummaryChapterResponseModel(AbsoluteBaseModel, ResponseModel): 
-    pass 
+    chapter_name: str 
+    language_code: str 
 
 class RewriteJSONRequestModel(RequestModel):
     node_id: int  
@@ -76,7 +77,8 @@ class RewriteJSONRequestModel(RequestModel):
     chapter_name: str 
 
 class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
-    pass 
+    language_code: str 
+    node_id: int 
 
 class ConvertPDFModel(AbsoluteBaseModel): 
     uri: str 
@@ -129,6 +131,7 @@ class ContentsResponseModel(AbsoluteBaseModel):
 class ChapterIdentificationRequestModel(AbsoluteBaseModel): 
     last_page: int 
     first_page: int 
+    language_code: str 
 
 class ChapterIdentificationResponseModel(AbsoluteBaseModel): 
     token_count: int 
@@ -147,7 +150,5 @@ class ChapterLoaderRequestModel(AbsoluteBaseModel):
     chapter_name: str 
     language_code: str 
 
-class ChapterLoaderResponseModel(AbsoluteBaseModel): 
+class ChapterLoaderResponseModel(AbsoluteBaseModel, ResponseModel): 
     chapter_name: str 
-    time: float
-    token_count: int 
