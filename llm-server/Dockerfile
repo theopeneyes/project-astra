@@ -6,6 +6,6 @@ RUN apt-get update --fix-missing && apt-get install -y --fix-missing build-essen
 RUN apt-get -y update && apt-get -y install curl
 RUN apt-get install -y poppler-utils 
 
-RUN pip install -r requirements.txt 
+RUN pip install --no-cache-dir -r requirements.txt  
 EXPOSE 8080 
-ENTRYPOINT uvicorn main:app --port 8080 
+CMD python3 -m uvicorn main:app --workers 10
