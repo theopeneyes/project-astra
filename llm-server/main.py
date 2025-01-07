@@ -55,7 +55,7 @@ import urllib.error
 
 import pdf2image as p2i 
 import pandas as pd 
-
+from PyPDF2 import PdfReader
 from openai import OpenAI 
 
 # custom defined libraries 
@@ -98,6 +98,8 @@ from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundExc
 
 
 from exceptions import EmptyPDFException
+from exceptions import CorruptPDFException
+from exceptions import IncorrectGCPBucketException
 from summarizer.exceptions import SummaryNotFoundException
 
 from chapter_broker.breakdown import segment_breakdown
@@ -130,7 +132,6 @@ ERROR_DIR: str = "error_dir"
 gpt4o = OpenAI(api_key=OPENAI_API_KEY)
 gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 
-#facebook nllbs
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
@@ -153,6 +154,8 @@ app.add_middleware(
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
 
+
+
 @app.post("/upload_pdf") 
 async def upload_pdf(
     email_id: str = Form(...), 
@@ -163,11 +166,13 @@ async def upload_pdf(
     # leadtime conversion 
     start_time: int = time.time()
     content = await pdf.read() 
+
     try:
+        # check if PDF is empty
         if len(content)==0:
             raise EmptyPDFException()
         
-        
+
         upload_pdf_blob = bucket.blob(os.path.join(
             email_id, 
             "uploaded_document", 
@@ -177,7 +182,14 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb") as fp: 
             fp.write(content)
 
-        
+        with open(content, 'rb') as f:
+            pdf = PdfReader(f)
+            info = pdf.metadata
+            if info:
+                return True
+            else:
+                return False
+    
     
     except EmptyPDFException as emptyPDF:
         error_line: int = emptyPDF.__traceback__.tb_lineno 
@@ -186,7 +198,7 @@ async def upload_pdf(
             status_code=404, 
             detail = f"Error {error_name} at line {error_line}"
         )
-        
+    
 
     except urllib.error.URLError as e:
         if isinstance(e.reason, ConnectionError):
@@ -203,8 +215,7 @@ async def upload_pdf(
         raise HTTPException(
             status_code=404, 
             detail = f"Error {error_name} at line {error_line}"
-        )
-    
+        )    
     
     return PDFUploadResponseModel(
         email_id = email_id, 
@@ -240,6 +251,13 @@ async def convert_pdf(pdf_file:
                 fmt="jpg", 
             )
         
+        # check if PDF is uploaded in correct GCP bucket
+        file_name = pdf_file.filename
+        file_blob = bucket.blob(file_name)
+        if file_blob==False:
+            raise IncorrectGCPBucketException()
+
+
         
     except Exception as err: 
         error_line: int = err.__traceback__.tb_lineno 

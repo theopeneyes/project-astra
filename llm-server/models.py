@@ -148,3 +148,4 @@ class ChapterLoaderResponseModel(AbsoluteBaseModel):
     chapter_name: str 
     time: float
     token_count: int 
+
