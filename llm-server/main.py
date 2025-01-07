@@ -298,6 +298,7 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
             images, 
             contents_request.number_of_pages, 
             contents_request.language_code, 
+            translator, 
             gpt4o, gpt4o_encoder
         )
 
@@ -388,8 +389,8 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
         )
 
 
-        chapters: pd.DataFrame = df.loc[df.heading_type == "h1"]
-        headings: pd.DataFrame = df.loc[df.heading_type == "h2"] 
+        chapters: pd.DataFrame = df.loc[df.headingType == "h1"]
+        headings: pd.DataFrame = df.loc[df.headingType == "h2"] 
 
         chapter_pages_csv_blob = bucket.blob(os.path.join(
             identification_request.email_id, 

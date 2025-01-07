@@ -19,34 +19,35 @@ pdf_names: str = [
     "Machine-Learning-For-Absolute-Beginners.pdf", 
     "lbdl.pdf", 
     "rdpd.pdf", 
-    "rdpd-1-140.pdf"
+    "rdpd-1-140.pdf", 
+    "japanese-book.pdf"
 ]
 
 user_email: str = "test.fifth@yahoo.com"
 BASE_LOCATION: str = "../streamlit-app/test_books/"
-pdf_name = pdf_names[3] 
+pdf_name = pdf_names[-1] 
 
-# with open(os.path.join(BASE_LOCATION, pdf_name), "rb") as fp: 
-#     requests.post(
-#         URL + "/upload_pdf", 
-#         data = {
-#             "email_id": user_email, 
-#             "filename" : pdf_name, 
-#         }, 
-#         files = {
-#             "pdf": fp, 
-#         }, 
-#         timeout=300, 
-#     )
+with open(os.path.join(BASE_LOCATION, pdf_name), "rb") as fp: 
+    requests.post(
+        URL + "/upload_pdf", 
+        data = {
+            "email_id": user_email, 
+            "filename" : pdf_name, 
+        }, 
+        files = {
+            "pdf": fp, 
+        }, 
+        timeout=300, 
+    )
 
-# # pdf_name = "machine-learning-algorithms.pdf"
+# pdf_name = "machine-learning-algorithms.pdf"
 
-# convert_response = requests.post(
-#     URL + "/convert_pdf", json = {
-#         "email_id": user_email, 
-#         "uri": f"{user_email}/uploaded_document/{pdf_name}", 
-#         "filename": pdf_name,  
-# })
+convert_response = requests.post(
+    URL + "/convert_pdf", json = {
+        "email_id": user_email, 
+        "uri": f"{user_email}/uploaded_document/{pdf_name}", 
+        "filename": pdf_name,  
+})
 
 language_detected_response = requests.post(
    URL + "/detect_lang", json = {

@@ -13,8 +13,14 @@ A contents page will have the following properties:
 ### PROPERTIES ###
 1) A contents page will typically contain multiple page numbers associated with a certain
 piece of text, which is often a chapter heading, section-heading or a sub-heading.
-2) A contents page will typically contain keywords such as "contents", "table of contents"
-or "index"
+2) A contents page will typically contain keywords such as {} or other words in the same
+language that mean something similar.
+3) If the previous page was a contents page and the current page has list like content as well,
+then this page might be a continuation of the contents page. VERIFY if this page is a continuation
+of the previous page.
+
+### PREVIOUS PAGE ###
+{}
 
 ### INSTRUCTIONS ###
 - If the page is a contents page, then return <contents>True</contents>
