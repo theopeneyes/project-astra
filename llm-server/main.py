@@ -56,7 +56,6 @@ import urllib.error
 
 import pdf2image as p2i 
 import pandas as pd 
-from PyPDF2 import PdfReader
 from openai import OpenAI 
 
 # custom defined libraries 
@@ -85,7 +84,7 @@ from metadata_producers.nodes import classify_about
 from metadata_producers.exceptions import AboutListNotGeneratedException, DepthListNotGeneratedException
 
 from synthesizers.synthesize import synthesizer 
-
+from google.cloud.storage.retry import DEFAULT_RETRY
 from segregator.segregation import segregator
 from segregator.prompts import counting_prompt 
 from segregator.modifier import get_relevant_count
@@ -103,7 +102,6 @@ from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
 
-from google.cloud.storage.retry import DEFAULT_RETRY
 
 from json import JSONDecodeError
 
@@ -185,14 +183,6 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
-        with open(content, 'rb') as f:
-            pdf = PdfReader(f)
-            info = pdf.metadata
-            if info:
-                return True
-            else:
-                return False
-    
     
     except EmptyPDFException as emptyPDF:
         error_line: int = emptyPDF.__traceback__.tb_lineno 
