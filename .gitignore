@@ -10,11 +10,13 @@ llm-server/json_editor/ignoreme
 llm-server/.gitignore 
 llm-server/__pycache__
 llm-server/tests/__pycache__
+llm-server/find_issue_introduction.py 
 
 # streamlit application 
 streamlit-app/.gitignore
 streamlit-app/.stapp
 streamlit-app/.secrets
+streamlit-app/test_books
 
 # reactflow application 
 react-flow-app/node_modules

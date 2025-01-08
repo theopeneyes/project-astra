@@ -32,7 +32,7 @@ class DataClassifierModel(AbsoluteBaseModel):
 # summarization model 
 class SummarizationRequestModel(RequestModel): 
     chapter_name: str 
-    language: str 
+    language_code: str 
 
 class SummarizationResponseModel(AbsoluteBaseModel, ResponseModel): 
     status: bool 
@@ -54,27 +54,31 @@ class DataMapPlotInputModel(BaseModel):
     Y_col: List[float] 
     labels: List[str]
     
-class DetectedLanguageModel(AbsoluteBaseModel): 
+class DetectedLanguageResponseModel(AbsoluteBaseModel, ResponseModel): 
     detected_language: str
     time: float
     token_count: int
+    confidence: float 
     
 class GeneratedImageModel(BaseModel):
     encoded_image: str 
 
 class SummaryChapterRequestModel(RequestModel): 
     chapter_name: str 
-    language: str 
+    language_code: str 
 
 class SummaryChapterResponseModel(AbsoluteBaseModel, ResponseModel): 
-    pass 
+    chapter_name: str 
+    language_code: str 
 
-class RewriteJSONRequestModel(AbsoluteBaseModel):
+class RewriteJSONRequestModel(RequestModel):
     node_id: int  
-    language: str 
+    language_code: str 
+    chapter_name: str 
 
 class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
-    pass 
+    language_code: str 
+    node_id: int 
 
 class ConvertPDFModel(AbsoluteBaseModel): 
     uri: str 
@@ -83,7 +87,7 @@ class ConvertPDFOutputModel(AbsoluteBaseModel):
     uri: str 
     time: float # in seconds 
 
-class PushToJSONModel(AbsoluteBaseModel): 
+class PushToJsonResponseModel(AbsoluteBaseModel): 
     time: float 
 
 class SynthesisContentInputModel(AbsoluteBaseModel): 
@@ -96,15 +100,14 @@ class ModificationOutputModel(ModificationInputModel):
     time: float 
     token_count: int 
 
-class SynthesisContentInputModel(AbsoluteBaseModel): 
+class SynthesisContentRequestModel(RequestModel): 
     node_id: int 
     branch_name: str
+    chapter_name: str 
 
-class SynthesisContentOutputModel(AbsoluteBaseModel): 
+class SynthesisContentResponseModel(AbsoluteBaseModel, ResponseModel): 
     node_id: int
     branch_name: str 
-    time: float 
-    token_count: int 
 
 class MetaDataEditModel(AbsoluteBaseModel): 
     pass 
@@ -117,6 +120,7 @@ class LLMGenerationRequestModel(AbsoluteBaseModel):
 
 class ContentsRequestModel(AbsoluteBaseModel): 
     number_of_pages: int 
+    language_code: str 
 
 class ContentsResponseModel(AbsoluteBaseModel): 
     first_page: int
@@ -127,6 +131,7 @@ class ContentsResponseModel(AbsoluteBaseModel):
 class ChapterIdentificationRequestModel(AbsoluteBaseModel): 
     last_page: int 
     first_page: int 
+    language_code: str 
 
 class ChapterIdentificationResponseModel(AbsoluteBaseModel): 
     token_count: int 
@@ -143,6 +148,7 @@ class PDFUploadResponseModel(AbsoluteBaseModel):
 
 class ChapterLoaderRequestModel(AbsoluteBaseModel): 
     chapter_name: str 
+    language_code: str 
 
 class ChapterLoaderResponseModel(AbsoluteBaseModel): 
     chapter_name: str 

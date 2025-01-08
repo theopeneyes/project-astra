@@ -6,7 +6,7 @@ from .exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
 import re 
 
-def parse_index(images: list, number_of_pages: int, gpt4o, gpt4o_encoder): 
+def parse_index(images: list, number_of_pages: int, language_code: str, translator, gpt4o, gpt4o_encoder): 
     """
     Inputs: 
     images: list -> List of all images extracted from the book. 
@@ -21,8 +21,26 @@ def parse_index(images: list, number_of_pages: int, gpt4o, gpt4o_encoder):
     token_count: int = 0 
     index_contents: list = []
 
+    text: str = """Index, Table of contents, Table of texts, List of topics, topic list or subject-matter""".strip()
+    keywords: str = translator.translate(text, target_language=language_code).get("translatedText")
+
     for idx, image in enumerate(images[:number_of_pages]):
-        messages[1]["content"][0]["text"] = content_detection_prompt
+        
+        if contents_detected:
+            prompt: str = content_detection_prompt.format(
+                keywords,
+                "Previous Page was a Contents page",
+            )
+
+        else:
+            prompt: str = content_detection_prompt.format(
+                keywords,
+                "Previous Page was NOT a Contents page",
+            )
+
+        messages[0]["content"][0]["text"] = f"Your output MUST be within the language thats associated with the following language code: {language_code}" 
+
+        messages[1]["content"][0]["text"] = prompt 
         messages[1]["content"][1]["image_url"]["url"] = (
             f"data:image/jpeg;base64,{image['img_b64']}")
 
@@ -41,7 +59,7 @@ def parse_index(images: list, number_of_pages: int, gpt4o, gpt4o_encoder):
                 # first contents page
                 contents_detected = True
                 first_page = idx 
-                page_content, parsed_token_count = extract_index(image, gpt4o, gpt4o_encoder)
+                page_content, parsed_token_count = extract_index(image, language_code, gpt4o, gpt4o_encoder)
                 token_count += parsed_token_count
                 index_contents.extend(page_content)
             elif contents_detected and not status:
@@ -49,7 +67,7 @@ def parse_index(images: list, number_of_pages: int, gpt4o, gpt4o_encoder):
                 last_page = idx 
                 break
             elif contents_detected: 
-                page_content, parsed_token_count = extract_index(image, gpt4o, gpt4o_encoder)
+                page_content, parsed_token_count = extract_index(image, language_code, gpt4o, gpt4o_encoder)
                 token_count += parsed_token_count
                 index_contents.extend(page_content)
                 

@@ -5,7 +5,14 @@ from collections import defaultdict
 
 import re 
 
-def segment_breakdown(images: list, index_content: list[list[str]], last_page: int, first_page: int, gpt4o, gpt4o_encoder) -> list[dict|list|int]: 
+def segment_breakdown(
+    images: list, 
+    index_content: list[list[str]], 
+    last_page: int, 
+    first_page: int, 
+    language_code: str, 
+    gpt4o, gpt4o_encoder) -> list[dict|list|int]: 
+
     content_to_page: dict = {}
     content_to_df: list = [] 
     index: int = last_page - 1
@@ -29,13 +36,15 @@ def segment_breakdown(images: list, index_content: list[list[str]], last_page: i
             index = j + start_index
             section = "" if section == 'no-section-number' else section 
             prompt: str = identification_prompt.format(title, section)
+
+            messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}"   
             messages[1]["content"][0]["text"] = prompt
             messages[1]["content"][1]["image_url"]["url"] = (
                 f"data:image/jpeg;base64,{image['img_b64']}")
 
             completions = gpt4o.chat.completions.create(
                 messages = messages,
-                model = "gpt-4o",
+                model = "gpt-4o-mini",
                 temperature=0.01
             )
 

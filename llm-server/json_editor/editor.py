@@ -11,7 +11,10 @@ def edit_metadata(final_json: List[Dict],
     
     for _, js_object in enumerate(final_json): 
         try: 
-            topic_count = topic_json[js_object["topic"]]["count"]
+
+            category: str = ('null' if (js_object['topic'] == None) or (js_object["topic"] == 'None') 
+                             else js_object['topic']) 
+            topic_count = topic_json[category]["count"]
             js_object["topic_word_count"] = topic_count 
 
         except Exception as e: 
@@ -22,7 +25,10 @@ def edit_metadata(final_json: List[Dict],
 
 
         try: 
-            concept_count = concept_json[js_object["concept"]]["count"]
+
+            category: str = ('null' if (js_object['concept'] == None) or (js_object["concept"] == 'None') 
+                             else js_object['concept']) 
+            concept_count = concept_json[category]["count"]
             js_object["concept_word_count"] = concept_count 
 
         except Exception as e: 
@@ -31,11 +37,12 @@ def edit_metadata(final_json: List[Dict],
                 print("Concept: ", js_object["concept"])
                 print("Concepts listed in concepts: ") 
                 pprint(list(concept_json.keys())) 
-            
-
 
         try: 
-            heading_count = heading_json[js_object["heading_text"]]["count"]
+            category: str = ('null' if (js_object['heading_text'] == None) or (js_object["heading_text"] == 'None') 
+                             else js_object['heading_text']) 
+
+            heading_count = heading_json[category]["count"]
             js_object["heading_word_count"] = heading_count 
 
         except Exception as e: 

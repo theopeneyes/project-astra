@@ -5,11 +5,11 @@ from .exceptions import SummaryNotFoundException
 
 # summarized document 
 def summarize_texts(text_content: str, 
-                    language: str,  
+                    language_code: str,  
                     gpt4o_encoder, gpt4o) -> tuple[str| None] : 
 
-    messages[0]["content"][0]["text"] = messages[0]["content"][0]["text"].format(language)
-    messages[1]["content"][0]["text"] = prompt.format(language, text_content) 
+    messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}" 
+    messages[1]["content"][0]["text"] = prompt.format(language_code, text_content) 
     completion = gpt4o.chat.completions.create(
         messages=messages, 
         model="gpt-4o-mini", 

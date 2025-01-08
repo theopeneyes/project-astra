@@ -2,7 +2,13 @@ import pandas as pd
 from .prompts import text_extraction_prompt
 from .skeleton import messages 
 
-def load_chapters(chapter_name: str, chapter_json: dict[list], df: pd.DataFrame, content: list[dict], gpt4o, gpt4o_encoder) -> list[str]: 
+def load_chapters(
+    chapter_name: str, 
+    chapter_json: dict[list], 
+    df: pd.DataFrame, 
+    content: list[dict], 
+    language_code: str, 
+    gpt4o, gpt4o_encoder) -> list[str]: 
     chapter_name = chapter_name.split(".json")[0].split("_")[1]
     title, _, origin, _ = df.loc[df.title == chapter_name].values.tolist()[0]
 
@@ -37,6 +43,7 @@ def load_chapters(chapter_name: str, chapter_json: dict[list], df: pd.DataFrame,
             title, str(headings_page_form)  
         ) 
 
+        messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}"  
         messages[1]["content"][0]["text"] = prompt
         messages[1]["content"][1]["image_url"]["url"] = (
             f"data:image/jpeg;base64,{image['img_b64']}")

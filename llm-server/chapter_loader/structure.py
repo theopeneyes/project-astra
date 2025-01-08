@@ -7,7 +7,7 @@ def structure_html(output: list[str]) ->list[dict[str, str|int]]:
     table_content: list[str]
     df_json : list[dict[str, str]] = []
 
-    for html_page in output:
+    for idx, html_page in enumerate(output):
         paragraph_count: int = 0
         for html_tag in html_page.split("\n"):
             
@@ -68,6 +68,7 @@ def structure_html(output: list[str]) ->list[dict[str, str|int]]:
                     "text_type": text[0],
                     "paragraph_number": paragraph_count,
                     "text": text[3],
+                    "index": idx, 
                 })
 
     return df_json
