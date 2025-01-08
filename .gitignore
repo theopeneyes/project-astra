@@ -11,6 +11,7 @@ llm-server/.gitignore
 llm-server/__pycache__
 llm-server/tests/__pycache__
 llm-server/find_issue_introduction.py 
+llm-server/test_books
 
 # streamlit application 
 streamlit-app/.gitignore
