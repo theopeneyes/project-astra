@@ -56,7 +56,6 @@ import urllib.error
 
 import pdf2image as p2i 
 import pandas as pd 
-from PyPDF2 import PdfReader
 from openai import OpenAI 
 
 # custom defined libraries 
@@ -95,7 +94,6 @@ from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundExc
 
 
 from exceptions import EmptyPDFException
-from exceptions import CorruptPDFException
 from exceptions import IncorrectGCPBucketException
 from summarizer.exceptions import SummaryNotFoundException
 
@@ -185,15 +183,6 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
-        with open(content, 'rb') as f:
-            pdf = PdfReader(f)
-            info = pdf.metadata
-            if info:
-                return True
-            else:
-                return False
-    
-    
     except EmptyPDFException as emptyPDF:
         error_line: int = emptyPDF.__traceback__.tb_lineno 
         error_name: str = type(emptyPDF).__name__
