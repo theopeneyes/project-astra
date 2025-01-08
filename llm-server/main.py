@@ -94,7 +94,6 @@ from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundExc
 
 
 from exceptions import EmptyPDFException
-from exceptions import CorruptPDFException
 from exceptions import IncorrectGCPBucketException
 from summarizer.exceptions import SummaryNotFoundException
 
