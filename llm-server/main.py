@@ -182,25 +182,27 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
-    
+    # Checking for empty pdf 
     except EmptyPDFException as emptyPDF:
+
         error_line: int = emptyPDF.__traceback__.tb_lineno 
         error_name: str = type(emptyPDF).__name__
         raise HTTPException(
             status_code=404, 
-            detail = f"Error {error_name} at line {error_line}"
+            detail = f"EmptyPDFException: {error_line}"
         )
     
-
+    # checking for Connection error 
     except urllib.error.URLError as e:
         if isinstance(e.reason, ConnectionError):
             error_line: int = e.__traceback__.tb_lineno 
             error_name: str = type(e).__name__
             raise HTTPException(
                 status_code=404, 
-                detail = f"Error {error_name} at line {error_line}"
+                detail = f"NetworkError: {error_line}"
             )
 
+    # Unexpected Exceptions
     except Exception as err: 
         error_line: int = err.__traceback__.tb_lineno 
         error_name: str = type(err).__name__

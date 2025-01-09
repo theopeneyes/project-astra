@@ -32,11 +32,11 @@ bucket = gcs_client.bucket(BUCKET_NAME)
 
 def test_detect_lang_function(): 
     filenames_being_processed: Dict[str, str| None] ={ 
-        "Machine-Learning-For-Absolute-Beginners.pdf": "english", 
-        "algorithms.pdf": "english", 
-        "lbdl.pdf": "english", 
-        "gujaratibook.pdf": "gujarati", 
-        "hindibook.pdf": "hindi", 
+        "Machine-Learning-For-Absolute-Beginners.pdf": "en", 
+        "algorithms.pdf": "en", 
+        "lbdl.pdf": "en", 
+        "gujaratibook.pdf": "gu", 
+        "hindibook.pdf": "hi", 
         "lmao.pdf": None,  
     } 
 
