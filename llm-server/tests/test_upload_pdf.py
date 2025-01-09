@@ -36,7 +36,6 @@ response = requests.post(
         "email_id": EMAIL_ID, 
     }
 )
-print(response)
 if response.status_code == 200: 
     response_dict = response.json()
     assert response_dict.get("filename") == filename
