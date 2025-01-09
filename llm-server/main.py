@@ -54,8 +54,9 @@ import time
 import tiktoken 
 import urllib.error
 
+
 import pdf2image as p2i 
-import pandas as pd 
+import pandas as pd
 from openai import OpenAI 
 
 # custom defined libraries 
@@ -68,7 +69,7 @@ from generation.prompts import (
 ) 
 
 from summarizer.summarize import summarize_texts
-
+from convert_pdf.check_encryption import check_pdf_for_drm
 from json_editor.editor import edit_metadata
 
 from language_detection.detector import detect_language
@@ -95,6 +96,8 @@ from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundExc
 
 from exceptions import EmptyPDFException
 from exceptions import IncorrectGCPBucketException
+from exceptions import UnsupportedPDFException 
+
 from summarizer.exceptions import SummaryNotFoundException
 
 from chapter_broker.breakdown import segment_breakdown
@@ -171,8 +174,7 @@ async def upload_pdf(
         # check if PDF is empty
         if len(content)==0:
             raise EmptyPDFException()
-        
-
+    
         upload_pdf_blob = bucket.blob(os.path.join(
             email_id, 
             "uploaded_document", 
@@ -191,7 +193,7 @@ async def upload_pdf(
             status_code=404, 
             detail = f"EmptyPDFException: {error_line}"
         )
-    
+     
     # checking for Connection error 
     except urllib.error.URLError as e:
         if isinstance(e.reason, ConnectionError):
@@ -201,6 +203,8 @@ async def upload_pdf(
                 status_code=404, 
                 detail = f"NetworkError: {error_line}"
             )
+        else: 
+            print("BUG")
 
     # Unexpected Exceptions
     except Exception as err: 
@@ -235,31 +239,51 @@ async def convert_pdf(pdf_file:
     """
     # accessing the file blob from the URI 
     start_time = time.time()
-    try: 
-        pdf_blob = bucket.blob(pdf_file.uri)
+    # try: 
+    pdf_blob = bucket.blob(pdf_file.uri)
         
-        with pdf_blob.open("rb") as f:   
-            images: List[PIL.Image] = p2i.convert_from_bytes(
-                f.read(), 
-                dpi=200, 
-                fmt="jpg", 
-            )
+    with pdf_blob.open("rb") as f:   
+        drm_status: bool = check_pdf_for_drm(f)
+        if drm_status: 
+            raise UnsupportedPDFException()
         
-        # check if PDF is uploaded in correct GCP bucket
-        file_name = pdf_file.filename
-        file_blob = bucket.blob(file_name)
-        if file_blob==False:
-            raise IncorrectGCPBucketException()
-
-
-        
-    except Exception as err: 
-        error_line: int = err.__traceback__.tb_lineno 
-        error_name: str = type(err).__name__
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error {error_name} at line {error_line}"
+        images: List[PIL.Image] = p2i.convert_from_bytes(
+            f.read(), 
+            dpi=200, 
+            fmt="jpg", 
         )
+    
+    # check if PDF is uploaded in correct GCP bucket
+    file_name = pdf_file.filename
+    file_blob = bucket.blob(file_name)
+    if not file_blob.exists():
+        raise IncorrectGCPBucketException()
+    
+    # except UnsupportedPDFException as unsupportedPDF: 
+    #     error_line: int = unsupportedPDF.__traceback__.tb_lineno 
+    #     error_name: str = type(unsupportedPDF).__name__
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"UnsupportedPDFException: lol"
+    #     )
+
+
+    # except IncorrectGCPBucketException as incorrectBucket: 
+    #     error_line: int = incorrectBucket.__traceback__.tb_lineno 
+    #     error_name: str = type(incorrectBucket).__name__
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error {error_name} at line {error_line}"
+    #     )
+    
+    # except Exception as err: 
+    #     error_line: int = err.__traceback__.tb_lineno 
+    #     error_name: str = type(err).__name__
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error {error_name} at line {error_line}"
+    #     )
+
     
 
     # encoding the images and saving the encoded json to a directory  
