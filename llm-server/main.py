@@ -6,6 +6,8 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi import File 
 
+from models import FontForChapterDetectionRequestModel
+from models import FontForChapterDetectionResponseModel
 from models import ChapterLoaderRequestModel
 from models import ChapterLoaderResponseModel
 from models import GenerationContext
@@ -103,6 +105,8 @@ from chapter_loader.loader import load_chapters
 
 from google.cloud.storage.retry import DEFAULT_RETRY
 
+from font_chapter.extractcss import css_extractor 
+
 from json import JSONDecodeError
 
 load_dotenv(override=True)
@@ -154,8 +158,6 @@ retry = retry.with_delay(initial=1.5, multiplier=1.2, maximum=45.0)
 @app.get("/")
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
-
-
 
 @app.post("/upload_pdf") 
 async def upload_pdf(
@@ -290,6 +292,41 @@ async def convert_pdf(pdf_file:
         time=duration,  
     ) 
 
+@app.post("/extract_font_indices")
+async def extract_font_indices(request: FontForChapterDetectionRequestModel) -> FontForChapterDetectionResponseModel: 
+    # reading the json file 
+    image_json_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "processed_image", 
+        request.filename.split(".")[0] + ".json"
+    ))
+
+    fontdb_rules_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "fontwarehouse", 
+        request.filename.split(".")[0], 
+        "cssrules.csv"
+    ))
+
+    fontdb_page_combinations = bucket.blob(os.path.join(
+        request.email_id, 
+        "fontwarehouse", 
+        request.filename.split(".")[0], 
+        "fontdb.csv"
+    ))
+
+    with image_json_blob.open("rb") as fp: 
+        images = json.load(fp=fp)
+    
+    font_db, css_rules, token_count = css_extractor(images, gpt4o, gpt4o_encoder)    
+
+    with fontdb_rules_blob.open("w") as fp: 
+        pd.DataFrame(css_rules).to_csv(fp)
+
+    with fontdb_page_combinations.open("w") as fp: 
+        pd.DataFrame(font_db).to_csv(fp)
+    
+
 @app.post("/extract_contents_page")
 async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
     start_time: float = time.time()
@@ -396,7 +433,6 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
                 "heading_type" 
             ]
         )
-
 
         chapters: pd.DataFrame = df.loc[df.headingType == "h1"]
         headings: pd.DataFrame = df.loc[df.headingType == "h2"] 
@@ -566,65 +602,65 @@ async def get_book_chapters(email_id: str, filename: str) -> JSONResponse:
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
     start_time = time.time()
-    # try: 
-    chapter_to_heading_map_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapter_to_heading.json"
-    ))
+    try: 
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapter_to_heading.json"
+        ))
 
-    chapters_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapters.csv"
-    ))
+        chapters_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapters.csv"
+        ))
 
-    chapter_image_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_processed_images", 
-        request.filename.split(".")[0], 
-        request.chapter_name, 
-    ))
+        chapter_image_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_processed_images", 
+            request.filename.split(".")[0], 
+            request.chapter_name, 
+        ))
 
-    with chapter_to_heading_map_blob.open("r") as f:
-        chapter_json: dict = json.load(f)
+        with chapter_to_heading_map_blob.open("r") as f:
+            chapter_json: dict = json.load(f)
+        
+        with chapters_blob.open("r") as f:
+            df: pd.DataFrame = pd.read_csv(f)
+        
+        with chapter_image_blob.open("r") as f: 
+            chapter_images: list[dict]  = json.load(f) 
+        
+        responses, token_count = load_chapters(
+            request.chapter_name, 
+            chapter_json, 
+            df, chapter_images, 
+            request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
+
+        structured_chapter: list[dict] = structure_html(responses)
+
+        chapter_processed_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "inherent_metadata.json" 
+        ))
+
+        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
+            json.dump(structured_chapter, fp)
     
-    with chapters_blob.open("r") as f:
-        df: pd.DataFrame = pd.read_csv(f)
-    
-    with chapter_image_blob.open("r") as f: 
-        chapter_images: list[dict]  = json.load(f) 
-    
-    responses, token_count = load_chapters(
-        request.chapter_name, 
-        chapter_json, 
-        df, chapter_images, 
-        request.language_code, 
-        gpt4o, gpt4o_encoder
-    )
-
-    structured_chapter: list[dict] = structure_html(responses)
-
-    chapter_processed_json_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapterwise_processed_json", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".")[0], 
-        "inherent_metadata.json" 
-    ))
-
-    with chapter_processed_json_blob.open("w", retry=retry) as fp: 
-        json.dump(structured_chapter, fp)
-    
-    # except Exception as err:
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     return ChapterLoaderResponseModel(
         email_id = request.email_id, 

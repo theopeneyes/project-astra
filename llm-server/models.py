@@ -150,8 +150,15 @@ class ChapterLoaderRequestModel(AbsoluteBaseModel):
     chapter_name: str 
     language_code: str 
 
-class ChapterLoaderResponseModel(AbsoluteBaseModel): 
+class ChapterLoaderResponseModel(AbsoluteBaseModel, ResponseModel): 
     chapter_name: str 
-    time: float
-    token_count: int 
+
+class FontForChapterDetectionRequestModel(RequestModel): 
+    pass 
+
+class FontForChapterDetectionResponseModel(AbsoluteBaseModel, ResponseModel): 
+    pass 
+
+
+
 
