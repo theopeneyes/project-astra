@@ -86,7 +86,7 @@ from metadata_producers.nodes import classify_about
 from metadata_producers.exceptions import AboutListNotGeneratedException, DepthListNotGeneratedException
 
 from synthesizers.synthesize import synthesizer 
-
+from google.cloud.storage.retry import DEFAULT_RETRY
 from segregator.segregation import segregator
 from segregator.prompts import counting_prompt 
 from segregator.modifier import get_relevant_count
@@ -103,7 +103,6 @@ from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
 
-from google.cloud.storage.retry import DEFAULT_RETRY
 
 from font_chapter.extractcss import css_extractor 
 
@@ -185,24 +184,27 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
+    # Checking for empty pdf 
     except EmptyPDFException as emptyPDF:
+
         error_line: int = emptyPDF.__traceback__.tb_lineno 
         error_name: str = type(emptyPDF).__name__
         raise HTTPException(
             status_code=404, 
-            detail = f"Error {error_name} at line {error_line}"
+            detail = f"EmptyPDFException: {error_line}"
         )
     
-
+    # checking for Connection error 
     except urllib.error.URLError as e:
         if isinstance(e.reason, ConnectionError):
             error_line: int = e.__traceback__.tb_lineno 
             error_name: str = type(e).__name__
             raise HTTPException(
                 status_code=404, 
-                detail = f"Error {error_name} at line {error_line}"
+                detail = f"NetworkError: {error_line}"
             )
 
+    # Unexpected Exceptions
     except Exception as err: 
         error_line: int = err.__traceback__.tb_lineno 
         error_name: str = type(err).__name__
