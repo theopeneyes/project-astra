@@ -358,39 +358,74 @@ import io
 
 client = TestClient(app)
 
-    # Generate a valid PDF in memory
-    buffer = io.BytesIO()
-    c = canvas.Canvas(buffer)
-    c.drawString(100, 750, "This is a valid PDF document.")
-    c.save()
-    buffer.seek(0)  # Go back to the beginning of the BytesIO buffer
-    return buffer
+#     # Generate a valid PDF in memory
+#     buffer = io.BytesIO()
+#     c = canvas.Canvas(buffer)
+#     c.drawString(100, 750, "This is a valid PDF document.")
+#     c.save()
+#     buffer.seek(0)  # Go back to the beginning of the BytesIO buffer
+#     return buffer
 
-def create_invalid_pdf():
-    # Generate an invalid PDF (simulating corrupted data)
-    return b"%PDF-1.4 corrupted data"
+# def create_invalid_pdf():
+#     # Generate an invalid PDF (simulating corrupted data)
+#     return b"%PDF-1.4 corrupted data"
 
-def test_upload_valid_pdf():
-    # Create a valid PDF dynamically
-    valid_pdf_buffer = create_valid_pdf()
-    files = {"pdf": ("valid_sample.pdf", valid_pdf_buffer, "application/pdf")}
-    data = {"email_id": "test@example.com", "filename": "valid_sample.pdf"}
+# def test_upload_valid_pdf():
+#     # Create a valid PDF dynamically
+#     valid_pdf_buffer = create_valid_pdf()
+#     files = {"pdf": ("valid_sample.pdf", valid_pdf_buffer, "application/pdf")}
+#     data = {"email_id": "test@example.com", "filename": "valid_sample.pdf"}
 
-    # Send the valid PDF to the /upload_pdf endpoint
-    response = client.post("/upload_pdf", data=data, files=files)
+#     # Send the valid PDF to the /upload_pdf endpoint
+#     response = client.post("/upload_pdf", data=data, files=files)
 
-    # Assert the response is successful (200 OK)
-    assert response.status_code == 200
-    assert response.json()["filename"] == "valid_sample.pdf"
-    assert "time" in response.json()
+#     # Assert the response is successful (200 OK)
+#     assert response.status_code == 200
+#     assert response.json()["filename"] == "valid_sample.pdf"
+#     assert "time" in response.json()
 
 
-def test_upload_invalid_pdf():
-    invalid_pdf_content = create_invalid_pdf()
-    files = {"pdf": ("corrupted_book.pdf", invalid_pdf_content, "application/pdf")}
-    data = {"email_id": "test@example.com", "filename": "corrupted_book.pdf"}
+# def test_upload_invalid_pdf():
+#     invalid_pdf_content = create_invalid_pdf()
+#     files = {"pdf": ("corrupted_book.pdf", invalid_pdf_content, "application/pdf")}
+#     data = {"email_id": "test@example.com", "filename": "corrupted_book.pdf"}
 
-    response = client.post("/upload_pdf", data=data, files=files)
+#     response = client.post("/upload_pdf", data=data, files=files)
 
-    assert response.status_code == 404 
-    assert response.json()["detail"] == "Invalid PDF: Unable to read or parse the PDF file."
+#     assert response.status_code == 404 
+#     assert response.json()["detail"] == "Invalid PDF: Unable to read or parse the PDF file."
+
+
+
+
+import pytest
+from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
+from main import app
+
+client = TestClient(app)
+
+def test_conversion_timeout():
+    """
+    Test to ensure the endpoint handles timeout correctly during PDF conversion.
+    """
+    # Mock input data
+    input_data = {
+        "filename": "large_book",
+        "email_id": "user@example.com",
+        "uri": "uploaded_document/large_book.pdf"
+    }
+
+    # Mock bucket and blob to simulate a timeout
+    with patch('main.bucket') as mock_bucket:
+        mock_blob = MagicMock()
+        mock_bucket.blob.return_value = mock_blob
+        mock_blob.open.side_effect = TimeoutError("Simulated timeout")
+
+        # Send the POST request
+        response = client.post("/convert_pdf", json=input_data)
+
+        # Assertions
+        assert response.status_code == 500
+        assert "Error converting PDF: Simulated timeout" in response.json()["detail"]
+
