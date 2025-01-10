@@ -104,6 +104,7 @@ from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
 
+from rate_limiter.limit_utility import get_rate_limit_metadata, update_rate_limit_metadata
 
 from json import JSONDecodeError
 
@@ -151,6 +152,9 @@ app.add_middleware(
 retry = DEFAULT_RETRY.with_deadline(500.0)
 retry = retry.with_delay(initial=1.5, multiplier=1.2, maximum=45.0)
 
+RATE_LIMIT = 5  # Max requests
+WINDOW_SECONDS = 60  # Time window in seconds
+
 
 #Endpoints 
 @app.get("/")
@@ -166,9 +170,29 @@ async def upload_pdf(
     pdf: UploadFile = File(...),  
 ) -> PDFUploadResponseModel: 
 
-    # leadtime conversion 
+    # Fetch rate-limit metadata
+    blob, rate_limit_data = get_rate_limit_metadata(email_id)
+    current_time = time.time()
+
+    # Check if the rate-limit window has reset
+    if current_time > rate_limit_data["reset_time"]:
+        rate_limit_data = {"count": 0, "reset_time": current_time + WINDOW_SECONDS}
+
+    # Check if rate limit is exceeded
+    if rate_limit_data["count"] >= RATE_LIMIT:
+        retry_after = int(rate_limit_data["reset_time"] - current_time)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Rate limit exceeded. Retry after {retry_after} seconds."
+        )
+
+    # Increment request count and update metadata
+    rate_limit_data["count"] += 1
+    update_rate_limit_metadata(blob, rate_limit_data)
+
+    # Lead-time conversion
     start_time: int = time.time()
-    content = await pdf.read() 
+    content = await pdf.read()
 
     try:
         # check if PDF is empty
@@ -203,8 +227,7 @@ async def upload_pdf(
                 status_code=404, 
                 detail = f"NetworkError: {error_line}"
             )
-        else: 
-            print("BUG")
+       
 
     # Unexpected Exceptions
     except Exception as err: 

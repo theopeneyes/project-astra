@@ -94,7 +94,6 @@ def test_unsupported_pdf():
             }
         )
 
-
         assert response.status_code == 404
         response_dict: dict = response.json()
         exception = response_dict.get("detail").split(":")[0].strip()
