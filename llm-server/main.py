@@ -48,16 +48,18 @@ from collections import defaultdict
 
 import PIL 
 import random 
-import os 
+import os
+import io
 import json
 import time 
 import tiktoken 
 import urllib.error
 
-
+import PyPDF2
 import pdf2image as p2i 
 import pandas as pd
-from openai import OpenAI 
+from openai import OpenAI
+from io import BytesIO
 
 # custom defined libraries 
 from json_trees.generate import JSONParser 
@@ -96,7 +98,8 @@ from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundExc
 
 from exceptions import EmptyPDFException
 from exceptions import IncorrectGCPBucketException
-from exceptions import UnsupportedPDFException 
+from exceptions import UnsupportedPDFException
+from exceptions import InvalidPDFExeption
 
 from summarizer.exceptions import SummaryNotFoundException
 
@@ -163,42 +166,25 @@ async def home() -> Dict[str, str]:
 
 
 
-@app.post("/upload_pdf") 
+@app.post("/upload_pdf")
 async def upload_pdf(
     email_id: str = Form(...), 
     filename: str = Form(...), 
-    pdf: UploadFile = File(...),  
-) -> PDFUploadResponseModel: 
-
-    # Fetch rate-limit metadata
-    blob, rate_limit_data = get_rate_limit_metadata(email_id)
-    current_time = time.time()
-
-    # Check if the rate-limit window has reset
-    if current_time > rate_limit_data["reset_time"]:
-        rate_limit_data = {"count": 0, "reset_time": current_time + WINDOW_SECONDS}
-
-    # Check if rate limit is exceeded
-    if rate_limit_data["count"] >= RATE_LIMIT:
-        retry_after = int(rate_limit_data["reset_time"] - current_time)
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded. Retry after {retry_after} seconds."
-        )
-
-    # Increment request count and update metadata
-    rate_limit_data["count"] += 1
-    update_rate_limit_metadata(blob, rate_limit_data)
-
+    pdf: UploadFile = File(...),
+) -> PDFUploadResponseModel:
+    """
+    Upload PDF and check if it is valid.
+    If the PDF is invalid or corrupted, raise an error.
+    """
     # Lead-time conversion
     start_time: int = time.time()
     content = await pdf.read()
 
-    try:
-        # check if PDF is empty
-        if len(content)==0:
-            raise EmptyPDFException()
-    
+    try: 
+        pdf_reader = PyPDF2.PdfReader(BytesIO(content))
+        if pdf_reader.pages == 0:
+            raise InvalidPDFExeption("The PDF has no pages.")
+
         upload_pdf_blob = bucket.blob(os.path.join(
             email_id, 
             "uploaded_document", 
@@ -208,136 +194,119 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp: 
             fp.write(content)
 
-    # Checking for empty pdf 
-    except EmptyPDFException as emptyPDF:
+        if len(content) == 0:
+            raise EmptyPDFException()
 
-        error_line: int = emptyPDF.__traceback__.tb_lineno 
+        upload_pdf_blob = bucket.blob(os.path.join(
+            email_id,
+            "uploaded_document",
+            filename,
+        ))
+
+        with upload_pdf_blob.open("wb", retry=retry) as fp:
+            fp.write(content)
+
+    except PyPDF2.errors.PdfReadError as pdfReadError:  
+        error_line: int = pdfReadError.__traceback__.tb_lineno
+        error_name: str = type(pdfReadError).__name__
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Invalid PDF: Unable to read or parse the PDF file."
+        )
+
+    # Handling empty PDF
+    except EmptyPDFException as emptyPDF:
+        error_line: int = emptyPDF.__traceback__.tb_lineno
         error_name: str = type(emptyPDF).__name__
         raise HTTPException(
             status_code=404, 
-            detail = f"EmptyPDFException: {error_line}"
+            detail=f"EmptyPDFException: {error_line}"
         )
-     
-    # checking for Connection error 
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ConnectionError):
-            error_line: int = e.__traceback__.tb_lineno 
-            error_name: str = type(e).__name__
-            raise HTTPException(
-                status_code=404, 
-                detail = f"NetworkError: {error_line}"
-            )
-       
-
-    # Unexpected Exceptions
-    except Exception as err: 
-        error_line: int = err.__traceback__.tb_lineno 
+     # Handling Invalid PDF
+    except InvalidPDFExeption as invalidPdf: 
+        error_line: int = invalidPdf.__traceback__.tb_lineno
+        error_name: str = type(invalidPdf).__name__
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Invalid PDF: Unable to read or parse the PDF file."
+        )
+    # Unexpected exceptions
+    except Exception as err:
+        error_line: int = err.__traceback__.tb_lineno
         error_name: str = type(err).__name__
         raise HTTPException(
             status_code=404, 
-            detail = f"Error {error_name} at line {error_line}"
-        )    
+            detail=f"Error {error_name} at line {error_line}"
+        )
     
     return PDFUploadResponseModel(
-        email_id = email_id, 
+        email_id=email_id, 
         filename=filename, 
-        time=time.time() - start_time, 
+        time=time.time() - start_time,
     )
 
 
 # No LLM is used in this step. SO we are not charging tokens. 
 # we are however computing the amount of time this endpoint takes to run 
 @app.post("/convert_pdf")
-async def convert_pdf(pdf_file: 
-    ConvertPDFModel) -> ConvertPDFOutputModel : 
+async def convert_pdf(pdf_file: ConvertPDFModel) -> ConvertPDFOutputModel:
     """
     Input: {
-        filename: name of the book 
-        email_id: email id of the user used as a unique identified 
-        uri: uri of the located file within uploaded_document
+        filename: name of the book
+        email_id: email id of the user used as a unique identifier
+        uri: URI of the located file within uploaded_document
     }
-
-    Function: 
-    Disintegrates the pdf into a set of images to be stored within processed_image directory  
+    Function:
+    Disintegrates the pdf into a set of images to be stored within processed_image directory
     """
-    # accessing the file blob from the URI 
     start_time = time.time()
-    # try: 
+    converted_pages = []
+    missing_pages = []
+    # Accessing the file blob from the URI
     pdf_blob = bucket.blob(pdf_file.uri)
-        
-    with pdf_blob.open("rb") as f:   
-        drm_status: bool = check_pdf_for_drm(f)
-        if drm_status: 
-            raise UnsupportedPDFException()
-        
-        images: List[PIL.Image] = p2i.convert_from_bytes(
-            f.read(), 
-            dpi=200, 
-            fmt="jpg", 
-        )
-    
-    # check if PDF is uploaded in correct GCP bucket
-    file_name = pdf_file.filename
-    file_blob = bucket.blob(file_name)
-    if not file_blob.exists():
-        raise IncorrectGCPBucketException()
-    
-    # except UnsupportedPDFException as unsupportedPDF: 
-    #     error_line: int = unsupportedPDF.__traceback__.tb_lineno 
-    #     error_name: str = type(unsupportedPDF).__name__
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"UnsupportedPDFException: lol"
-    #     )
-
-
-    # except IncorrectGCPBucketException as incorrectBucket: 
-    #     error_line: int = incorrectBucket.__traceback__.tb_lineno 
-    #     error_name: str = type(incorrectBucket).__name__
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error {error_name} at line {error_line}"
-    #     )
-    
-    # except Exception as err: 
-    #     error_line: int = err.__traceback__.tb_lineno 
-    #     error_name: str = type(err).__name__
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error {error_name} at line {error_line}"
-    #     )
-
-    
-
-    # encoding the images and saving the encoded json to a directory  
-    encoded_images: List[Dict[str, str]] = []
-    for img in images: 
-        encoded_image: str = encode_image(img) 
-        image: Dict[str, str] = {
-            "img_name": pdf_file.filename, 
-            "img_b64": encoded_image, 
-        }
-
-        # formatting it as json 
-        encoded_images.append(image)
-
-    json_path: str = f"{pdf_file.email_id}/processed_image/{pdf_file.filename.split('.pdf')[0]}.json"
-    json_blob = bucket.blob(json_path)
-    json_blob.chunk_size = 10 * 1024 * 1024 
-    
-    with json_blob.open("w", retry=retry) as f: 
-        f.write(
-            json.dumps(encoded_images, ensure_ascii=True)
-        )
-    
-    duration = time.time() - start_time
-
+    try:
+        with pdf_blob.open("rb") as f:
+            # Check if PDF has DRM
+            drm_status: bool = check_pdf_for_drm(f)
+            if drm_status:
+                raise UnsupportedPDFException()
+            # Convert PDF to images
+            images: List[PIL.Image] = p2i.convert_from_bytes(
+                f.read(),
+                dpi=200,
+                fmt="jpg",
+            )
+            # Check for missing images (pages)
+            total_pages = len(images)
+            if total_pages == 0:
+                raise HTTPException(status_code=404, detail="No pages converted to images.")
+            # Simulate checking each page for conversion
+            for page_number, image in enumerate(images, start=1):
+                if image is not None:
+                    converted_pages.append(page_number)
+                else:
+                    missing_pages.append(page_number)
+            if missing_pages:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Missing images for pages: {missing_pages}"
+                )
+            # Save images to processed_image directory
+            for page_number, image in zip(converted_pages, images):
+                image_filename = f"{pdf_file.filename}_page_{page_number}.jpg"
+                image_path = f"processed_image/{pdf_file.email_id}/{image_filename}"
+                # Save the image blob
+                image_blob = bucket.blob(image_path)
+                with image_blob.open("wb") as image_file:
+                    image.save(image_file, format="JPEG")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error converting PDF: {str(e)}")
+    # Return the result, including successfully converted pages
     return ConvertPDFOutputModel(
-        filename=pdf_file.filename, 
-        email_id=pdf_file.email_id, 
-        uri=json_path, 
-        time=duration,  
-    ) 
+        filename=pdf_file.filename,
+        converted_pages=converted_pages,
+        time_taken=time.time() - start_time
+    )
 
 @app.post("/extract_contents_page")
 async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
