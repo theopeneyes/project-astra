@@ -85,5 +85,10 @@ class ErrorHandlingFailureException(Exception):
 class NotificationAndLogsException(Exception):
     def __init__(self):
         super().__init__("Notification or logging failed. Please check the system's logging and notification mechanisms.")
-        
-        
+
+
+##### Exceptions for detect_lang
+
+class FalsePositivesException(Exception):
+    def __init__(self):
+        super().__init__("The detected language should NOT match the expected language.")
