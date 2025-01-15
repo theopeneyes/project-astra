@@ -86,4 +86,6 @@ class NotificationAndLogsException(Exception):
     def __init__(self):
         super().__init__("Notification or logging failed. Please check the system's logging and notification mechanisms.")
         
-        
+class HandlingMixedLangException(Exception):
+    def __init__(self):
+        super().__init__("The PDF contains multiple languages. Please upload a PDF with a single language.")

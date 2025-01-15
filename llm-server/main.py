@@ -100,6 +100,7 @@ from exceptions import EmptyPDFException
 from exceptions import IncorrectGCPBucketException
 from exceptions import UnsupportedPDFException
 from exceptions import InvalidPDFExeption
+from exceptions import HandlingMixedLangException
 
 from summarizer.exceptions import SummaryNotFoundException
 
@@ -652,8 +653,14 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
         chapter_name = request.chapter_name 
     )
         
-@app.post("/detect_lang") 
-async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel: 
+import logging
+from exceptions import HandlingMixedLangException
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+
+@app.post("/detect_lang")
+async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
     """
     Input: {
         filename: Name of the file to detect the language of 
@@ -667,13 +674,16 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
     start_time = time.time()  
 
     try: 
-        image_blob = bucket.blob(f"{request.email_id}/processed_image/{request.filename.split('.pdf')[0]}.json")
+        file_path = f"{request.email_id}/processed_image/{request.filename.split('.pdf')[0]}.json"
+        logging.info(f"Looking for file at path: {file_path}")
+        image_blob = bucket.blob(file_path)
         with image_blob.open("r") as f: 
             images: List[Dict] = json.load(fp=f)
 
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
+        logging.error(f"Error: {error_name} at line {error_line}")
         raise HTTPException(
             status_code=404, 
             detail = f"Error :{error_name} at line {error_line}"
@@ -694,20 +704,32 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
             gpt4o_encoder, 
         )
 
-        languages.append(language) 
-        confidii.append(confidence)
+        logging.info(f"Detected language: {language} with confidence: {confidence}")
+
+        # Handling mixed languages
+        if isinstance(language, list):
+            languages.extend(language)
+            confidii.extend(confidence)
+        else:
+            languages.append(language)
+            confidii.append(confidence)
     
+    if not languages:
+        raise HandlingMixedLangException("No languages detected in the provided images.")
+
     duration = time.time() - start_time
     
+    detected_language = max(languages, key=languages.count).lower()
+    logging.info(f"Final detected language: {detected_language}")
+
     return DetectedLanguageResponseModel(
         filename=request.filename, 
         email_id=request.email_id, 
-        detected_language=max(languages, key=languages.count).lower(),
+        detected_language=detected_language,
         time=duration, 
         token_count=token_count, 
         confidence=float(sum(confidii) / len(confidii)) 
-    ) 
-
+    )
 @app.post("/summarize")
 async def summarize(request: 
     SummarizationRequestModel) -> SummarizationResponseModel: 
