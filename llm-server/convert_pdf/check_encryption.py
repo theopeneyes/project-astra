@@ -1,4 +1,4 @@
-import PyPDF2
+import pypdf
 
 def check_pdf_for_drm(file_obj) -> bool:
     """
@@ -6,7 +6,7 @@ def check_pdf_for_drm(file_obj) -> bool:
     Returns True if DRM protection (encryption) is found, otherwise False.
     """
     try:
-        reader = PyPDF2.PdfFileReader(file_obj)
+        reader = pypdf.PdfFileReader(file_obj)
         if reader.isEncrypted:
             try:
                 reader.decrypt("")

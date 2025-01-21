@@ -92,3 +92,8 @@ class NotificationAndLogsException(Exception):
 class FalsePositivesException(Exception):
     def __init__(self):
         super().__init__("The detected language should NOT match the expected language.")
+
+    
+class AmbiguousClassificationError(Exception):
+    def __init__(self):
+        super().__init__("Content classification is ambiguous. Multiple possible classifications detected.")

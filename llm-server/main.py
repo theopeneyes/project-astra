@@ -53,9 +53,10 @@ import io
 import json
 import time 
 import tiktoken 
+import aiofiles
 import urllib.error
 
-import PyPDF2
+import pypdf
 import pdf2image as p2i 
 import pandas as pd
 from openai import OpenAI
@@ -95,11 +96,13 @@ from segregator.modifier import get_relevant_count
 from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
+from google.cloud.exceptions import GoogleCloudError
 
 from exceptions import EmptyPDFException
 from exceptions import IncorrectGCPBucketException
 from exceptions import UnsupportedPDFException
 from exceptions import InvalidPDFExeption
+from exceptions import AmbiguousClassificationError
 
 from summarizer.exceptions import SummaryNotFoundException
 
@@ -110,7 +113,7 @@ from chapter_loader.loader import load_chapters
 from rate_limiter.limit_utility import get_rate_limit_metadata, update_rate_limit_metadata
 
 from json import JSONDecodeError
-
+SUPPORTED_LANGUAGES: set[str] = {"en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "ja", "zh", "ko"}
 load_dotenv(override=True)
 
 question_type_map: Dict[str, str] = {
@@ -181,7 +184,7 @@ async def upload_pdf(
     content = await pdf.read()
 
     try: 
-        pdf_reader = PyPDF2.PdfReader(BytesIO(content))
+        pdf_reader = pypdf.PdfReader(BytesIO(content))
         if pdf_reader.pages == 0:
             raise InvalidPDFExeption("The PDF has no pages.")
 
@@ -206,7 +209,7 @@ async def upload_pdf(
         with upload_pdf_blob.open("wb", retry=retry) as fp:
             fp.write(content)
 
-    except PyPDF2.errors.PdfReadError as pdfReadError:  
+    except pypdf.errors.PdfReadError as pdfReadError:  
         error_line: int = pdfReadError.__traceback__.tb_lineno
         error_name: str = type(pdfReadError).__name__
         raise HTTPException(
@@ -584,65 +587,65 @@ async def get_book_chapters(email_id: str, filename: str) -> JSONResponse:
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
     start_time = time.time()
-    # try: 
-    chapter_to_heading_map_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapter_to_heading.json"
-    ))
+    try: 
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapter_to_heading.json"
+        ))
 
-    chapters_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapters.csv"
-    ))
+        chapters_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapters.csv"
+        ))
 
-    chapter_image_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_processed_images", 
-        request.filename.split(".")[0], 
-        request.chapter_name, 
-    ))
+        chapter_image_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_processed_images", 
+            request.filename.split(".")[0], 
+            request.chapter_name, 
+        ))
 
-    with chapter_to_heading_map_blob.open("r") as f:
-        chapter_json: dict = json.load(f)
+        with chapter_to_heading_map_blob.open("r") as f:
+            chapter_json: dict = json.load(f)
+        
+        with chapters_blob.open("r") as f:
+            df: pd.DataFrame = pd.read_csv(f)
+        
+        with chapter_image_blob.open("r") as f: 
+            chapter_images: list[dict]  = json.load(f) 
+        
+        responses, token_count = load_chapters(
+            request.chapter_name, 
+            chapter_json, 
+            df, chapter_images, 
+            request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
+
+        structured_chapter: list[dict] = structure_html(responses)
+
+        chapter_processed_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".")[0], 
+            "inherent_metadata.json" 
+        ))
+
+        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
+            json.dump(structured_chapter, fp)
     
-    with chapters_blob.open("r") as f:
-        df: pd.DataFrame = pd.read_csv(f)
-    
-    with chapter_image_blob.open("r") as f: 
-        chapter_images: list[dict]  = json.load(f) 
-    
-    responses, token_count = load_chapters(
-        request.chapter_name, 
-        chapter_json, 
-        df, chapter_images, 
-        request.language_code, 
-        gpt4o, gpt4o_encoder
-    )
-
-    structured_chapter: list[dict] = structure_html(responses)
-
-    chapter_processed_json_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapterwise_processed_json", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".")[0], 
-        "inherent_metadata.json" 
-    ))
-
-    with chapter_processed_json_blob.open("w", retry=retry) as fp: 
-        json.dump(structured_chapter, fp)
-    
-    # except Exception as err:
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     return ChapterLoaderResponseModel(
         email_id = request.email_id, 
@@ -651,7 +654,8 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
         token_count = token_count,  
         chapter_name = request.chapter_name 
     )
-        
+
+    
 @app.post("/detect_lang") 
 async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel: 
     """
@@ -712,6 +716,13 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
 async def summarize(request: 
     SummarizationRequestModel) -> SummarizationResponseModel: 
     start_time = time.time()
+    MAX_TEXT_LENTGH = 50000
+    
+    if request.language_code not in SUPPORTED_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid language code: {request.language_code}. Supported languages are: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+        )
     try: 
         chapter_json_blob = bucket.blob(os.path.join(
             request.email_id, 
@@ -725,6 +736,13 @@ async def summarize(request:
             chapter_content = json.load(fp)
         
         summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip() 
+        
+        if(len(summary_content) > MAX_TEXT_LENTGH):
+            raise HTTPException(
+                status_code=413,
+                detail=f"Text length ({len(summary_content)} characters) exceeds maximum limit of {MAX_TEXT_LENTGH} characters"
+            )
+        
         if summary_content:  
             status, summary, token_count = summarize_texts(
                 summary_content, 
@@ -764,14 +782,16 @@ async def summarize(request:
             detail = f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
         )
 
+    except HTTPException as http_err:
+        raise http_err
+
     except Exception as err: 
         error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
+        error_line: int = err.__traceback__.tb_lineno
         raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            status_code=500,  # Use 500 for unexpected internal server errors
+            detail=f"Error: {error_name} at line {error_line}"
         )
-
     duration = time.time() - start_time 
     return SummarizationResponseModel(
         filename=request.filename, 
@@ -812,6 +832,14 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
 
         with classified_summary_blob.open("w", retry=retry) as f: 
             json.dump(content, fp=f)
+
+    except AmbiguousClassificationError as ambiguousError:
+        error_name: str = type(ambiguousError).__name__
+        error_line: int  = ambiguousError.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=400, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
     except JSONDecodeError as decodingError: 
         error_name: str = type(decodingError).__name__
