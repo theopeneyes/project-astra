@@ -39,7 +39,6 @@ def parse_index(images: list, number_of_pages: int, language_code: str, translat
             )
 
         messages[0]["content"][0]["text"] = f"Your output MUST be within the language thats associated with the following language code: {language_code}" 
-
         messages[1]["content"][0]["text"] = prompt 
         messages[1]["content"][1]["image_url"]["url"] = (
             f"data:image/jpeg;base64,{image['img_b64']}")
@@ -62,10 +61,12 @@ def parse_index(images: list, number_of_pages: int, language_code: str, translat
                 page_content, parsed_token_count = extract_index(image, language_code, gpt4o, gpt4o_encoder)
                 token_count += parsed_token_count
                 index_contents.extend(page_content)
+
             elif contents_detected and not status:
                 contents_detected = False
                 last_page = idx 
                 break
+
             elif contents_detected: 
                 page_content, parsed_token_count = extract_index(image, language_code, gpt4o, gpt4o_encoder)
                 token_count += parsed_token_count

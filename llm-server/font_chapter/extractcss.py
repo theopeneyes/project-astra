@@ -4,7 +4,6 @@ from .cssparser import parse_css
 from .exceptions import CSSParsingException
 from .prompts import breakdown_to_html, style_extraction_prompt
 from .skeleton import messages
-from .encoder import encode_image
 
 def css_extractor(images: list[dict[str, str]], gpt4o, gpt4o_encoder): 
     css_rules: list[dict[str, str]] = []
@@ -14,7 +13,7 @@ def css_extractor(images: list[dict[str, str]], gpt4o, gpt4o_encoder):
     for idx, image in enumerate(images):
         messages[1]["content"][0]["text"] = breakdown_to_html
         messages[1]["content"][1]["image_url"]["url"] = (
-            f"data:image/jpeg;base64,{encode_image(image)}")
+            f"data:image/jpeg;base64,{image['img_b64']}")
 
         completions = gpt4o.chat.completions.create(
             messages = messages,
@@ -31,7 +30,7 @@ def css_extractor(images: list[dict[str, str]], gpt4o, gpt4o_encoder):
         prompt: str = style_extraction_prompt.format(html_content)
         messages[1]["content"][0]["text"] = prompt
         messages[1]["content"][1]["image_url"]["url"] = (
-            f"data:image/jpeg;base64,{encode_image(image)}")
+            f"data:image/jpeg;base64,{image['img_b64']}")
 
         completions = gpt4o.chat.completions.create(
             messages = messages,

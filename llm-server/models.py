@@ -81,10 +81,9 @@ class RewriteJSONResponseModel(AbsoluteBaseModel, ResponseModel):
     node_id: int 
 
 class ConvertPDFModel(AbsoluteBaseModel): 
-    uri: str 
+    pass 
 
 class ConvertPDFOutputModel(AbsoluteBaseModel): 
-    uri: str 
     time: float # in seconds 
 
 class PushToJsonResponseModel(AbsoluteBaseModel): 

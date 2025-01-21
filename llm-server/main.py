@@ -70,6 +70,10 @@ from generation.prompts import (
 ) 
 
 from summarizer.summarize import summarize_texts
+from summarizer.summary_modifiers import domain_extraction
+from summarizer.summary_modifiers import problem_extractor
+from summarizer.summary_modifiers import enlarge_summary
+from summarizer.summary_modifiers import qualitate_summary
 
 from json_editor.editor import edit_metadata
 
@@ -158,67 +162,74 @@ retry = retry.with_delay(initial=1.5, multiplier=1.2, maximum=45.0)
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
 
-@app.post("/upload_pdf") 
-async def upload_pdf(
+@app.post("/upload_pdfs") 
+async def upload_pdfs(
     email_id: str = Form(...), 
-    filename: str = Form(...), 
-    pdf: UploadFile = File(...),  
-) -> PDFUploadResponseModel: 
+    filenames: List[str] = Form(...), 
+    pdfs: List[UploadFile] = File(...),  
+) -> List[PDFUploadResponseModel]: 
 
-    # leadtime conversion 
     start_time: int = time.time()
-    content = await pdf.read() 
+    responses = []
 
-    try:
-        # check if PDF is empty
-        if len(content)==0:
-            raise EmptyPDFException()
-        
-
-        upload_pdf_blob = bucket.blob(os.path.join(
-            email_id, 
-            "uploaded_document", 
-            filename, 
-        ))
-
-        with upload_pdf_blob.open("wb", retry=retry) as fp: 
-            fp.write(content)
-
-    # Checking for empty pdf 
-    except EmptyPDFException as emptyPDF:
-
-        error_line: int = emptyPDF.__traceback__.tb_lineno 
-        error_name: str = type(emptyPDF).__name__
+    if len(pdfs) != len(filenames):
         raise HTTPException(
-            status_code=404, 
-            detail = f"EmptyPDFException: {error_line}"
+            status_code=400,
+            detail="The number of filenames and PDFs must match."
         )
-    
-    # checking for Connection error 
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ConnectionError):
-            error_line: int = e.__traceback__.tb_lineno 
-            error_name: str = type(e).__name__
+
+    for filename, pdf in zip(filenames, pdfs):
+        try:
+            content = await pdf.read()
+
+            if len(content) == 0:
+                raise EmptyPDFException()
+            
+            upload_pdf_blob = bucket.blob(os.path.join(
+                email_id, 
+                "uploaded_document", 
+                filename, 
+            ))
+
+            with upload_pdf_blob.open("wb", retry=retry) as fp: 
+                fp.write(content)
+
+        # Checking for empty PDF 
+        except EmptyPDFException as emptyPDF:
+            error_line: int = emptyPDF.__traceback__.tb_lineno 
+            error_name: str = type(emptyPDF).__name__
             raise HTTPException(
                 status_code=404, 
-                detail = f"NetworkError: {error_line}"
+                detail=f"EmptyPDFException: {error_line} for file {filename}"
             )
 
-    # Unexpected Exceptions
-    except Exception as err: 
-        error_line: int = err.__traceback__.tb_lineno 
-        error_name: str = type(err).__name__
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error {error_name} at line {error_line}"
-        )    
-    
-    return PDFUploadResponseModel(
-        email_id = email_id, 
-        filename=filename, 
-        time=time.time() - start_time, 
-    )
+        # Checking for connection error 
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ConnectionError):
+                error_line: int = e.__traceback__.tb_lineno 
+                error_name: str = type(e).__name__
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"NetworkError: {error_line} for file {filename}"
+                )
 
+        # Unexpected Exceptions
+        except Exception as err: 
+            error_line: int = err.__traceback__.tb_lineno 
+            error_name: str = type(err).__name__
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Error {error_name} at line {error_line} for file {filename}"
+            )    
+
+        # Add successful upload to the response
+        responses.append(PDFUploadResponseModel(
+            email_id=email_id,
+            filename=filename,
+            time=time.time() - start_time,
+        ))
+
+    return responses
 
 # No LLM is used in this step. SO we are not charging tokens. 
 # we are however computing the amount of time this endpoint takes to run 
@@ -229,7 +240,6 @@ async def convert_pdf(pdf_file:
     Input: {
         filename: name of the book 
         email_id: email id of the user used as a unique identified 
-        uri: uri of the located file within uploaded_document
     }
 
     Function: 
@@ -238,7 +248,11 @@ async def convert_pdf(pdf_file:
     # accessing the file blob from the URI 
     start_time = time.time()
     try: 
-        pdf_blob = bucket.blob(pdf_file.uri)
+        pdf_blob = bucket.blob(os.path.join(
+            pdf_file.email_id, 
+            "uploaded_document", 
+            pdf_file.filename, 
+        ))
         
         with pdf_blob.open("rb") as f:   
             images: List[PIL.Image] = p2i.convert_from_bytes(
@@ -250,10 +264,8 @@ async def convert_pdf(pdf_file:
         # check if PDF is uploaded in correct GCP bucket
         file_name = pdf_file.filename
         file_blob = bucket.blob(file_name)
-        if file_blob==False:
+        if not file_blob:
             raise IncorrectGCPBucketException()
-
-
         
     except Exception as err: 
         error_line: int = err.__traceback__.tb_lineno 
@@ -296,6 +308,7 @@ async def convert_pdf(pdf_file:
 
 @app.post("/extract_font_indices")
 async def extract_font_indices(request: FontForChapterDetectionRequestModel) -> FontForChapterDetectionResponseModel: 
+    start_time: float = time.time()
     # reading the json file 
     image_json_blob = bucket.blob(os.path.join(
         request.email_id, 
@@ -317,6 +330,20 @@ async def extract_font_indices(request: FontForChapterDetectionRequestModel) -> 
         "fontdb.csv"
     ))
 
+    top_five_styles_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "fontwarehouse", 
+        request.filename.split(".")[0], 
+        "top_five_styles.json"
+    ))
+
+    fontwise_narrowed_image_indices = bucket.blob(os.path.join(
+        request.email_id, 
+        "fontwarehouse", 
+        request.filename.split(".")[0], 
+        "chapter_image_fontwise_indices.json"
+    ))
+
     with image_json_blob.open("rb") as fp: 
         images = json.load(fp=fp)
     
@@ -327,7 +354,36 @@ async def extract_font_indices(request: FontForChapterDetectionRequestModel) -> 
 
     with fontdb_page_combinations.open("w") as fp: 
         pd.DataFrame(font_db).to_csv(fp)
+
+    df = pd.DataFrame(font_db)
+    top_five_fonts = (df["style"]
+                    .value_counts()
+                    .reset_index()
+                    .iloc[:5, :]
+                    .values
+                    .tolist())
     
+    with top_five_styles_blob.open("w") as fp: 
+        json.dump(top_five_fonts,fp=fp)
+    
+    indices : list = []
+    for _, font_count in enumerate(top_five_fonts):
+        style, _ = font_count
+        style_indices = list(filter(lambda ds: ds[1] == style, df.values.tolist()))
+        style_index = [indx for indx, _ in style_indices]
+        indices.extend(style_index)
+    
+    with fontwise_narrowed_image_indices.open("w") as fp: 
+        json.dump({
+           "chapter_indices": indices 
+        }, fp = fp)
+    
+    return FontForChapterDetectionResponseModel(
+        time = time.time() - start_time, 
+        filename = request.filename, 
+        token_count = token_count, 
+        email_id=request.email_id, 
+    )
 
 @app.post("/extract_contents_page")
 async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
@@ -411,20 +467,51 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             identification_request.filename.split(".pdf")[0] + ".json", 
         ))
 
+        training_data_blob = bucket.blob(os.path.join(
+            "TRAINING_DATA", 
+            "train.json"    
+        ))
+
         with csv_blob.open("r") as fp: 
             index_content_csv: pd.DataFrame = pd.read_csv(fp).values.tolist()
         
         with image_blob.open("r") as fp: 
             images: list[str] = json.load(fp=fp)
+
+        with training_data_blob.open("r") as fp: 
+            training_data: list = json.load(fp=fp)
         
-        
-        content_csv, content_dict, chapter_to_heading_map, token_count = segment_breakdown(
+        (content_csv, 
+            labelled_chapters,
+            unlabelled_chapters, 
+            labelled_headings, 
+            content_dict, 
+            chapter_to_heading_map, 
+            token_count) = segment_breakdown(
             images, index_content_csv, 
             identification_request.last_page, 
             identification_request.first_page, 
             identification_request.language_code, 
             gpt4o, gpt4o_encoder
         )
+
+        chapter_count: int = len(labelled_chapters)
+        non_chapter_count: int = 0.9 * chapter_count 
+
+
+        if labelled_headings and len(labelled_headings) > int(non_chapter_count / 2) : 
+            heading_chapters = random.sample(labelled_headings, k = int(non_chapter_count / 2)) 
+        else: 
+            heading_chapters = []
+
+        if unlabelled_chapters and len(unlabelled_chapters) > int(non_chapter_count / 2) : 
+            if not heading_chapters: 
+                non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count) ) 
+            else: 
+                non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count / 2) ) 
+
+        else: 
+            non_chapters = []
 
         df: pd.DataFrame = pd.DataFrame(
             content_csv, 
@@ -436,8 +523,8 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
             ]
         )
 
-        chapters: pd.DataFrame = df.loc[df.headingType == "h1"]
-        headings: pd.DataFrame = df.loc[df.headingType == "h2"] 
+        chapters: pd.DataFrame = df.loc[df.heading_type == "h1"]
+        headings: pd.DataFrame = df.loc[df.heading_type == "h2"] 
 
         chapter_pages_csv_blob = bucket.blob(os.path.join(
             identification_request.email_id, 
@@ -488,6 +575,12 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
 
         with chapter_to_heading_map_blob.open("w", retry=retry) as fp: 
             json.dump(chapter_to_heading_map, fp=fp)
+
+        with training_data_blob.open("w", retry=retry) as fp: 
+            training_data.extend(labelled_chapters)
+            training_data.extend(non_chapters)
+            training_data.extend(heading_chapters)
+            json.dump(training_data, fp=fp)
 
     except LLMTooDUMBException as tooDumb: 
         error_name: str = type(tooDumb).__name__
@@ -649,7 +742,7 @@ async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderRes
             request.email_id, 
             "chapterwise_processed_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             "inherent_metadata.json" 
         ))
 
@@ -729,141 +822,189 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
     ) 
 
 @app.post("/summarize")
-async def summarize(request: 
-    SummarizationRequestModel) -> SummarizationResponseModel: 
+async def summarize(request: SummarizationRequestModel) -> SummarizationResponseModel:
     start_time = time.time()
-    try: 
-        chapter_json_blob = bucket.blob(os.path.join(
+    # try:
+    chapter_json_blob = bucket.blob(os.path.join(
+        request.email_id,
+        "chapterwise_processed_json",
+        request.filename.split(".")[0],
+        request.chapter_name.split(".json")[0],
+        "inherent_metadata.json"
+    ))
+
+    with chapter_json_blob.open("r") as fp:
+        chapter_content = json.load(fp)
+
+    summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip()
+
+    if summary_content:
+        status, summary, token_count = summarize_texts(
+            summary_content,
+            request.language_code,
+            gpt4o_encoder, gpt4o
+        )
+
+        summary_blob = bucket.blob(os.path.join(
             request.email_id, 
-            "chapterwise_processed_json", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            "inherent_metadata.json" 
+            "chapter_summary_metadata",
+            request.filename.split(".")[0],
+            request.chapter_name.split(".json")[0],
+            "summary_content.txt"
         ))
 
-        with chapter_json_blob.open("r") as fp: 
-            chapter_content = json.load(fp)
-        
-        summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip() 
-        if summary_content:  
-            status, summary, token_count = summarize_texts(
-                summary_content, 
-                request.language_code, 
-                gpt4o_encoder, gpt4o
+        if status:
+            with summary_blob.open("w", retry=retry) as f:
+                f.write(summary)
+
+            enlarged_summary, token_count = enlarge_summary(
+                summary_content,
+                request.chapter_name,
+                summary,
+                gpt4o,
+                gpt4o_encoder
             )
 
-            summary_blob = bucket.blob(os.path.join(
-                request.email_id, 
-                "chapter_summary_metadata", 
-                request.filename.split(".")[0], 
-                request.chapter_name.split(".")[0], 
-                "summary_content.txt"
+            accurate_summary, token_count = qualitate_summary(
+                summary_content,
+                enlarged_summary,
+                gpt4o,
+                gpt4o_encoder
+            )
+
+            actual_json, token_count = domain_extraction(
+                accurate_summary,
+                gpt4o,
+                gpt4o_encoder
+            )
+
+            issues, principle_types, problems, token_count = problem_extractor(
+                summary_content, 
+                summary, 
+                accurate_summary,
+                gpt4o,
+                gpt4o_encoder
+            )
+
+            data: list = []
+            for issue, principle_type, problem in zip(issues, principle_types, problems):
+                data.append({
+                    "generated_output": summary,
+                    "desired_generation": accurate_summary,
+                    "issue_type": issue,
+                    "principle_type": principle_type,
+                    "differences": problem,
+                    **actual_json
+                })
+
+            result_blob = bucket.blob(os.path.join(
+                "chapterwise_analytical_metadata",
+                "analysis_data.json"
             ))
 
-            if status: 
-                with summary_blob.open("w", retry=retry) as f: 
-                    f.write(summary)
+            if result_blob.exists(): 
+                with result_blob.open("r", retry=retry) as f:
+                    existing_data = json.load(f)
+                    existing_data.extend(data)
             else: 
-                print("Empty summary here. Bad summarization output from llm")
-                print(summary)
-        else: 
-            token_count: int = 0 
-            raise HTTPException(
-                status_code=404,  
-                details = f"""
-                No text content extracted for chapter: {request.chapter_name}
-                Empty text in chapter identified! content: {summary_content}
-                """
-            )
-        
-    except SummaryNotFoundException as summNotFound: 
-        error_name: str = type(summNotFound).__name__
-        error_line: int  = summNotFound.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
-        )
+                existing_data = data
 
-    except Exception as err: 
-        error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+            with result_blob.open("w", retry=retry) as f:
+                json.dump(existing_data, f, indent=2)
+        else:
+            print("Empty summary here. Bad summarization output from llm")
+            print(summary)
+    else:
+        token_count: int = 0
+    # except SummaryNotFoundException as summNotFound:
+    #     error_name: str = type(summNotFound).__name__
+    #     error_line: int = summNotFound.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
+    #     )
 
-    duration = time.time() - start_time 
+    # except Exception as err:
+    #     error_name: str = type(err).__name__
+    #     error_line: int = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404,
+    #         detail=f"Error :{error_name} at line {error_line}"
+    #     )
+
+    duration = time.time() - start_time
     return SummarizationResponseModel(
-        filename=request.filename, 
-        email_id=request.email_id, 
-        time=duration, 
-        token_count=token_count, 
+        filename=request.filename,
+        email_id=request.email_id,
+        time=duration,
+        token_count=token_count,
         status=True
     )
+
 
 @app.post("/summary_classifier")
 async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapterResponseModel: 
     start_time = time.time()
-    try: 
-        summary_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_summary_metadata", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            "summary_content.txt"
-        ))
+    # try: 
+    summary_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_summary_metadata", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".json")[0], 
+        "summary_content.txt"
+    ))
 
-        with summary_blob.open("r") as fp: 
-            summary_content: str = fp.read()
+    with summary_blob.open("r") as fp: 
+        summary_content: str = fp.read()
 
-        content, token_count = generate_chapter_metadata(
-            summary_content, 
-            request.language_code, 
-            gpt4o_encoder, 
-            gpt4o)
-        
-        classified_summary_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_summary_metadata", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            "classified_summary_content.json" 
-        ))
+    content, token_count = generate_chapter_metadata(
+        summary_content, 
+        request.language_code, 
+        gpt4o_encoder, 
+        gpt4o)
+    
+    classified_summary_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_summary_metadata", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".json")[0], 
+        "classified_summary_content.json" 
+    ))
 
-        with classified_summary_blob.open("w", retry=retry) as f: 
-            json.dump(content, fp=f)
+    with classified_summary_blob.open("w", retry=retry) as f: 
+        json.dump(content, fp=f)
 
-    except JSONDecodeError as decodingError: 
-        error_name: str = type(decodingError).__name__
-        error_line: int  = decodingError.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    # except JSONDecodeError as decodingError: 
+    #     error_name: str = type(decodingError).__name__
+    #     error_line: int  = decodingError.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
 
-    except AboutListNotGeneratedException as aboutNotGenerated:  
-        error_name: str = type(aboutNotGenerated).__name__
-        error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    # except AboutListNotGeneratedException as aboutNotGenerated:  
+    #     error_name: str = type(aboutNotGenerated).__name__
+    #     error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
    
-    except DepthListNotGeneratedException as depthNotGenerated: 
-        error_name: str = type(depthNotGenerated).__name__
-        error_line: int  = depthNotGenerated.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    # except DepthListNotGeneratedException as depthNotGenerated: 
+    #     error_name: str = type(depthNotGenerated).__name__
+    #     error_line: int  = depthNotGenerated.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
 
-    except Exception as err: 
-        error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    # except Exception as err: 
+    #     error_name: str = type(err).__name__
+    #     error_line: int  = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
         
     return SummaryChapterResponseModel(
         filename=request.filename, 
@@ -884,7 +1025,7 @@ async def get_node_count(email_id: str, filename: str, chapter_name: str) -> JSO
             email_id, 
             "chapterwise_processed_json", 
             filename.split(".")[0], 
-            chapter_name.split(".")[0], 
+            chapter_name.split(".json")[0], 
             "inherent_metadata.json"
         ))
 
@@ -902,7 +1043,7 @@ async def get_node_count(email_id: str, filename: str, chapter_name: str) -> JSO
         )
     
     return {
-        "chapter_name": chapter_name.split(".")[0], 
+        "chapter_name": chapter_name.split(".json")[0], 
         "node_count": node_count, 
         "email_id": email_id, 
         "filename": filename, 
@@ -916,7 +1057,7 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
             request.email_id, 
             "chapterwise_processed_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             "inherent_metadata.json"
         ))
         
@@ -940,7 +1081,7 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
             request.email_id, 
             "intermediate_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             f"modified_processed_json_NODE_ID:{request.node_id}.json"
         ))
 
@@ -1062,7 +1203,7 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
             request.email_id, 
             "intermediate_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             f"modified_processed_json_NODE_ID:{request.node_id}.json"
         ))
 
@@ -1111,7 +1252,7 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
             request.email_id, 
             "intermediate_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             f"modified_processed_json_NODE_ID:{request.node_id}.json"
         ))
 
@@ -1160,7 +1301,7 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
             request.email_id, 
             "intermediate_json", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             f"modified_processed_json_NODE_ID:{request.node_id}.json"
         ))
 

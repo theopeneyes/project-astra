@@ -64,6 +64,9 @@ class JSONParser:
         nodes = []
         edges = []
         origins = []
+
+        if len(child_titles) == 0: 
+            child_titles = 200 
         
         child_node_y_distance = 3000 / len(child_titles) 
         child_node_y_position = origin.get("y") - child_node_y_distance 

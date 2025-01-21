@@ -19,6 +19,9 @@ def segment_breakdown(
     token_count: int = 0
     chapter_to_heading_maps = defaultdict(list)
     previous_title: str | None = None
+    chapter_json: list[dict[str, str| int]] = []
+    non_chapter_json: list[dict[str, str| int]] = []
+    heading_json: list[dict[str, str| int]] = []
 
     for _, index_item in enumerate(index_content):
         # within the book, look for the chapter
@@ -61,12 +64,18 @@ def segment_breakdown(
                     ): 
                         previous_title = title 
                         chapter_to_heading_maps[previous_title] = []
+                        image["label"] = 1
+                        chapter_json.append(image)
 
                     elif heading_type == "h2": 
                         chapter_to_heading_maps[previous_title].append([title, section, index, heading_type])
-
+                        image["label"] = 0 
+                        heading_json.append(image)
                     break
+                else: 
+                    image['label'] = 0 
+                    non_chapter_json.append(image)
             else: 
                 raise LLMTooDUMBException(response=html_response)
 
-    return content_to_df, content_to_page, dict(chapter_to_heading_maps), token_count 
+    return content_to_df, chapter_json, non_chapter_json, heading_json, content_to_page, dict(chapter_to_heading_maps), token_count 
