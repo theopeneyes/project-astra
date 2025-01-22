@@ -97,3 +97,7 @@ class FalsePositivesException(Exception):
 class AmbiguousClassificationError(Exception):
     def __init__(self):
         super().__init__("Content classification is ambiguous. Multiple possible classifications detected.")
+        
+class HandlingMixedLangException(Exception):
+    def __init__(self):
+        super().__init__("The PDF contains multiple languages. Please upload a PDF with a single language.")

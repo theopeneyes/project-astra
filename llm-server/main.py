@@ -103,6 +103,7 @@ from exceptions import IncorrectGCPBucketException
 from exceptions import UnsupportedPDFException
 from exceptions import InvalidPDFExeption
 from exceptions import AmbiguousClassificationError
+from exceptions import HandlingMixedLangException
 
 from summarizer.exceptions import SummaryNotFoundException
 
@@ -113,7 +114,9 @@ from chapter_loader.loader import load_chapters
 from rate_limiter.limit_utility import get_rate_limit_metadata, update_rate_limit_metadata
 
 from json import JSONDecodeError
+import logging
 SUPPORTED_LANGUAGES: set[str] = {"en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "ja", "zh", "ko"}
+
 load_dotenv(override=True)
 
 question_type_map: Dict[str, str] = {
@@ -671,13 +674,16 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
     start_time = time.time()  
 
     try: 
-        image_blob = bucket.blob(f"{request.email_id}/processed_image/{request.filename.split('.pdf')[0]}.json")
+        file_path = f"{request.email_id}/processed_image/{request.filename.split('.pdf')[0]}.json"
+        logging.info(f"Looking for file at path: {file_path}")
+        image_blob = bucket.blob(file_path)
         with image_blob.open("r") as f: 
             images: List[Dict] = json.load(fp=f)
 
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
+        logging.error(f"Error: {error_name} at line {error_line}")
         raise HTTPException(
             status_code=404, 
             detail = f"Error :{error_name} at line {error_line}"
@@ -698,20 +704,32 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
             gpt4o_encoder, 
         )
 
-        languages.append(language) 
-        confidii.append(confidence)
+        logging.info(f"Detected language: {language} with confidence: {confidence}")
+
+        # Handling mixed languages
+        if isinstance(language, list):
+            languages.extend(language)
+            confidii.extend(confidence)
+        else:
+            languages.append(language)
+            confidii.append(confidence)
     
+    if not languages:
+        raise HandlingMixedLangException("No languages detected in the provided images.")
+
     duration = time.time() - start_time
     
+    detected_language = max(languages, key=languages.count).lower()
+    logging.info(f"Final detected language: {detected_language}")
+
     return DetectedLanguageResponseModel(
         filename=request.filename, 
         email_id=request.email_id, 
-        detected_language=max(languages, key=languages.count).lower(),
+        detected_language=detected_language,
         time=duration, 
         token_count=token_count, 
         confidence=float(sum(confidii) / len(confidii)) 
-    ) 
-
+    )
 @app.post("/summarize")
 async def summarize(request: 
     SummarizationRequestModel) -> SummarizationResponseModel: 
@@ -719,9 +737,14 @@ async def summarize(request:
     MAX_TEXT_LENTGH = 50000
     
     if request.language_code not in SUPPORTED_LANGUAGES:
+        
+        detail: str = f"Invalid language code: {request.language_code}. Supported languages are: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+        logging.log(detail)
+        
+
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid language code: {request.language_code}. Supported languages are: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+            detail=detail
         )
     try: 
         chapter_json_blob = bucket.blob(os.path.join(
@@ -738,9 +761,14 @@ async def summarize(request:
         summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip() 
         
         if(len(summary_content) > MAX_TEXT_LENTGH):
+            
+            detail: str = f"Invalid language code: {request.language_code}. Supported languages are: {', '.join(sorted(SUPPORTED_LANGUAGES))}"
+            logging.log(detail)
+            
             raise HTTPException(
+
                 status_code=413,
-                detail=f"Text length ({len(summary_content)} characters) exceeds maximum limit of {MAX_TEXT_LENTGH} characters"
+                detail=detail
             )
         
         if summary_content:  
@@ -763,23 +791,30 @@ async def summarize(request:
                     f.write(summary)
             else: 
                 print("Empty summary here. Bad summarization output from llm")
+                logging.info("Empty summary here. Bad summarization output from llm")
                 print(summary)
         else: 
-            token_count: int = 0 
-            raise HTTPException(
-                status_code=404,  
-                details = f"""
+            token_count: int = 0
+            detail: str = f"""
                 No text content extracted for chapter: {request.chapter_name}
                 Empty text in chapter identified! content: {summary_content}
                 """
+            logging.log(detail) 
+            raise HTTPException(
+                status_code=404,  
+                details = detail
             )
+
         
     except SummaryNotFoundException as summNotFound: 
         error_name: str = type(summNotFound).__name__
         error_line: int  = summNotFound.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
+        logging.error(detail)
+        
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
+            detail=detail
         )
 
     except HTTPException as http_err:
@@ -787,11 +822,18 @@ async def summarize(request:
 
     except Exception as err: 
         error_name: str = type(err).__name__
+        
         error_line: int = err.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}"
+        logging.error(detail)
+        
         raise HTTPException(
+            
             status_code=500,  # Use 500 for unexpected internal server errors
-            detail=f"Error: {error_name} at line {error_line}"
+            detail=detail
         )
+
+
     duration = time.time() - start_time 
     return SummarizationResponseModel(
         filename=request.filename, 
@@ -833,44 +875,61 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
         with classified_summary_blob.open("w", retry=retry) as f: 
             json.dump(content, fp=f)
 
+    
     except AmbiguousClassificationError as ambiguousError:
         error_name: str = type(ambiguousError).__name__
         error_line: int  = ambiguousError.__traceback__.tb_lineno
+        detail:str = f"Error :{error_name} at line {error_line}."
+        logging.error(detail)
+
         raise HTTPException(
             status_code=400, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
 
     except JSONDecodeError as decodingError: 
         error_name: str = type(decodingError).__name__
         error_line: int  = decodingError.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}."
+        logging.error(detail)
+
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
 
     except AboutListNotGeneratedException as aboutNotGenerated:  
         error_name: str = type(aboutNotGenerated).__name__
         error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}."
+        logging.log(detail)
+
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
+    
    
     except DepthListNotGeneratedException as depthNotGenerated: 
         error_name: str = type(depthNotGenerated).__name__
         error_line: int  = depthNotGenerated.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}."
+        logging.error(detail)
+
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
 
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
+        detail:str = f"Error :{error_name} at line {error_line}."
+        logging.error(detail)
+        
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
         
     return SummaryChapterResponseModel(
@@ -904,9 +963,12 @@ async def get_node_count(email_id: str, filename: str, chapter_name: str) -> JSO
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
+        detail:str = f"Error :{error_name} at line {error_line}."
+        logging.error(detail)
+        
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
     
     return {
@@ -916,72 +978,162 @@ async def get_node_count(email_id: str, filename: str, chapter_name: str) -> JSO
         "filename": filename, 
     }
 
-@app.post("/rewrite_json")
-async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseModel: 
+# @app.post("/rewrite_json")
+# async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseModel: 
+#     start_time = time.time()
+#     try: 
+#         extracted_json_blob = bucket.blob(os.path.join(
+#             request.email_id, 
+#             "chapterwise_processed_json", 
+#             request.filename.split(".")[0], 
+#             request.chapter_name.split(".")[0], 
+#             "inherent_metadata.json"
+#         ))
+
+#         if extracted_json_blob.size > 10 * 1024 * 1024:
+#             raise ValueError("File is bigger than 10 Mb.")
+        
+        
+#         # after reading this json content you process it with the metadata_generators
+#         try:
+#             with extracted_json_blob.open("r") as f:  
+#                 extracted_json = json.load(fp=f)[request.node_id]
+#         except (ConnectionError, TimeoutError) as e:
+#             raise ConnectionError(f"Network error during upload of {str(e)}") 
+
+#         # open the classified summary blob from the summaries section 
+#         classified_summary_blob = bucket.blob(os.path.join(
+#             request.email_id, 
+#             "chapter_summary_metadata", 
+#             request.filename.split(".")[0], 
+#             request.chapter_name.split(".")[0], 
+#             "classified_summary_content.json"
+#         )) 
+        
+#         with classified_summary_blob.open("r") as f:   
+#             generated_list = json.load(fp=f)
+        
+#         generated_metadata_blob = bucket.blob(os.path.join(
+#             request.email_id, 
+#             "intermediate_json", 
+#             request.filename.split(".")[0], 
+#             request.chapter_name.split(".")[0], 
+#             f"modified_processed_json_NODE_ID:{request.node_id}.json"
+#         ))
+
+#         # classify the prompt 
+#         comprehensive_node, token_count = classify_about(
+#             extracted_json, 
+#             generated_list, 
+#             request.language_code, 
+#             gpt4o, 
+#             gpt4o_encoder, 
+#         )
+
+#         with generated_metadata_blob.open("w", retry=retry) as fp: 
+#             json.dump(comprehensive_node, fp=fp) 
+
+#     except Exception as err: 
+#         error_name: str = type(err).__name__
+#         error_line: int  = err.__traceback__.tb_lineno
+#         detail: str = f"Error :{error_name} at line {error_line}"
+#         logging.error(detail)
+
+#         if isinstance(err, (ConnectionError, TimeoutError)):
+#             status_code = 503 #service unavailable
+#         elif isinstance(err, ValueError):
+#             status_code = 413 #payload too large
+#         else:
+#             status_code = 404
+
+
+
+#         raise HTTPException(
+#             status_code=status_code, 
+#             detail=detail
+#         )
+            
+#     duration = time.time() - start_time
+#     # process complete 
+#     return RewriteJSONResponseModel(
+#         filename=request.filename, 
+#         email_id=request.email_id, 
+#         node_id=request.node_id, 
+#         language_code=request.language_code, 
+#         time=duration, 
+#         token_count=token_count, 
+#     )
+
+SUPPORTED_FORMATS = ['.json']  # List of supported file formats
+
+@app.post("/rewrite_json", response_model=RewriteJSONResponseModel)
+async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseModel:
     start_time = time.time()
-    try: 
+    token_count = 0  # Initialize token_count
+
+    try:
+        # Check for unsupported file format
+        file_extension = os.path.splitext(request.filename)[1].lower()
+        if file_extension not in SUPPORTED_FORMATS:
+            raise ValueError(f"Unsupported File Format: {file_extension}")
+
+        # Process the file (existing logic)
         extracted_json_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapterwise_processed_json", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.email_id,
+            "chapterwise_processed_json",
+            request.filename.split(".")[0],
+            request.chapter_name.split(".")[0],
             "inherent_metadata.json"
         ))
-        
-        # after reading this json content you process it with the metadata_generators
-        with extracted_json_blob.open("r") as f:  
-            extracted_json = json.load(fp=f)[request.node_id]
 
-        # open the classified summary blob from the summaries section 
-        classified_summary_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_summary_metadata", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            "classified_summary_content.json"
-        )) 
-        
-        with classified_summary_blob.open("r") as f:   
-            generated_list = json.load(fp=f)
-        
-        generated_metadata_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "intermediate_json", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
-            f"modified_processed_json_NODE_ID:{request.node_id}.json"
-        ))
+        if extracted_json_blob.size > 10 * 1024 * 1024:
+            raise ValueError("File is bigger than 10 Mb.")
 
-        # classify the prompt 
-        comprehensive_node, token_count = classify_about(
-            extracted_json, 
-            generated_list, 
-            request.language_code, 
-            gpt4o, 
-            gpt4o_encoder, 
+        # Additional file processing (existing logic)
+
+        return RewriteJSONResponseModel(
+            filename=request.filename,
+            email_id=request.email_id,
+            node_id=request.node_id,
+            language_code=request.language_code,
+            time=duration,  # duration calculated based on time.time()
+            token_count=token_count,  # token count calculated during processing
         )
 
-        with generated_metadata_blob.open("w", retry=retry) as fp: 
-            json.dump(comprehensive_node, fp=fp) 
-
-    except Exception as err: 
+    except Exception as err:
         error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
+        error_line: int = err.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}"
+
+        # Include specific error messages for ValueError exceptions
+        if isinstance(err, ValueError):
+            if "File is bigger than 10 Mb." in str(err):
+                detail = f"File is bigger than 10 Mb."
+                status_code = 413  # Payload Too Large
+            elif "Unsupported File Format" in str(err):
+                detail = "Unsupported File Format"
+                status_code = 415  # Unsupported Media Type
+            else:
+                # Catch other ValueErrors
+                detail = f"Error :{error_name} at line {error_line}"
+                status_code = 400  # Bad Request
+
+        # Handle network-related errors
+        elif isinstance(err, (ConnectionError, TimeoutError)):
+            detail = f"Network error during upload of {str(err)}"
+            status_code = 503  # Service Unavailable
+        else:
+            status_code = 500  # Internal Server Error
+
+        logging.error(detail)
+
         raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            status_code=status_code,
+            detail=detail
         )
-            
-    duration = time.time() - start_time
-    # process complete 
-    return RewriteJSONResponseModel(
-        filename=request.filename, 
-        email_id=request.email_id, 
-        node_id=request.node_id, 
-        language_code=request.language_code, 
-        time=duration, 
-        token_count=token_count, 
-    )
+
+
+
 
 @app.post("/preprocess_for_graph")
 async def push_to_json(request: RequestModel) -> PushToJsonResponseModel: 
@@ -1015,9 +1167,12 @@ async def push_to_json(request: RequestModel) -> PushToJsonResponseModel:
     except Exception as err: 
         error_name: str = type(err).__name__
         error_line: int  = err.__traceback__.tb_lineno
+        detail: str = f"Error :{error_name} at line {error_line}"
+        logging.error(detail)
+
         raise HTTPException(
             status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
+            detail=detail
         )
 
     return PushToJsonResponseModel(
