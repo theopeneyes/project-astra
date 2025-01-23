@@ -136,7 +136,7 @@ class ChapterIdentificationResponseModel(AbsoluteBaseModel):
     token_count: int 
     time: float 
 
-class StatusRequestModel(): 
+class StatusRequestModel(BaseModel): 
     email_id: str 
 
 class ReformRequestModel(AbsoluteBaseModel): 
