@@ -46,7 +46,8 @@ env:
   DEPLOYMENT_NAME: 'gke-test' # Updated to your deployment name
   REPOSITORY: 'samples' # Updated to your Artifact Registry docker repository name
   IMAGE: 'static-site'
-  WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider' # Updated to your workload identity provider
+  workload_identity_provider: 'projects/intrepid-abacus-384710/locations/global/workloadIdentityPools/my-pool/providers/my-provider'
+
 
 jobs:
   setup-build-publish-deploy:
