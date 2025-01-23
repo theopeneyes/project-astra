@@ -4,17 +4,15 @@ import { getAuth } from "firebase/auth";
 import { getDatabase } from "firebase/database";
 // import { getStorage } from "firebase/storage";
 
-// PRODUCTION
 const firebaseConfig = {
-  apiKey: "AIzaSyADJ5vPmOfXKfaMQTqkwPBBoUrhbKuku6Q",
-  authDomain: "auth-astra.firebaseapp.com",
-  databaseURL:
-    "https://auth-astra-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "auth-astra",
-  storageBucket: "auth-astra.appspot.com",
-  messagingSenderId: "310634675231",
-  appId: "1:310634675231:web:f2a30378746a764986292a",
-  measurementId: "G-V8Q3JMBPVR",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.REACT_APP_FIREBASE_DATABASE_URL,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
 // ANSHUMAN LOCAL

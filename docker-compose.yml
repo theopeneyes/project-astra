@@ -19,4 +19,10 @@ services:
     env_file: ./streamlit-app/.env
     ports: 
       - 8051:8051
+
+  astra-frontend: 
+    platform: linux/amd64 
+    build: ./astra-frontend
+    ports: 
+      - 3000:3000 
     
