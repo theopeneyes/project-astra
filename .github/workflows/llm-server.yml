@@ -39,14 +39,14 @@ on:
       - 'main'
 
 env:
-  PROJECT_ID: 'intrepid-abacus-384710' # Updated to your Google Cloud project ID
-  GAR_LOCATION: 'us-central1' # Updated to your region
-  GKE_CLUSTER: 'autopilot-cluster-1' # Updated to your cluster name
-  GKE_ZONE: 'us-central1-c' # Updated to your cluster zone
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}  # Updated to your Google Cloud project ID
+  GAR_LOCATION: ${{ secrets.GAR_LOCATION }} # Updated to your region
+  GKE_CLUSTER: ${{ secrets.GKE_CLUSTER }} # Updated to your cluster name
+  GKE_ZONE: ${{ secrets.GKE_ZONE }}  # Updated to your cluster zone
   DEPLOYMENT_NAME: 'gke-test' # Updated to your deployment name
   REPOSITORY: 'samples' # Updated to your Artifact Registry docker repository name
   IMAGE: 'static-site'
-  WORKLOAD_IDENTITY_PROVIDER: 'projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/my-provider' # Updated to your workload identity provider
+  WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }} # Updated to your workload identity provider
 
 jobs:
   setup-build-publish-deploy:
