@@ -15,17 +15,6 @@ const firebaseConfig = {
   measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
 };
 
-// ANSHUMAN LOCAL
-//  const firebaseConfig = {
-//    apiKey: "AIzaSyAoyeW7myV56P4BjtQjoxSR3vfpPpoQPZQ",
-//    authDomain: "neww-53636.firebaseapp.com",
-//    projectId: "neww-53636",
-//    storageBucket: "neww-53636.firebasestorage.app",
-//    messagingSenderId: "35158755879",
-//    appId: "1:35158755879:web:54a0e90860a433a2a7dc02",
-//    measurementId: "G-C83FKK4P2P"
-//  };
-
 // Initialize Firebase
 // const firebaseApp = initializeApp(firebaseConfig);
 

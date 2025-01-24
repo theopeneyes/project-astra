@@ -50,6 +50,7 @@ react-flow-app/*.sw?
 # Frontend 
 astra-frontend/logs
 astra-frontend/node_modules
+astra-frontend/.env
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies

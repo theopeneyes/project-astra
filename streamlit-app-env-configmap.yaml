@@ -1,6 +1,6 @@
 apiVersion: v1
 data:
-  BUCKET_NAME: ${{ secrets.BUCKET_NAME }}
+  BUCKET_NAME: ${{ secrets.BUCKET_NAME }} 
   FILE_ID: ${{ secrets.FILE_ID }} 
   FIREBASE_CLIENT: ${{ secrets.FIREBASE_CLIENT }} 
   FIREBASE_SERVER: ${{ secrets.FIREBASE_SERVER }} 
