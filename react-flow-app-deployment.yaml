@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose --file docker-compose.yml convert
+    kompose.version: 1.35.0 (9532ceef3)
+  labels:
+    io.kompose.service: react-flow-app
+  name: react-flow-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: react-flow-app
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose --file docker-compose.yml convert
+        kompose.version: 1.35.0 (9532ceef3)
+      labels:
+        io.kompose.service: react-flow-app
+    spec:
+      containers:
+        - image: react-flow-app
+          name: react-flow-app
+          ports:
+            - containerPort: 4174
+              protocol: TCP
+      restartPolicy: Always

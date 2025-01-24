@@ -1,0 +1,21 @@
+apiVersion: v1
+data:
+  BUCKET_NAME: ${{ secrets.BUCKET_NAME }} 
+  FILE_ID: ${{ secrets.FILE_ID }} 
+  FIREBASE_CLIENT: ${{ secrets.FIREBASE_CLIENT }} 
+  FIREBASE_SERVER: ${{ secrets.FIREBASE_SERVER }} 
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }} 
+  HF_TOKEN: ${{ secrets.HF_TOKEN }} 
+  LLM_API_URL: ${{ secrets.LLM_API_URL }} 
+  MY_GEMINI_API_KEY: ${{ secrets.MY_GEMINI_API_KEY }} 
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} 
+  PORT: ${{ secrets.PORT }} 
+  REACT_FLOW_APP_URL: ${{ secrets.REACT_FLOW_APP_URL }} 
+  STREAMLIT_APP_URL: ${{ secrets.STREAMLIT_APP_URL }} 
+  URL: ${{ secrets.URL }} 
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: llm-server-llm-server-env
+  name: llm-server-env
