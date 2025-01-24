@@ -23,6 +23,7 @@ services:
   astra-frontend: 
     platform: linux/amd64 
     build: ./astra-frontend
+    env_file: ./astra-frontend/.env
     ports: 
       - 3000:3000 
     
