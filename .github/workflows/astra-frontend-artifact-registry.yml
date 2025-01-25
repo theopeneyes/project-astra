@@ -22,9 +22,8 @@ jobs:
       - name: Pushing to docker using the CLI 
         env: 
           PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} 
-          REGION: ${{ secrets.REGION }} 
         run: |
-          gcloud auth configure-docker ${{ env.REGION }}-docker-pkg.dev
-          docker build -t ${{ env.REGION }}-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:latest ./astra-frontend
-          docker push ${{ env.REGION }}-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:latest  
+          gcloud auth configure-docker us-central1-docker-pkg.dev
+          docker build -t us-central1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node-frontend ./astra-frontend
+          docker push ${{ env.REGION }}-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node-frontend  
 
