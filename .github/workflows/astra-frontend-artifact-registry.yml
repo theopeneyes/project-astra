@@ -6,17 +6,29 @@ on:
       - main 
   
 jobs: 
+
   deploy: 
+
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
     steps: 
       - name: Code checkout
         uses: actions/checkout@v2 
       
-      - name: Installing the gcloud cli 
-        uses: google-github-actions/setup-gcloud@v2
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
         with: 
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}  
           service_account: ${{ secrets.SERVICE_ACCOUNT_EMAIL }}
+      
+      - name: Installing the gcloud cli 
+        uses: google-github-actions/setup-gcloud@v2
+        with: 
+          version: '>= 363.0.0'
       
       - name: Pushing to docker using the CLI 
         env: 
