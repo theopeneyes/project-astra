@@ -35,9 +35,9 @@ on:
       - main
 
 env:
-  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}' # TODO: update to your Google Cloud project ID
-  REGION: '${{ secrets.REGION }}' # TODO: update to your region
-  SERVICE: 'astra-frontend' # TODO: update to your service name
+  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}' 
+  REGION: '${{ secrets.REGION }}' 
+  SERVICE: 'astra-frontend' 
   WORKLOAD_IDENTITY_PROVIDER: '${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}' # TODO: update to your workload identity provider
 
 jobs:
