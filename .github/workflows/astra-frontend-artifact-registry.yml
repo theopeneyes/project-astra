@@ -37,7 +37,7 @@ on:
 env:
   # PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}' 
   PROJECT_ID: 'intrepid-abacus-384710'
-  REGION: '${{ secrets.REGION }}' 
+  REGION: 'us-central1' 
   SERVICE: 'astra-frontend' 
   WORKLOAD_IDENTITY_PROVIDER: 'projects/375938256317/locations/global/workloadIdentityPools/deployment-pool/providers/github-actions' # TODO: update to your workload identity provider
 
