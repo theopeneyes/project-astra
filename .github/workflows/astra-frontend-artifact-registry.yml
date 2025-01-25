@@ -25,5 +25,5 @@ jobs:
         run: |
           gcloud auth configure-docker us-central1-docker-pkg.dev
           docker build -t us-central1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node-frontend ./astra-frontend
-          docker push ${{ env.REGION }}-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node-frontend  
+          docker push us-central1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node-frontend  
 
