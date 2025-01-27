@@ -39,12 +39,12 @@ Given below are further detailed instructions:
 
 ### DEFINTIONS ###
 - section number: the section number assoicated with the concept. If a section number doesn't exist
-in the page, then write 'no-section-number'. 
+in the page, then write 'no-section-number'.
 - key concept: The concept present in a line item of the contents page
 - heading type: Whether the concept is a heading or a sub-heading. If the concept is a
 heading store h1, if it is a sub-heading store h2.
 - page number: The page number associated with the concept. If a page number doesn't exist in the
-page, then write 'no-page-number'. 
+page, then write 'no-page-number'.
 
 ### INSTRUCTIONS ###
 Step 1: Extract the content as an html table with section numbers, name and page numbers.

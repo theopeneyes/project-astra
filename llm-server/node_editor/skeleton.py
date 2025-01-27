@@ -1,19 +1,17 @@
 text_messages: list[dict] = [
   {
-    "role": "system", 
+    "role": "system",
     "content": [{
-      "type": "text", 
+      "type": "text",
       "text": "Generate the output in {} language."
     }]
-  }, 
-  
+  },
+
   {
-    "role": "user", 
+    "role": "user",
     "content": [{
-      "type": "text", 
+      "type": "text",
       "text": ""
     }]
   }
 ]
-
-    

@@ -6,6 +6,12 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi import File 
 
+from models import RectificationRequestModel
+from models import RectificationResponseModel
+from models import TextNodeRequestModel
+from models import TextNodeResponseModel
+from models import JSONEditorRequestModel
+from models import JSONEditorResponseModel
 from models import StatusRequestModel
 from models import FontForChapterDetectionRequestModel
 from models import FontForChapterDetectionResponseModel
@@ -98,7 +104,7 @@ from segregator.modifier import get_relevant_count
 
 from contents_parser.parse_index import parse_index
 from contents_parser.exceptions import LLMTooDUMBException, IndexPageNotFoundException
-
+from node_editor.edit_text_nodes import edit
 
 from exceptions import EmptyPDFException
 from exceptions import IncorrectGCPBucketException
@@ -163,7 +169,7 @@ retry = retry.with_delay(initial=1.5, multiplier=1.2, maximum=45.0)
 async def home() -> Dict[str, str]: 
     return {"home": "page"}
 
-@app.post("/upload_pdfs") 
+@app.post("/upload_pdf") 
 async def upload_pdfs(
     email_id: str = Form(...), 
     filename: str = Form(...), 
@@ -684,6 +690,145 @@ async def get_book_chapters(email_id: str, filename: str) -> JSONResponse:
     return dict(
         titles=chapter_titles, 
     ) 
+    
+@app.post("/json_editor")  
+async def edit_text_json(request: JSONEditorRequestModel) -> JSONEditorResponseModel:
+    start_time: float = time.time() 
+    chapter_inherent_json_blob = bucket.blob(os.path.join(
+        request.email_id,
+        "chapterwise_processed_json",
+        request.filename.split(".")[0],
+        request.chapter_name.split(".json")[0],
+        "inherent_metadata.json"
+    ))
+
+    chapter_rewritten_json_blob = bucket.blob(os.path.join(
+        request.email_id,
+        "intermediate_json",
+        request.filename.split(".")[0],
+        request.chapter_name.split(".json")[0],
+        f"modified_processed_json_NODE_ID:{request.node_id}.json"
+    ))
+
+    analytical_metadata_json_blob = bucket.blob(os.path.join(
+        "chapterwise_analytical_metadata", 
+        "analysis_data.json"
+    ))
+
+    with chapter_inherent_json_blob.open("r") as fp: inherent_json = json.load(fp=fp) 
+    with chapter_rewritten_json_blob.open("r") as fp: json_node = json.load(fp=fp)  
+
+    if analytical_metadata_json_blob.exists(): 
+        with analytical_metadata_json_blob.open("r") as fp: train_json : list = json.load(fp=fp)  
+    else: 
+        train_json: list = [] 
+
+    user_modified_json: dict = json.loads(request.user_modified_json) 
+
+    summary_text : str = " ".join([inherent_text["text"] for inherent_text in inherent_json])
+    error_data, token_count = edit(json_node, user_modified_json, summary_text, gpt4o)
+    train_json.extend(error_data) 
+    
+    with chapter_rewritten_json_blob.open("w") as fp: json.dump(user_modified_json, fp=fp) 
+    with analytical_metadata_json_blob.open("w") as fp: json.dump(train_json, fp=fp)
+
+    return JSONEditorResponseModel(
+        email_id = request.email_id, 
+        filename = request.filename, 
+        time = time.time() - start_time, 
+        token_count = token_count, 
+        node_id = request.node_id, 
+        chapter_name = request.chapter_name
+    ) 
+
+
+@app.post("/rectify_update_chain") 
+async def rectify_update_chain(request : RectificationRequestModel) -> RectificationResponseModel:   
+    start_time: float = time.time()
+    try: 
+        intermediate_json_blobs = gcs_client.list_blobs(
+            BUCKET_NAME, 
+            prefix=os.path.join(
+                request.email_id, 
+                "intermediate_json", 
+                request.filename.split(".")[0], 
+                request.chapter_name.split(".json")[0] + "/", 
+            ), 
+            delimiter="/"
+        ) 
+
+        summary_classification_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            "classified_summary_content.json"
+        ))
+
+        older_classification_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            "old_classified_summary_content.json", 
+        ))
+
+        with summary_classification_blob.open("r") as fp : summary_json = json.load(fp=fp) 
+        with older_classification_blob.open("w") as fp: json.dump(summary_json, fp=fp) 
+
+        concept : list = [] 
+        sub_concept: list = []
+        topic: list = [] 
+        sub_topic: list = [] 
+        major_domains: list = [] 
+        root_concept: list = []
+        sub_domains: list = [] 
+
+        json_nodes: list = []
+        for intermediate_json_blob in intermediate_json_blobs: 
+            with intermediate_json_blob.open("r") as fp: data_node = json.load(fp=fp) 
+            concept.append(data_node.get("concept", ""))
+            sub_concept.append(data_node.get("sub_concept", ""))
+            topic.append(data_node.get("topic", ""))
+            sub_topic.append(data_node.get("sub_topic", ""))
+            major_domains.append(data_node.get("major_domains", ""))
+            root_concept.append(data_node.get("root_concept", ""))
+            sub_domains.append(data_node.get("sub_domains", ""))
+            
+            json_nodes.append(data_node) 
+
+        strength_json, depth_json = summary_json
+        strength_json["concept"] = list(set(concept)) 
+        strength_json["sub_concept"] = list(set(sub_concept)) 
+        strength_json["topic"] = list(set(topic)) 
+        strength_json["sub_topic"] = list(set(sub_topic)) 
+        depth_json["major_domains"] = list(set(major_domains)) 
+        depth_json["root_concept"] = list(set(root_concept)) 
+        depth_json["sub_domains"] = list(set(sub_domains)) 
+        
+        final_json_update_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "final_json", 
+            request.filename.split(".")[0] + ".json", 
+        ))
+
+        with summary_classification_blob.open("w") as fp: json.dump([strength_json, depth_json], fp=fp)
+        with final_json_update_blob.open("w") as fp: json.dump(json_nodes, fp=fp) 
+
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return RectificationResponseModel(
+        time = time.time() - start_time, 
+        email_id = request.email_id, 
+        filename = request.filename, 
+        chapter_name = request.chapter_name, 
+    ) 
 
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
@@ -815,113 +960,110 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
 @app.post("/summarize")
 async def summarize(request: SummarizationRequestModel) -> SummarizationResponseModel:
     start_time = time.time()
-    # try:
-    chapter_json_blob = bucket.blob(os.path.join(
-        request.email_id,
-        "chapterwise_processed_json",
-        request.filename.split(".")[0],
-        request.chapter_name.split(".json")[0],
-        "inherent_metadata.json"
-    ))
-
-    with chapter_json_blob.open("r") as fp:
-        chapter_content = json.load(fp)
-
-    summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip()
-
-    if summary_content:
-        status, summary, token_count = summarize_texts(
-            summary_content,
-            request.language_code,
-            gpt4o_encoder, gpt4o
-        )
-
-        summary_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_summary_metadata",
+    try:
+        chapter_json_blob = bucket.blob(os.path.join(
+            request.email_id,
+            "chapterwise_processed_json",
             request.filename.split(".")[0],
             request.chapter_name.split(".json")[0],
-            "summary_content.txt"
+            "inherent_metadata.json"
         ))
 
-        if status:
-            with summary_blob.open("w", retry=retry) as f:
-                f.write(summary)
+        with chapter_json_blob.open("r") as fp:
+            chapter_content = json.load(fp)
 
-            enlarged_summary, token_count = enlarge_summary(
+        summary_content: str = " ".join([node.get("text") for node in chapter_content]).strip()
+
+        if summary_content:
+            status, summary, token_count = summarize_texts(
                 summary_content,
-                request.chapter_name,
-                summary,
-                gpt4o,
-                gpt4o_encoder
+                request.language_code,
+                gpt4o_encoder, gpt4o
             )
 
-            accurate_summary, token_count = qualitate_summary(
-                summary_content,
-                enlarged_summary,
-                gpt4o,
-                gpt4o_encoder
-            )
-
-            actual_json, token_count = domain_extraction(
-                accurate_summary,
-                gpt4o,
-                gpt4o_encoder
-            )
-
-            issues, principle_types, problems, token_count = problem_extractor(
-                summary_content, 
-                summary, 
-                accurate_summary,
-                gpt4o,
-                gpt4o_encoder
-            )
-
-            data: list = []
-            for issue, principle_type, problem in zip(issues, principle_types, problems):
-                data.append({
-                    "generated_output": summary,
-                    "desired_generation": accurate_summary,
-                    "issue_type": issue,
-                    "principle_type": principle_type,
-                    "differences": problem,
-                    **actual_json
-                })
-
-            result_blob = bucket.blob(os.path.join(
-                "chapterwise_analytical_metadata",
-                "analysis_data.json"
+            summary_blob = bucket.blob(os.path.join(
+                request.email_id, 
+                "chapter_summary_metadata",
+                request.filename.split(".")[0],
+                request.chapter_name.split(".json")[0],
+                "summary_content.txt"
             ))
 
-            if result_blob.exists(): 
-                with result_blob.open("r", retry=retry) as f:
-                    existing_data = json.load(f)
-                    existing_data.extend(data)
-            else: 
-                existing_data = data
+            if status:
+                with summary_blob.open("w", retry=retry) as f:
+                    f.write(summary)
 
-            with result_blob.open("w", retry=retry) as f:
-                json.dump(existing_data, f, indent=2)
+                enlarged_summary, token_count = enlarge_summary(
+                    summary_content,
+                    request.chapter_name,
+                    summary,
+                    gpt4o,
+                )
+
+                accurate_summary, token_count = qualitate_summary(
+                    summary_content,
+                    enlarged_summary,
+                    gpt4o,
+                )
+
+                actual_json, token_count = domain_extraction(
+                    accurate_summary,
+                    gpt4o,
+                )
+
+                issues, principle_types, problems, token_count = problem_extractor(
+                    summary_content, 
+                    summary, 
+                    accurate_summary,
+                    gpt4o,
+                )
+
+                data: list = []
+                for issue, principle_type, problem in zip(issues, principle_types, problems):
+                    data.append({
+                        "generated_output": summary,
+                        "desired_generation": accurate_summary,
+                        "issue_type": issue,
+                        "principle_type": principle_type,
+                        "differences": problem,
+                        "field_type": "summarize", 
+                        **actual_json
+                    })
+
+                result_blob = bucket.blob(os.path.join(
+                    "chapterwise_analytical_metadata",
+                    "analysis_data.json"
+                ))
+
+                if result_blob.exists(): 
+                    with result_blob.open("r", retry=retry) as f:
+                        existing_data = json.load(f)
+                        existing_data.extend(data)
+                else: 
+                    existing_data = data
+
+                with result_blob.open("w", retry=retry) as f:
+                    json.dump(existing_data, f, indent=2)
+            else:
+                print("Empty summary here. Bad summarization output from llm")
+                print(summary)
         else:
-            print("Empty summary here. Bad summarization output from llm")
-            print(summary)
-    else:
-        token_count: int = 0
-    # except SummaryNotFoundException as summNotFound:
-    #     error_name: str = type(summNotFound).__name__
-    #     error_line: int = summNotFound.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404,
-    #         detail=f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
-    #     )
+            token_count: int = 0
+    except SummaryNotFoundException as summNotFound:
+        error_name: str = type(summNotFound).__name__
+        error_line: int = summNotFound.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error :{error_name} at line {error_line}. The error in response: {summNotFound.llm_response}"
+        )
 
-    # except Exception as err:
-    #     error_name: str = type(err).__name__
-    #     error_line: int = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404,
-    #         detail=f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404,
+            detail=f"Error :{error_name} at line {error_line}"
+        )
 
     duration = time.time() - start_time
     return SummarizationResponseModel(
@@ -936,66 +1078,66 @@ async def summarize(request: SummarizationRequestModel) -> SummarizationResponse
 @app.post("/summary_classifier")
 async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapterResponseModel: 
     start_time = time.time()
-    # try: 
-    summary_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_summary_metadata", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".json")[0], 
-        "summary_content.txt"
-    ))
+    try: 
+        summary_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            "summary_content.txt"
+        ))
 
-    with summary_blob.open("r") as fp: 
-        summary_content: str = fp.read()
+        with summary_blob.open("r") as fp: 
+            summary_content: str = fp.read()
 
-    content, token_count = generate_chapter_metadata(
-        summary_content, 
-        request.language_code, 
-        gpt4o_encoder, 
-        gpt4o)
-    
-    classified_summary_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_summary_metadata", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".json")[0], 
-        "classified_summary_content.json" 
-    ))
+        content, token_count = generate_chapter_metadata(
+            summary_content, 
+            request.language_code, 
+            gpt4o_encoder, 
+            gpt4o)
+        
+        classified_summary_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_summary_metadata", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            "classified_summary_content.json" 
+        ))
 
-    with classified_summary_blob.open("w", retry=retry) as f: 
-        json.dump(content, fp=f)
+        with classified_summary_blob.open("w", retry=retry) as f: 
+            json.dump(content, fp=f)
 
-    # except JSONDecodeError as decodingError: 
-    #     error_name: str = type(decodingError).__name__
-    #     error_line: int  = decodingError.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except JSONDecodeError as decodingError: 
+        error_name: str = type(decodingError).__name__
+        error_line: int  = decodingError.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
-    # except AboutListNotGeneratedException as aboutNotGenerated:  
-    #     error_name: str = type(aboutNotGenerated).__name__
-    #     error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except AboutListNotGeneratedException as aboutNotGenerated:  
+        error_name: str = type(aboutNotGenerated).__name__
+        error_line: int  = aboutNotGenerated.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
    
-    # except DepthListNotGeneratedException as depthNotGenerated: 
-    #     error_name: str = type(depthNotGenerated).__name__
-    #     error_line: int  = depthNotGenerated.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except DepthListNotGeneratedException as depthNotGenerated: 
+        error_name: str = type(depthNotGenerated).__name__
+        error_line: int  = depthNotGenerated.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
-    # except Exception as err: 
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
         
     return SummaryChapterResponseModel(
         filename=request.filename, 
@@ -1061,7 +1203,7 @@ async def rewrite_json(request: RewriteJSONRequestModel) -> RewriteJSONResponseM
             request.email_id, 
             "chapter_summary_metadata", 
             request.filename.split(".")[0], 
-            request.chapter_name.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
             "classified_summary_content.json"
         )) 
         
@@ -1161,6 +1303,37 @@ async def interactive_plot(email_id: str, filename: str) -> HTMLResponse:
 
     return HTMLResponse(
         content = content 
+    ) 
+
+@app.post("/get_text_node")
+async def get_text_node(request: TextNodeRequestModel) -> TextNodeResponseModel: 
+    start_time: float = time.time() 
+    try: 
+        generated_metadata_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "intermediate_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            f"modified_processed_json_NODE_ID:{request.node_id}.json"
+        ))
+
+        with generated_metadata_blob.open("r") as fp: data = json.load(fp=fp)
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+    
+    return TextNodeResponseModel(
+        filename= request.filename, 
+        chapter_name = request.chapter_name, 
+        email_id = request.email_id, 
+        json_content = json.dumps(data, indent=4), 
+        node_id = request.node_id, 
+        time = time.time() - start_time, 
     ) 
 
 @app.get("/reactFlow/{category}/{emailId}/{fileName}")
@@ -1333,6 +1506,7 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
         time=duration, 
         token_count=token_count
     )
+
 
 @app.post("/segregate")
 async def segregate_json(request: RequestModel) -> ResponseModel: 

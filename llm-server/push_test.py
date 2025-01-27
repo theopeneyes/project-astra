@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+import json 
 from google.cloud import storage
 from json.decoder import JSONDecodeError
 import os 
@@ -23,12 +24,12 @@ pdf_names: str = [
     "japanese-book.pdf"
 ]
 
-user_email: str = "test.sixth@yahoo.com"
+user_email: str = "test.ai@yahoo.com"
 BASE_LOCATION: str = "test_books/"
 pdf_name = pdf_names[1] 
 
 # with open(os.path.join(BASE_LOCATION, pdf_name), "rb") as fp: 
-#     requests.post(
+#     response = requests.post(
 #         URL + "/upload_pdf", 
 #         data = {
 #             "email_id": user_email, 
@@ -40,68 +41,73 @@ pdf_name = pdf_names[1]
 #         timeout=300, 
 #     )
 
-# # pdf_name = "machine-learning-algorithms.pdf"
+#     if response.status_code == 404: 
+#         print(json.dumps(response.json(), indent=4) ) 
 
-# convert_response = requests.post(
-#     URL + "/convert_pdf", json = {
-#         "email_id": user_email, 
-#         "uri": f"{user_email}/uploaded_document/{pdf_name}", 
-#         "filename": pdf_name,  
-# })
+# pdf_name = "machine-learning-algorithms.pdf"
+# if response.status_code == 200: 
 
-# language_detected_response = requests.post(
-#    URL + "/detect_lang", json = {
-#       "email_id": user_email,  
-#       "filename": pdf_name, 
-#    } 
-# )
+#     convert_response = requests.post(
+#         URL + "/convert_pdf", json = {
+#             "email_id": user_email, 
+#             "uri": f"{user_email}/uploaded_document/{pdf_name}", 
+#             "filename": pdf_name,  
+#     })
 
-# # font_parsing_response = requests.post(
-# #     URL + "/extract_font_indices", 
-# #     json = {
-# #         "email_id": user_email,  
-# #         "filename": pdf_name, 
-# #     }
-# # )
+    # language_detected_response = requests.post(
+    #    URL + "/detect_lang", json = {
+    #       "email_id": user_email,  
+    #       "filename": pdf_name, 
+    #    } 
+    # )
 
-language_code = "en"
-# language_code = language_detected_response.json().get("detected_language")
- 
+    # # font_parsing_response = requests.post(
+    # #     URL + "/extract_font_indices", 
+    # #     json = {
+    # #         "email_id": user_email,  
+    # #         "filename": pdf_name, 
+    # #     }
+    # # )
 
-# response = requests.post(
-#     URL + "/extract_contents_page", 
-#     json = {
-#         "email_id": user_email, 
-#         "filename": pdf_name, 
-#         "number_of_pages": 20, 
-#         "language_code": language_code
-#     }
-# )
+    # language_code = "en"
+    # # language_code = language_detected_response.json().get("detected_language")
+    
 
-# response_content = response.json()
-# last_page: int = response_content.get("last_page")
-# first_page: int = response_content.get("first_page")
+    # response = requests.post(
+    #     URL + "/extract_contents_page", 
+    #     json = {
+    #         "email_id": user_email, 
+    #         "filename": pdf_name, 
+    #         "number_of_pages": 20, 
+    #         "language_code": language_code
+    #     }
+    # )
 
-# response = requests.post(
-#     URL + "/identify/chapter_pages", 
-#     json = {
-#         "email_id": user_email, 
-#         "filename": pdf_name, 
-#         "last_page": last_page, 
-#         "first_page": first_page, 
-#         "language_code": language_code
-#     }
-# )
+    # response_content = response.json()
+    # last_page: int = response_content.get("last_page")
+    # first_page: int = response_content.get("first_page")
+
+    # response = requests.post(
+    #     URL + "/identify/chapter_pages", 
+    #     json = {
+    #         "email_id": user_email, 
+    #         "filename": pdf_name, 
+    #         "last_page": last_page, 
+    #         "first_page": first_page, 
+    #         "language_code": language_code
+    #     }
+    # )
 
 
-# response = requests.post(
-#     URL + "/reform/chapter_pages", 
-#     json = {
-#         "email_id": user_email, 
-#         "filename": pdf_name, 
-#     }
-# )
+    # response = requests.post(
+    #     URL + "/reform/chapter_pages", 
+    #     json = {
+    #         "email_id": user_email, 
+    #         "filename": pdf_name, 
+    #     }
+    # )
 
+language_code: str = "en"
 response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
 chapters = response.json()
 
@@ -137,6 +143,9 @@ for chapter in chapters["titles"]:
                 "language_code": language_code, 
             }
         )
+    else: 
+        print(f"Chapter title: {chapter}") 
+        print(json.dumps(response.json(), indent=4))
     
 
 # response = requests.get(URL + f"/book_chapters/{user_email}/{pdf_name}")
@@ -274,72 +283,72 @@ for chapter in chapters["titles"]:
 
 
 
-# print("Preprocessing the data for the graph...")    
-# # putting it all in one directory  
-# requests.post(
-#     URL + "/preprocess_for_graph", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email, 
-#     } 
-# )
+print("Preprocessing the data for the graph...")    
+# putting it all in one directory  
+requests.post(
+    URL + "/preprocess_for_graph", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email, 
+    } 
+)
 
-# print("Segregating the json by topics, headings and concepts....")
-# requests.post(
-#     URL + "/segregate", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email, 
-#     } 
-# )
+print("Segregating the json by topics, headings and concepts....")
+requests.post(
+    URL + "/segregate", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email, 
+    } 
+)
 
-# print("Getting topic relevant count") 
-# requests.post(
-#     URL + "/modify_branch", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email,  
-#         "branch_name": "topic"
-#     }
+print("Getting topic relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "topic"
+    }
     
-# )
+)
 
 
-# print("Getting concept relevant count") 
-# requests.post(
-#     URL + "/modify_branch", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email,  
-#         "branch_name": "concept"
-#     }
+print("Getting concept relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "concept"
+    }
     
-# )
+)
 
-# print("Getting heading relevant count") 
-# requests.post(
-#     URL + "/modify_branch", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email,  
-#         "branch_name": "heading_text"
-#     }
-# )
+print("Getting heading relevant count") 
+requests.post(
+    URL + "/modify_branch", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+        "branch_name": "heading_text"
+    }
+)
 
 
-# print("Relevant Count edit") 
-# response =  requests.post(
-#     URL + "/add_word_count", 
-#     json = {
-#         "filename": pdf_name, 
-#         "email_id": user_email,  
-#     }
-# )
+print("Relevant Count edit") 
+response =  requests.post(
+    URL + "/add_word_count", 
+    json = {
+        "filename": pdf_name, 
+        "email_id": user_email,  
+    }
+)
         
-# try: 
-#     if response.status_code != 200: 
-#         print(response.content)
-#     content = response.json()
+try: 
+    if response.status_code != 200: 
+        print(response.content)
+    content = response.json()
 
-# except JSONDecodeError as err: 
-#     print(response.content)
+except JSONDecodeError as err: 
+    print(response.content)

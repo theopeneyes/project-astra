@@ -1,5 +1,7 @@
 import json 
 import re 
+import tiktoken
+
 from .prompts import summary_enlargement_prompt  
 from .prompts import hallucination_elimination_prompt
 from .prompts import domain_generation_prompt
@@ -8,11 +10,14 @@ from .prompts import difference_classification_prompt
 from .prompts import principle_type_classification_prompt 
 from .skeleton import text_messages
 
+MODEL: str = "gpt-3.5-turbo" 
+gpt_encoder = tiktoken.encoding_for_model(MODEL) 
+
 def enlarge_summary(
         content: str, 
         chapter_title: str, 
         summary_text: str, 
-        gpt4omini, gpt4o_encoder) -> str: 
+        gpt4omini) -> str: 
 
     prompt: str = summary_enlargement_prompt.format(content, chapter_title, summary_text)
     text_messages[1]["content"][0]["text"] = prompt
@@ -20,12 +25,12 @@ def enlarge_summary(
     
     completions = gpt4omini.chat.completions.create(
         messages = text_messages,
-        model = "gpt-4o-mini",
+        model = MODEL,
         temperature=0.01
     )
     
     html_response: str = completions.choices[0].message.content
-    token_count: int = gpt4o_encoder.encode(html_response)
+    token_count: int = gpt_encoder.encode(html_response)
     if re.findall("<enlarged_summary>(.*?)</enlarged_summary>", html_response, re.DOTALL):
         enlarged_summary: str = re.findall("<enlarged_summary>(.*?)</enlarged_summary>",
                                         html_response, re.DOTALL)[0]
@@ -35,38 +40,38 @@ def enlarge_summary(
 def qualitate_summary(
         content: str, 
         enlarged_summary: str, 
-        gpt4omini, gpt4o_encoder) -> list[str| int]:
+        gpt4omini) -> list[str| int]:
 
     prompt: str = hallucination_elimination_prompt.format(content , enlarged_summary)
     text_messages[1]["content"][0]["text"] = prompt
     
     completions = gpt4omini.chat.completions.create(
         messages = text_messages,
-        model = "gpt-4o-mini",
+        model = MODEL,
         temperature=0.01
     )
     
     html_response: str = completions.choices[0].message.content
-    token_count: int = gpt4o_encoder.encode(html_response)
+    token_count: int = gpt_encoder.encode(html_response)
     if re.findall("<accurate_summary>(.*?)</accurate_summary>", html_response, re.DOTALL):
         accurate_summary: str = re.findall("<accurate_summary>(.*?)</accurate_summary>",
                                         html_response, re.DOTALL)[0]
 
     return accurate_summary, token_count 
 
-def domain_extraction(accurate_summary: str, gpt4omini, gpt4o_encoder) -> list[dict | int]: 
+def domain_extraction(accurate_summary: str, gpt4omini) -> list[dict | int]: 
     # infinite void 
     prompt: str = domain_generation_prompt.format(accurate_summary)
     text_messages[1]["content"][0]["text"] = prompt
     
     completions = gpt4omini.chat.completions.create(
         messages = text_messages,
-        model = "gpt-4o-mini",
+        model = MODEL,
         temperature=0.01
     )
     
     html_response: str = completions.choices[0].message.content
-    token_count: int = gpt4o_encoder.encode(html_response)
+    token_count: int = gpt_encoder.encode(html_response)
     if re.findall("<json>(.*?)</json>", html_response, re.DOTALL):
         attribute_json: str = re.findall("<json>(.*?)</json>",
                                         html_response, re.DOTALL)[0]
@@ -81,19 +86,19 @@ def domain_extraction(accurate_summary: str, gpt4omini, gpt4o_encoder) -> list[d
     
     return actual_json, token_count
 
-def problem_extractor(content: str, summary_text: str, accurate_summary: str, gpt4omini, gpt4o_encoder) :
+def problem_extractor(content: str, summary_text: str, accurate_summary: str, gpt4omini) :
     prompt: str = difference_identification_prompt.format(content,
                                                       summary_text, accurate_summary)
     text_messages[1]["content"][0]["text"] = prompt
     
     completions = gpt4omini.chat.completions.create(
         messages = text_messages,
-        model = "gpt-4o-mini",
+        model = MODEL,
         temperature=0.01
     )
     
     response: str = completions.choices[0].message.content
-    token_count: int = len(gpt4o_encoder.encode(response))
+    token_count: int = len(gpt_encoder.encode(response))
 
     issues: list = [] 
     principle_types: list = [] 
@@ -110,12 +115,12 @@ def problem_extractor(content: str, summary_text: str, accurate_summary: str, gp
             
             completions = gpt4omini.chat.completions.create(
                 messages = text_messages,
-                model = "gpt-4o-mini",
+                model = MODEL,
                 temperature=0.01
             )
         
             html_response: str = completions.choices[0].message.content
-            token_count += len(gpt4o_encoder.encode(html_response))
+            token_count += len(gpt_encoder.encode(html_response))
             if re.findall("<issue>(.*?)</issue>", html_response, re.DOTALL):
                 issue: str = re.findall("<issue>(.*?)</issue>", html_response, re.DOTALL)[0] 
         
@@ -125,12 +130,12 @@ def problem_extractor(content: str, summary_text: str, accurate_summary: str, gp
                     
                     completions = gpt4omini.chat.completions.create(
                         messages = text_messages,
-                        model = "gpt-4o-mini",
+                        model = MODEL,
                         temperature=0.01
                     )
                 
                     html_response: str = completions.choices[0].message.content
-                    token_count += len(gpt4o_encoder.encode(html_response))
+                    token_count += len(gpt_encoder.encode(html_response))
 
                     if re.findall("<issue>(.*?)</issue>", html_response, re.DOTALL):
                         principle_issue: str = re.findall("<issue>(.*?)</issue>", 

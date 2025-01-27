@@ -40,7 +40,7 @@ def segment_breakdown(
             section = "" if section == 'no-section-number' else section 
             prompt: str = identification_prompt.format(title, section)
 
-            messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}"   
+            messages[0]["content"][0]["text"] = f"Your output should be in the English : {language_code} Language"   
             messages[1]["content"][0]["text"] = prompt
             messages[1]["content"][1]["image_url"]["url"] = (
                 f"data:image/jpeg;base64,{image['img_b64']}")

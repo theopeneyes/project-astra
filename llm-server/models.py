@@ -161,6 +161,33 @@ class FontForChapterDetectionRequestModel(RequestModel):
 class FontForChapterDetectionResponseModel(AbsoluteBaseModel, ResponseModel): 
     pass 
 
+class JSONEditorRequestModel(RequestModel): 
+    chapter_name: str
+    node_id: int
+    user_modified_json: str
+
+class JSONEditorResponseModel(AbsoluteBaseModel, ResponseModel): 
+    chapter_name: str 
+    node_id: int
+
+class TextNodeRequestModel(RequestModel): 
+    chapter_name: str 
+    node_id: int 
+
+
+class TextNodeResponseModel(AbsoluteBaseModel): 
+    chapter_name: str 
+    node_id: int
+    json_content: str
+    time: float
+
+class RectificationRequestModel(RequestModel): 
+    chapter_name: str 
+
+class RectificationResponseModel(AbsoluteBaseModel): 
+    time: float 
+    chapter_name: str 
+
 
 
 

@@ -39,14 +39,13 @@ def generate_chapter_metadata(
             raise decodeError 
     else: 
         print("Encountered a JSON error parsing error from llm output from Depth Agent...")
-        print(f"The prompt provided is {about_list_generation_prompt.format(language_code, summary)}")
+        print(f"The prompt provided is {about_list_generation_prompt.format(summary)}")
         print(f"The chat completion provided is : {llm_response}")
         print(json.dumps(messages, indent=4))
         raise AboutListNotGeneratedException(llm_response = llm_response)
                     
     messages[0]["content"][0]["text"] = f"Your output should be in the language associated with the following language code: {language_code}"  
-    messages[1]["content"][0]["text"] = depth_list_generation_prompt.format(language_code, summary)
-    about_list_generation_prompt.format(language_code, summary)
+    messages[1]["content"][0]["text"] = depth_list_generation_prompt.format(summary)
     completion = gpt4o.chat.completions.create(
         messages=messages, 
         model="gpt-4o-mini", 
@@ -59,6 +58,7 @@ def generate_chapter_metadata(
     if re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL): 
             depth_json = json.loads(
                 re.findall(r"<json>(.*?)</json>", depth_llm_response, re.DOTALL)[0])
+            # print(json.dumps(depth_json, indent=4)) 
     else: 
         print("Encountered a JSON error parsing error from llm output from Depth Agent...")
         print(f"The prompt provided is {depth_list_generation_prompt.format(language_code, summary)}")
