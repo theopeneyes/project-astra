@@ -35,6 +35,6 @@ jobs:
           PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }} 
         run: |
           gcloud auth configure-docker us-central1-docker-pkg.dev
-          docker build -t us-central1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:20.18.2 ./astra-frontend
-          docker push us-central1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:20.18.2 
+          docker build -t us-east1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:20.18.2 ./astra-frontend
+          docker push us-east1-docker-pkg.dev/${{ env.PROJECT_ID }}/astra-frontend/node:20.18.2 
 
