@@ -793,7 +793,6 @@ async def rectify_update_chain(request : RectificationRequestModel) -> Rectifica
             sub_topic.append(data_node.get("sub_topic", ""))
             major_domains.append(data_node.get("major_domains", ""))
             root_concept.append(data_node.get("root_concept", ""))
-            sub_domains.append(data_node.get("sub_domains", ""))
             
             json_nodes.append(data_node) 
 
