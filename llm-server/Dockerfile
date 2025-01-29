@@ -7,5 +7,5 @@ RUN apt-get -y update && apt-get -y install curl
 RUN apt-get install -y poppler-utils 
 
 RUN pip install --no-cache-dir -r requirements.txt  
-EXPOSE 8080 
+EXPOSE 8000 
 CMD python3 -m uvicorn main:app --workers 10
