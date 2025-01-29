@@ -92,6 +92,7 @@ from data_loader.opeanai_formatters import text_message
 from google.cloud import storage 
 from google.cloud import translate_v2
 from image_utils.encoder import encode_image 
+from datetime import datetime 
 
 from metadata_producers.summaries import generate_chapter_metadata 
 from metadata_producers.nodes import classify_about
@@ -1949,7 +1950,7 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
             })
         else: 
             statuses.append({
-                "pdf_name": uploaded_pdf.split("/")[-1], 
+                "file_name": uploaded_pdf.split("/")[-1], 
                 "status": "Pending", 
                 "status_id": 1, 
                 "created_on": str(datetime.now()) 

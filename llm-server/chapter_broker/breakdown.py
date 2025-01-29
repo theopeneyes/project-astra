@@ -26,11 +26,14 @@ def segment_breakdown(
     for _, index_item in enumerate(index_content):
         # within the book, look for the chapter
         section, title, heading_type, page_no = index_item
-            
         if page_no != 'no-page-number': 
-            assumed_page_number: int = int(page_no)
-            start_index: int = first_page + assumed_page_number - 5
-            end_index: int = start_index + 11
+            try: 
+                assumed_page_number: int = int(page_no)
+                start_index: int = first_page + assumed_page_number - 5
+                end_index: int = start_index + 11
+            except Exception as _: 
+                start_index: int = index + 1
+                end_index: int = -1
         else: 
             start_index: int = index + 1
             end_index: int = -1
