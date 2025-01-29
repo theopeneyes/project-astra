@@ -13,3 +13,7 @@ class UnsupportedPDFException(Exception):
 class IncorrectGCPBucketException(Exception):
     def __init__(self):
         super().__init__("The PDF was uploaded in an incorrect storage bucket. Please re-upload")
+    
+class NoChaptersFoundException(Exception): 
+    def __init__(self):
+        super().__init__("No chapters were found in this PDF.")
