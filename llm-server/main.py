@@ -6,6 +6,8 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi import File 
 
+from models import PdfPageCountRequestModel
+from models import PdfPageCountResponseModel
 from models import RectificationRequestModel
 from models import RectificationResponseModel
 from models import TextNodeRequestModel
@@ -63,6 +65,8 @@ import time
 import tiktoken 
 import urllib.error
 import datetime 
+import pymupdf
+import tempfile
 
 import pdf2image as p2i 
 import pandas as pd 
@@ -1511,6 +1515,40 @@ async def synthesize_relative_strength(request: SynthesisContentRequestModel) ->
         time=duration, 
         token_count=token_count
     )
+
+@app.post("/pdf_page_count") 
+async def retrieve_page_count(request: PdfPageCountRequestModel) -> PdfPageCountResponseModel: 
+    start_time: float = time.time() 
+    try: 
+        uploaded_document = bucket.blob(os.path.join(
+            request.email_id, 
+            "uploaded_document", 
+            request.filename
+        ))
+
+        with uploaded_document.open("rb") as document: 
+            with tempfile.TemporaryDirectory() as temp_dir:  
+                temp_file_path: str = f"{temp_dir}/{request.filename}"
+                temp_file = open(temp_file_path, "wb")  
+                temp_file.write(document.read())
+                temp_file.close() 
+                pdf_file = pymupdf.open(temp_file_path)
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
+        
+    return PdfPageCountResponseModel(
+        page_count = len(pdf_file), 
+        time = time.time() - start_time, 
+        filename=request.filename,  
+        email_id=request.email_id, 
+    )
+
 
 
 @app.post("/segregate")

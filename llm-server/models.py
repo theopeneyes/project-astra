@@ -188,6 +188,13 @@ class RectificationResponseModel(AbsoluteBaseModel):
     time: float 
     chapter_name: str 
 
+class PdfPageCountRequestModel(RequestModel): 
+    pass 
+
+class PdfPageCountResponseModel(AbsoluteBaseModel): 
+    time: float
+    page_count : int 
+
 
 
 

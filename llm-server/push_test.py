@@ -52,7 +52,6 @@ if response.status_code == 200:
     convert_response = requests.post(
         URL + "/convert_pdf", json = {
             "email_id": user_email, 
-            "uri": f"{user_email}/uploaded_document/{pdf_name}", 
             "filename": pdf_name,  
     })
 
