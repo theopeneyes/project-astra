@@ -56,8 +56,6 @@ class DataMapPlotInputModel(BaseModel):
     
 class DetectedLanguageResponseModel(AbsoluteBaseModel, ResponseModel): 
     detected_language: str
-    time: float
-    token_count: int
     confidence: float 
     
 class GeneratedImageModel(BaseModel):
