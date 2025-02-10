@@ -73,7 +73,6 @@ if response.status_code == 200:
     # language_code = "en"
     language_code = language_detected_response.json().get("detected_language")
     
-
     response = requests.post(
         URL + "/extract_contents_page", 
         json = {

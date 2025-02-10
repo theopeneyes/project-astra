@@ -8,7 +8,7 @@ import (
 ) 
 
 
-func (pm *ProcessMetadata) DataLoader() error {
+func (pm *ProcessMetadata) DataLoader() (string, error) {
 	baseRequestJson := loader.BaseRequestModel {
 		FileName: pm.FileName, 
 		EmailId: pm.EmailId, 
@@ -25,11 +25,11 @@ func (pm *ProcessMetadata) DataLoader() error {
 	pageResponse := <- pageCh; 
 
 	if err != nil {
-		return err; 
+		return "", err; 
 	} 
 	
 	if pageResponse.Error != nil {
-		return pageResponse.Error; 
+		return "", pageResponse.Error; 
 	} 
 	
 	if pageResponse.PageCount > 20 {
@@ -41,7 +41,7 @@ func (pm *ProcessMetadata) DataLoader() error {
 
 	languageCode, err := loader.DetectLanguage(LlmServerURL, baseRequestJson); 
 	if err != nil {
-		return err; 
+		return "", err; 
 	} 
 
 	fmt.Printf("The language code : %s\n", languageCode); 
@@ -58,11 +58,11 @@ func (pm *ProcessMetadata) DataLoader() error {
 	
 	err = loader.RunChapterWiseSegmentation(LlmServerURL, extractContentsPageJson); 
 	if err != nil {
-		return nil; 
+		return "", nil; 
 	} 
 	
 	log.Println("Chapter reformation ran successfully!"); 
-	return nil; 
+	return languageCode, nil; 
 } 
 	
 

@@ -458,149 +458,149 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
 @app.post("/identify/chapter_pages")
 async def identify_chapters(identification_request: ChapterIdentificationRequestModel) -> ChapterIdentificationResponseModel: 
     start_time: int = time.time()
-    # try: 
-    csv_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "contents_page", 
-        identification_request.filename.split(".pdf")[0] + ".csv", 
-    ))
+    try: 
+        csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "contents_page", 
+            identification_request.filename.split(".pdf")[0] + ".csv", 
+        ))
 
-    image_blob = bucket.blob(os.path.join(
-        identification_request.email_id,  
-        "processed_image", 
-        identification_request.filename.split(".pdf")[0] + ".json", 
-    ))
+        image_blob = bucket.blob(os.path.join(
+            identification_request.email_id,  
+            "processed_image", 
+            identification_request.filename.split(".pdf")[0] + ".json", 
+        ))
 
-    training_data_blob = bucket.blob(os.path.join(
-        "TRAINING_DATA", 
-        "train.json"    
-    ))
+        training_data_blob = bucket.blob(os.path.join(
+            "TRAINING_DATA", 
+            "train.json"    
+        ))
 
-    with csv_blob.open("r") as fp: 
-        index_content_csv: pd.DataFrame = pd.read_csv(fp).values.tolist()
-    
-    with image_blob.open("r") as fp: 
-        images: list[str] = json.load(fp=fp)
+        with csv_blob.open("r") as fp: 
+            index_content_csv: pd.DataFrame = pd.read_csv(fp).values.tolist()
+        
+        with image_blob.open("r") as fp: 
+            images: list[str] = json.load(fp=fp)
 
-    with training_data_blob.open("r") as fp: 
-        training_data: list = json.load(fp=fp)
-    
-    (content_csv, 
-        labelled_chapters,
-        unlabelled_chapters, 
-        labelled_headings, 
-        content_dict, 
-        chapter_to_heading_map, 
-        token_count) = segment_breakdown(
-        images, index_content_csv, 
-        identification_request.last_page, 
-        identification_request.first_page, 
-        identification_request.language_code, 
-        gpt4o, gpt4o_encoder
-    )
+        with training_data_blob.open("r") as fp: 
+            training_data: list = json.load(fp=fp)
+        
+        (content_csv, 
+            labelled_chapters,
+            unlabelled_chapters, 
+            labelled_headings, 
+            content_dict, 
+            chapter_to_heading_map, 
+            token_count) = segment_breakdown(
+            images, index_content_csv, 
+            identification_request.last_page, 
+            identification_request.first_page, 
+            identification_request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
 
-    chapter_count: int = len(labelled_chapters)
-    non_chapter_count: int = 0.9 * chapter_count 
+        chapter_count: int = len(labelled_chapters)
+        non_chapter_count: int = 0.9 * chapter_count 
 
 
-    if labelled_headings and len(labelled_headings) > int(non_chapter_count / 2) : 
-        heading_chapters = random.sample(labelled_headings, k = int(non_chapter_count / 2)) 
-    else: 
-        heading_chapters = []
-
-    if unlabelled_chapters and len(unlabelled_chapters) > int(non_chapter_count / 2) : 
-        if not heading_chapters: 
-            non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count) ) 
+        if labelled_headings and len(labelled_headings) > int(non_chapter_count / 2) : 
+            heading_chapters = random.sample(labelled_headings, k = int(non_chapter_count / 2)) 
         else: 
-            non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count / 2) ) 
+            heading_chapters = []
 
-    else: 
-        non_chapters = []
+        if unlabelled_chapters and len(unlabelled_chapters) > int(non_chapter_count / 2) : 
+            if not heading_chapters: 
+                non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count) ) 
+            else: 
+                non_chapters = random.sample(unlabelled_chapters, k = int(non_chapter_count / 2) ) 
 
-    df: pd.DataFrame = pd.DataFrame(
-        content_csv, 
-        columns = [
-            "title", 
-            "section_number", 
-            "index", 
-            "heading_type" 
-        ]
-    )
+        else: 
+            non_chapters = []
 
-    chapters: pd.DataFrame = df.loc[df.heading_type == "h1"]
-    headings: pd.DataFrame = df.loc[df.heading_type == "h2"] 
+        df: pd.DataFrame = pd.DataFrame(
+            content_csv, 
+            columns = [
+                "title", 
+                "section_number", 
+                "index", 
+                "heading_type" 
+            ]
+        )
 
-    chapter_pages_csv_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "book_sections", 
-        identification_request.filename.split(".pdf")[0], 
-        "chapters.csv"
-    ))
+        chapters: pd.DataFrame = df.loc[df.heading_type == "h1"]
+        headings: pd.DataFrame = df.loc[df.heading_type == "h2"] 
 
-    pages_csv_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "book_sections", 
-        identification_request.filename.split(".pdf")[0], 
-        "all_pages.csv"
-    ))
+        chapter_pages_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "chapters.csv"
+        ))
 
-    headings_csv_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "book_sections", 
-        identification_request.filename.split(".pdf")[0], 
-        "headings.csv"
-    ))
+        pages_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "all_pages.csv"
+        ))
 
-    heading_sections_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "book_sections", 
-        identification_request.filename.split(".pdf")[0], 
-        "sections.json"
-    ))
+        headings_csv_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "headings.csv"
+        ))
 
-    chapter_to_heading_map_blob = bucket.blob(os.path.join(
-        identification_request.email_id, 
-        "book_sections", 
-        identification_request.filename.split(".pdf")[0], 
-        "chapter_to_heading.json"
-    ))
+        heading_sections_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "sections.json"
+        ))
 
-    with chapter_pages_csv_blob.open("w", retry=retry) as fp: 
-        chapters.to_csv(fp, index=False)
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            identification_request.email_id, 
+            "book_sections", 
+            identification_request.filename.split(".pdf")[0], 
+            "chapter_to_heading.json"
+        ))
 
-    with pages_csv_blob.open("w", retry=retry) as fp: 
-        df.to_csv(fp, index=False)
+        with chapter_pages_csv_blob.open("w", retry=retry) as fp: 
+            chapters.to_csv(fp, index=False)
 
-    with headings_csv_blob.open("w", retry=retry) as fp: 
-        headings.to_csv(fp, index=False)
-    
-    with heading_sections_blob.open("w", retry=retry) as fp: 
-        json.dump(content_dict, fp=fp)
+        with pages_csv_blob.open("w", retry=retry) as fp: 
+            df.to_csv(fp, index=False)
 
-    with chapter_to_heading_map_blob.open("w", retry=retry) as fp: 
-        json.dump(chapter_to_heading_map, fp=fp)
+        with headings_csv_blob.open("w", retry=retry) as fp: 
+            headings.to_csv(fp, index=False)
+        
+        with heading_sections_blob.open("w", retry=retry) as fp: 
+            json.dump(content_dict, fp=fp)
 
-    with training_data_blob.open("w", retry=retry) as fp: 
-        training_data.extend(labelled_chapters)
-        training_data.extend(non_chapters)
-        training_data.extend(heading_chapters)
-        json.dump(training_data, fp=fp)
+        with chapter_to_heading_map_blob.open("w", retry=retry) as fp: 
+            json.dump(chapter_to_heading_map, fp=fp)
 
-    # except LLMTooDUMBException as tooDumb: 
-    #     error_name: str = type(tooDumb).__name__
-    #     error_line: int  = tooDumb.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
-    #     )
+        with training_data_blob.open("w", retry=retry) as fp: 
+            training_data.extend(labelled_chapters)
+            training_data.extend(non_chapters)
+            training_data.extend(heading_chapters)
+            json.dump(training_data, fp=fp)
 
-    # except Exception as err: 
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except LLMTooDUMBException as tooDumb: 
+        error_name: str = type(tooDumb).__name__
+        error_line: int  = tooDumb.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
+        )
+
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
 
     return ChapterIdentificationResponseModel(
         email_id=identification_request.email_id, 
@@ -842,65 +842,65 @@ async def rectify_update_chain(request : RectificationRequestModel) -> Rectifica
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
     start_time = time.time()
-    try: 
-        chapter_to_heading_map_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "book_sections", 
-            request.filename.split(".")[0], 
-            "chapter_to_heading.json"
-        ))
+    # try: 
+    chapter_to_heading_map_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "book_sections", 
+        request.filename.split(".")[0], 
+        "chapter_to_heading.json"
+    ))
 
-        chapters_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "book_sections", 
-            request.filename.split(".")[0], 
-            "chapters.csv"
-        ))
+    chapters_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "book_sections", 
+        request.filename.split(".")[0], 
+        "chapters.csv"
+    ))
 
-        chapter_image_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapter_processed_images", 
-            request.filename.split(".")[0], 
-            request.chapter_name, 
-        ))
+    chapter_image_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapter_processed_images", 
+        request.filename.split(".")[0], 
+        request.chapter_name, 
+    ))
 
-        with chapter_to_heading_map_blob.open("r") as f:
-            chapter_json: dict = json.load(f)
-        
-        with chapters_blob.open("r") as f:
-            df: pd.DataFrame = pd.read_csv(f)
-        
-        with chapter_image_blob.open("r") as f: 
-            chapter_images: list[dict]  = json.load(f) 
-        
-        responses, token_count = load_chapters(
-            request.chapter_name, 
-            chapter_json, 
-            df, chapter_images, 
-            request.language_code, 
-            gpt4o, gpt4o_encoder
-        )
-
-        structured_chapter: list[dict] = structure_html(responses)
-
-        chapter_processed_json_blob = bucket.blob(os.path.join(
-            request.email_id, 
-            "chapterwise_processed_json", 
-            request.filename.split(".")[0], 
-            request.chapter_name.split(".json")[0], 
-            "inherent_metadata.json" 
-        ))
-
-        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
-            json.dump(structured_chapter, fp)
+    with chapter_to_heading_map_blob.open("r") as f:
+        chapter_json: dict = json.load(f)
     
-    except Exception as err:
-        error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    with chapters_blob.open("r") as f:
+        df: pd.DataFrame = pd.read_csv(f)
+    
+    with chapter_image_blob.open("r") as f: 
+        chapter_images: list[dict]  = json.load(f) 
+    
+    responses, token_count = load_chapters(
+        request.chapter_name, 
+        chapter_json, 
+        df, chapter_images, 
+        request.language_code, 
+        gpt4o, gpt4o_encoder
+    )
+
+    structured_chapter: list[dict] = structure_html(responses)
+
+    chapter_processed_json_blob = bucket.blob(os.path.join(
+        request.email_id, 
+        "chapterwise_processed_json", 
+        request.filename.split(".")[0], 
+        request.chapter_name.split(".json")[0], 
+        "inherent_metadata.json" 
+    ))
+
+    with chapter_processed_json_blob.open("w", retry=retry) as fp: 
+        json.dump(structured_chapter, fp)
+    
+    # except Exception as err:
+    #     error_name: str = type(err).__name__
+    #     error_line: int  = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
     
     return ChapterLoaderResponseModel(
         email_id = request.email_id, 

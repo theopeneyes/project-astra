@@ -9,6 +9,7 @@ import (
 type ProcessMetadata struct {
 	FileName string 
 	EmailId string 
+	LanguageCode string 
 } 
 
 func NewProcess() *ProcessMetadata {
@@ -46,10 +47,22 @@ func main() {
 		fmt.Errorf("Issue with parsing the email id you provided. Read the help and provide the inputs appropriately\n"); 
 	} 
 	
-	err := pm.DataLoader(); 
+	languageCode, err := pm.DataLoader(); 
 	if err != nil {
-		log.Printf("Error occured while parsing in the data loader: %+v\n", err.Error()); 
+        	log.Printf("Error occured while parsing in the data loader: %+v\n", err.Error()); 
 	} 
+	
+	pm.LanguageCode = languageCode; 
+	
+	// access each chapter name 
+	chapters := ChapterNameList{}; 
+	pm.ChapterGetter(LlmServerURL, &chapters); 
 
-	// Data Loader running sequentially  
+	// getting names of chapters  
+	log.Printf("Starting to summariz and classify json..."); 
+	procHistory := pm.Summarize(LlmServerURL, &chapters); 
+	log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
+	log.Printf("History processed. Length of errors %d\n", len(procHistory.ProcessStatus)); 
+
+	
 } 
