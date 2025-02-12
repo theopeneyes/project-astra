@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"flag"
 	"log" 
+	"slices" 
 ) 
 
 type ProcessMetadata struct {
@@ -55,37 +56,51 @@ func main() {
 	pm.LanguageCode = languageCode; 
 	
 	// access each chapter name 
-	chapters := ChapterNameList{}; 
+	chapters := chapternamelist{}; 
 	pm.ChapterGetter(LlmServerURL, &chapters); 
 
 	// getting names of chapters  
-	log.Printf("Starting to summariz and classify json..."); 
+	log.Printf("Starting to summarize and classify json..."); 
 	procHistory := pm.Summarize(LlmServerURL, &chapters); 
 
 	log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
 
-	chapters.Titles = make([] string, 0); 
+	chaptersFailed := ChapterNameList{}; 
+	chaptersFailed.Titles = make([] string, 0); 
 	
 	for processId, err := range procHistory.ProcessStatus {
 		if err != nil {
-			chapters.Titles = append(chapters.Titles, processId); 	
+			chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
 		} 
 	} 
 	
 	// processes where error occured 
-	log.Printf("Total count of failed titles are as follows: %d\n", len(chapters.Titles)); 
+	log.Printf("Total count of failed titles are as follows: %d\n", len(chaptersFailed.Titles)); 
 	log.Printf("Retrying failed titles...\n"); 
 	
 	// retrying the endpoint 
-	procHistory = pm.Summarize(LlmServerURL, &chapters); 
-	chapters.Titles = make([] string, 0); 
+	procHistory = pm.Summarize(LlmServerURL, &chaptersFailed); 
 
+	chaptersFailed := ChapterNameList{}; 
+	chaptersFailed.Titles = make([] string, 0); 
 	for processId, err := range procHistory.ProcessStatus {
 		if err != nil {
-			chapters.Titles = append(chapters.Titles, processId); 	
+			chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
 		} 
 	} 
 
-	log.Printf("Total count of failed titles are as follows: %d\n", len(chapters.Titles)); 
+
+	log.Printf("Total count of failed titles in retry are as follows: %d\n", len(chaptersFailed.Titles)); 
+	
+	// now let's get the node count 
+	chaptersSucceded := ChapterNameList{}; 
+	for _, chapterName := range chapters.Titles {
+		if !slices.Contains(chaptersFailed.Titles, chapterName) {
+			chaptersSucceded.Titles = append(chaptersSucceded.Titles, chapterName);  
+		} 
+	} 
+		
+	for _, elonMuskChapter := range chaptersSucceded.Titles {
+	} 
 	
 } 
