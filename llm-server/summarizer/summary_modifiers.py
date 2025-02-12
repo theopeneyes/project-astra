@@ -10,7 +10,7 @@ from .prompts import difference_classification_prompt
 from .prompts import principle_type_classification_prompt 
 from .skeleton import text_messages
 
-MODEL: str = "gpt-3.5-turbo" 
+MODEL: str = "gpt-4o-mini" 
 gpt_encoder = tiktoken.encoding_for_model(MODEL) 
 
 def enlarge_summary(
@@ -56,6 +56,8 @@ def qualitate_summary(
     if re.findall("<accurate_summary>(.*?)</accurate_summary>", html_response, re.DOTALL):
         accurate_summary: str = re.findall("<accurate_summary>(.*?)</accurate_summary>",
                                         html_response, re.DOTALL)[0]
+    else: 
+        accurate_summary : str = html_response
 
     return accurate_summary, token_count 
 

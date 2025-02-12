@@ -27,7 +27,7 @@ func (ph *ProcHistory) SetProcessStatus(title string, err error) {
 	ph.ProcessStatus[title] = err; 
 } 
 
-func GenerateSummary(proc *ProcHistory, url string, request *SummarizationRequestModel) {
+func GenerateSummary(proc *ProcHistory, url string, request SummarizationRequestModel) {
 	client := &http.Client{}; 
 	requestJsonBuff, err := json.Marshal(request); 
 	if err != nil {

@@ -9,12 +9,11 @@ import (
 
 func (pm *ProcessMetadata) Summarize(url string, chapters *ChapterNameList) *summarizer.ProcHistory {
 	var wg sync.WaitGroup; 
-	var request summarizer.SummarizationRequestModel; 
 	procHistory := summarizer.ProcHistory{ ProcessStatus: make(map[string] error) }; 
 	for _, title := range chapters.Titles {
 		wg.Add(1); 
-		go func() {
-			request = summarizer.SummarizationRequestModel{
+		go func(title string) {
+			request := summarizer.SummarizationRequestModel{
 				FileName: pm.FileName, 
 				EmailId: pm.EmailId, 
 				LanguageCode: pm.LanguageCode, 
@@ -22,8 +21,8 @@ func (pm *ProcessMetadata) Summarize(url string, chapters *ChapterNameList) *sum
 			} 
 
 			defer wg.Done(); 
-			summarizer.GenerateSummary(&procHistory, url, &request); 
-		}()  
+			summarizer.GenerateSummary(&procHistory, url, request); 
+		}(title)  
 	}
 
 	wg.Wait(); 

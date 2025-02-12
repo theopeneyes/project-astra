@@ -612,62 +612,62 @@ async def identify_chapters(identification_request: ChapterIdentificationRequest
 @app.post("/reform/chapter_pages")
 async def reform_chapter_pages(request: ReformRequestModel) -> ReformResponseModel: 
     start_time: float = time.time()
-    # try: 
-    chapter_csv_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".pdf")[0], 
-        "chapters.csv"
-    ))
+    try: 
+        chapter_csv_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".pdf")[0], 
+            "chapters.csv"
+        ))
 
-    images_blob  = bucket.blob(os.path.join(
-        request.email_id, 
-        "processed_image", 
-        request.filename.split(".pdf")[0] + ".json", 
-    ))
+        images_blob  = bucket.blob(os.path.join(
+            request.email_id, 
+            "processed_image", 
+            request.filename.split(".pdf")[0] + ".json", 
+        ))
 
-    with images_blob.open("r") as fp: 
-        images: list = json.load(fp=fp)
+        with images_blob.open("r") as fp: 
+            images: list = json.load(fp=fp)
 
-    with chapter_csv_blob.open("r") as fp: 
-        chapters: list[list[str]] = pd.read_csv(fp).values.tolist()
-    
-    if not chapters: 
-        raise NoChaptersFoundException("The chapters in the book were not found.") 
-    
-    for idx, chapter in enumerate(chapters[1:], 1):
-        _, _, next_index, _ = chapter  
-        curr_title, curr_section, curr_index, _ = chapters[idx-1]
-        chapter_images: list = images[curr_index:next_index]
+        with chapter_csv_blob.open("r") as fp: 
+            chapters: list[list[str]] = pd.read_csv(fp).values.tolist()
+        
+        if not chapters: 
+            raise NoChaptersFoundException("The chapters in the book were not found.") 
+        
+        for idx, chapter in enumerate(chapters[1:], 1):
+            _, _, next_index, _ = chapter  
+            curr_title, curr_section, curr_index, _ = chapters[idx-1]
+            chapter_images: list = images[curr_index:next_index]
 
+            chapter_image_blob = bucket.blob(os.path.join(
+                request.email_id, 
+                "chapter_processed_images", 
+                request.filename.split(".pdf")[0], 
+                f"{curr_section}_{curr_title}.json" 
+            ))
+
+            with chapter_image_blob.open("w", retry=retry) as fp: 
+                json.dump(chapter_images, fp=fp)
+                
+        last_chapter, last_section, last_index, _ = chapters[len(chapters) - 1]
         chapter_image_blob = bucket.blob(os.path.join(
             request.email_id, 
             "chapter_processed_images", 
             request.filename.split(".pdf")[0], 
-            f"{curr_section}_{curr_title}.json" 
+            f"{last_section}_{last_chapter}.json" 
         ))
 
         with chapter_image_blob.open("w", retry=retry) as fp: 
-            json.dump(chapter_images, fp=fp)
-            
-    last_chapter, last_section, last_index, _ = chapters[len(chapters) - 1]
-    chapter_image_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_processed_images", 
-        request.filename.split(".pdf")[0], 
-        f"{last_section}_{last_chapter}.json" 
-    ))
+            json.dump(images[last_index:], fp=fp)
 
-    with chapter_image_blob.open("w", retry=retry) as fp: 
-        json.dump(images[last_index:], fp=fp)
-
-    # except Exception as err: 
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+    except Exception as err: 
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     return ReformResponseModel(
         filename=request.filename, 
@@ -842,65 +842,65 @@ async def rectify_update_chain(request : RectificationRequestModel) -> Rectifica
 @app.post("/chapter_loader")
 async def chapter_loader(request: ChapterLoaderRequestModel) -> ChapterLoaderResponseModel: 
     start_time = time.time()
-    # try: 
-    chapter_to_heading_map_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapter_to_heading.json"
-    ))
+    try: 
+        chapter_to_heading_map_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapter_to_heading.json"
+        ))
 
-    chapters_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "book_sections", 
-        request.filename.split(".")[0], 
-        "chapters.csv"
-    ))
+        chapters_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "book_sections", 
+            request.filename.split(".")[0], 
+            "chapters.csv"
+        ))
 
-    chapter_image_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapter_processed_images", 
-        request.filename.split(".")[0], 
-        request.chapter_name, 
-    ))
+        chapter_image_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapter_processed_images", 
+            request.filename.split(".")[0], 
+            request.chapter_name, 
+        ))
 
-    with chapter_to_heading_map_blob.open("r") as f:
-        chapter_json: dict = json.load(f)
-    
-    with chapters_blob.open("r") as f:
-        df: pd.DataFrame = pd.read_csv(f)
-    
-    with chapter_image_blob.open("r") as f: 
-        chapter_images: list[dict]  = json.load(f) 
-    
-    responses, token_count = load_chapters(
-        request.chapter_name, 
-        chapter_json, 
-        df, chapter_images, 
-        request.language_code, 
-        gpt4o, gpt4o_encoder
-    )
+        with chapter_to_heading_map_blob.open("r") as f:
+            chapter_json: dict = json.load(f)
+        
+        with chapters_blob.open("r") as f:
+            df: pd.DataFrame = pd.read_csv(f)
+        
+        with chapter_image_blob.open("r") as f: 
+            chapter_images: list[dict]  = json.load(f) 
+        
+        responses, token_count = load_chapters(
+            request.chapter_name, 
+            chapter_json, 
+            df, chapter_images, 
+            request.language_code, 
+            gpt4o, gpt4o_encoder
+        )
 
-    structured_chapter: list[dict] = structure_html(responses)
+        structured_chapter: list[dict] = structure_html(responses)
 
-    chapter_processed_json_blob = bucket.blob(os.path.join(
-        request.email_id, 
-        "chapterwise_processed_json", 
-        request.filename.split(".")[0], 
-        request.chapter_name.split(".json")[0], 
-        "inherent_metadata.json" 
-    ))
+        chapter_processed_json_blob = bucket.blob(os.path.join(
+            request.email_id, 
+            "chapterwise_processed_json", 
+            request.filename.split(".")[0], 
+            request.chapter_name.split(".json")[0], 
+            "inherent_metadata.json" 
+        ))
 
-    with chapter_processed_json_blob.open("w", retry=retry) as fp: 
-        json.dump(structured_chapter, fp)
-    
-    # except Exception as err:
-    #     error_name: str = type(err).__name__
-    #     error_line: int  = err.__traceback__.tb_lineno
-    #     raise HTTPException(
-    #         status_code=404, 
-    #         detail = f"Error :{error_name} at line {error_line}"
-    #     )
+        with chapter_processed_json_blob.open("w", retry=retry) as fp: 
+            json.dump(structured_chapter, fp)
+        
+    except Exception as err:
+        error_name: str = type(err).__name__
+        error_line: int  = err.__traceback__.tb_lineno
+        raise HTTPException(
+            status_code=404, 
+            detail = f"Error :{error_name} at line {error_line}"
+        )
     
     return ChapterLoaderResponseModel(
         email_id = request.email_id, 
@@ -1131,7 +1131,7 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
             status_code=404, 
             detail = f"Error :{error_name} at line {error_line}"
         )
-   
+
     except DepthListNotGeneratedException as depthNotGenerated: 
         error_name: str = type(depthNotGenerated).__name__
         error_line: int  = depthNotGenerated.__traceback__.tb_lineno
@@ -1147,7 +1147,7 @@ async def classify_summary(request: SummaryChapterRequestModel) -> SummaryChapte
             status_code=404, 
             detail = f"Error :{error_name} at line {error_line}"
         )
-        
+    
     return SummaryChapterResponseModel(
         filename=request.filename, 
         email_id=request.email_id, 

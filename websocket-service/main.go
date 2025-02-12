@@ -61,8 +61,31 @@ func main() {
 	// getting names of chapters  
 	log.Printf("Starting to summariz and classify json..."); 
 	procHistory := pm.Summarize(LlmServerURL, &chapters); 
-	log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
-	log.Printf("History processed. Length of errors %d\n", len(procHistory.ProcessStatus)); 
 
+	log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
+
+	chapters.Titles = make([] string, 0); 
+	
+	for processId, err := range procHistory.ProcessStatus {
+		if err != nil {
+			chapters.Titles = append(chapters.Titles, processId); 	
+		} 
+	} 
+	
+	// processes where error occured 
+	log.Printf("Total count of failed titles are as follows: %d\n", len(chapters.Titles)); 
+	log.Printf("Retrying failed titles...\n"); 
+	
+	// retrying the endpoint 
+	procHistory = pm.Summarize(LlmServerURL, &chapters); 
+	chapters.Titles = make([] string, 0); 
+
+	for processId, err := range procHistory.ProcessStatus {
+		if err != nil {
+			chapters.Titles = append(chapters.Titles, processId); 	
+		} 
+	} 
+
+	log.Printf("Total count of failed titles are as follows: %d\n", len(chapters.Titles)); 
 	
 } 
