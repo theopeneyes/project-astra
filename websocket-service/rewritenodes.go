@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"sync"
 )
@@ -166,7 +165,6 @@ func (pm *ProcessMetadata) RewriteNodes(url, chapterName string, re *RequestErro
 func (pm *ProcessMetadata) RewriteJson(re *RequestErrors, url string, nodeId int, chapterName string) {
 	client := &http.Client{}
 
-	log.Println("Rewrite json chalra")
 	rewriteData := RewriteJsonRequestModel{
 		FileName:     pm.FileName,
 		EmailId:      pm.EmailId,
@@ -177,7 +175,6 @@ func (pm *ProcessMetadata) RewriteJson(re *RequestErrors, url string, nodeId int
 
 	rewriteBuf, err := json.Marshal(rewriteData)
 	if err != nil {
-		log.Printf("Maybe got error in rewrite json who's to say: %d and chapter name : %s, Error: %s\n", nodeId, chapterName, err.Error())
 		re.AddError(chapterName, FeedbackDefinition{
 			Request:     nil,
 			NodeId:      nodeId,
