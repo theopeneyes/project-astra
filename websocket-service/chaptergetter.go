@@ -15,6 +15,9 @@ func (pm *ProcessMetadata) ChapterGetter(url string, chapterList *ChapterNameLis
 	client := &http.Client{}; 
 	getUrl := fmt.Sprintf("%s/book_chapters/%s/%s", url, pm.EmailId, pm.FileName); 
 	request, err := http.NewRequest(http.MethodGet, getUrl, nil); 
+	if err != nil {
+			return err; 
+	} 
 	res, err := client.Do(request); 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("%s", http.StatusText(res.StatusCode)); 
