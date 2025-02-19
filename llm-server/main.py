@@ -6,6 +6,8 @@ from fastapi import Form
 from fastapi import UploadFile
 from fastapi import File 
 
+from models import SubprocessRequest 
+from models import SubprocessInitiatedResponse
 from models import PdfPageCountRequestModel
 from models import PdfPageCountResponseModel
 from models import RectificationRequestModel
@@ -1995,9 +1997,32 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
             })
     
     return statuses
-            
 
-            
+@app.post("/run_subprocess") 
+async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
+    """
+    Initiates the binary process asynchronously by executing:
+        ./websocket-service/project-astra --filename <filename> --emailId <email_id>
+    Instead of waiting for the process to complete, it schedules a background task
+    to await its termination (using asyncio.create_task(process.wait())),
+    ensuring that the process is properly reaped (avoiding zombie processes).
+    """
+    command = [
+        "./websocket-service/project-astra",
+        "--filename", request.filename,
+        "--emailId", request.email_id
+    ]
+    
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+    
+    # Schedule waiting for process termination in the background
+    asyncio.create_task(process.wait())
+
+    return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
     
         
 

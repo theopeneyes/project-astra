@@ -13,6 +13,7 @@ func (pm *ProcessMetadata) Summarize(url string, chapters *ChapterNameList) *sum
 	for _, title := range chapters.Titles {
 		wg.Add(1); 
 		go func(title string) {
+			defer wg.Done(); 
 			request := summarizer.SummarizationRequestModel{
 				FileName: pm.FileName, 
 				EmailId: pm.EmailId, 
@@ -20,7 +21,6 @@ func (pm *ProcessMetadata) Summarize(url string, chapters *ChapterNameList) *sum
 				ChapterName: title, 
 			} 
 
-			defer wg.Done(); 
 			summarizer.GenerateSummary(&procHistory, url, request); 
 		}(title)  
 	}

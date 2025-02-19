@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"flag"
 	"log" 
-	// "slices" 
+	"slices" 
 	"sync" 
 ) 
 
@@ -48,59 +48,58 @@ func main() {
 		panic(fmt.Errorf("issue with parsing the email id you provided. Read the help and provide the inputs appropriately"));  
 	} 
 	
-	// languageCode, err := pm.DataLoader(); 
-	// if err != nil {
-    //     	log.Printf("Error occured while parsing in the data loader: %+v\n", err.Error()); 
-	// } 
+	languageCode, err := pm.DataLoader(); 
+	if err != nil {
+        	log.Printf("Error occured while parsing in the data loader: %+v\n", 
+		 err.Error()); 
+	} 
 	
-	// pm.LanguageCode = languageCode; 
-	pm.LanguageCode = "en";  
+	pm.LanguageCode = languageCode; 
 	
 	// access each chapter name 
 	chapters := ChapterNameList{}; 
 	pm.ChapterGetter(LlmServerURL, &chapters); 
 
 	// getting names of chapters  
-	// log.Printf("Starting to summarize and classify json..."); 
-	// procHistory := pm.Summarize(LlmServerURL, &chapters); 
+	log.Printf("Starting to summarize and classify json..."); 
+	procHistory := pm.Summarize(LlmServerURL, &chapters); 
 
-	// log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
+	log.Printf("Process history accessed! %+v\n", procHistory.ProcessStatus); 
 
-	// chaptersFailed := ChapterNameList{}; 
-	// chaptersFailed.Titles = make([] string, 0); 
+	chaptersFailed := ChapterNameList{}; 
+	chaptersFailed.Titles = make([] string, 0); 
 	
-	// for processId, err := range procHistory.ProcessStatus {
-	// 	if err != nil {
-	// 		chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
-	// 	} 
-	// } 
+	for processId, err := range procHistory.ProcessStatus {
+		if err != nil {
+			chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
+		} 
+	} 
 	
-	// processes where error occured 
-	// log.Printf("Total count of failed titles are as follows: %d\n", len(chaptersFailed.Titles)); 
-	// log.Printf("Retrying failed titles...\n"); 
-	
+	log.Printf("Total count of failed titles are as follows: %d\n", len(chaptersFailed.Titles)); 
+	log.Printf("Retrying failed titles...\n"); 
+
 	// retrying the endpoint 
-	// procHistory = pm.Summarize(LlmServerURL, &chaptersFailed); 
+	procHistory = pm.Summarize(LlmServerURL, &chaptersFailed); 
 
-	// chaptersFailed = ChapterNameList{}; 
-	// chaptersFailed.Titles = make([] string, 0); 
-	// for processId, err := range procHistory.ProcessStatus {
-	// 	if err != nil {
-	// 		chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
-	// 	} 
-	// } 
+	chaptersFailed = ChapterNameList{}; 
+	chaptersFailed.Titles = make([] string, 0); 
+	for processId, err := range procHistory.ProcessStatus {
+		if err != nil {
+			chaptersFailed.Titles = append(chaptersFailed.Titles, processId); 	
+		} 
+	} 
 
 
-	// log.Printf("Total count of failed titles in retry are as follows: %d\n", len(chaptersFailed.Titles)); 
+	log.Printf("Total count of failed titles in retry are as follows: %d\n", len(chaptersFailed.Titles)); 
 	
 	// now let's get the node count 
-	// chaptersSucceded := ChapterNameList{}; 
-	// for _, chapterName := range chapters.Titles {
-	// 	if !slices.Contains(chaptersFailed.Titles, chapterName) {
-	// 		chaptersSucceded.Titles = append(chaptersSucceded.Titles, chapterName);  
-	// 	} 
-	// } 
-	
+	chaptersSucceded := ChapterNameList{}; 
+	for _, chapterName := range chapters.Titles {
+		if !slices.Contains(chaptersFailed.Titles, chapterName) {
+			chaptersSucceded.Titles = append(chaptersSucceded.Titles, chapterName);  
+		} 
+	} 
+
 	re := RequestErrors {
 		ErrMap : make(map[string] FeedbackDefinition), 
 	} 
@@ -117,4 +116,21 @@ func main() {
 	} 
 	wg.Wait(); 
 	log.Println("Done parsing chapters"); 
+
+	err = pm.Preprocess(LlmServerURL); 
+	if err != nil {
+		panic(err); 
+	} 
+
+	err = pm.Segregate(LlmServerURL); 
+	if err != nil {
+		panic(err); 
+	} 
+
+	pm.Modify(LlmServerURL); 
+
+	err = pm.AddWordCount(LlmServerURL); 
+	if err != nil {
+		panic(err); 
+	} 
 } 
