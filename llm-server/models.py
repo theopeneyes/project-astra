@@ -193,7 +193,7 @@ class PdfPageCountResponseModel(AbsoluteBaseModel):
     time: float
     page_count : int 
 
-class SubprocessRequest(RequestModel): 
+class RunSubprocessRequest(RequestModel): 
     pass 
 
 class SubprocessInitiatedResponse(AbsoluteBaseModel): 
