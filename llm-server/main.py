@@ -7,6 +7,8 @@ from fastapi import UploadFile
 from fastapi import File 
 
 from models import RunSubprocessRequest 
+from models import FinalBookListRequest
+from models import FinalBookListResponse
 from models import SubprocessInitiatedResponse
 from models import PdfPageCountRequestModel
 from models import PdfPageCountResponseModel
@@ -1999,6 +2001,23 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
             })
     
     return statuses
+
+@app.post("/get_all_processed_books") 
+async def processed_books_request(request: FinalBookListRequest) -> FinalBookListResponse: 
+        existent_blobs = gcs_client.list_blobs(
+            BUCKET_NAME, 
+            prefix=f"{request.email}/final_json/", 
+            delimiter="/"
+        )
+
+        blob_names = [blob.name.split("/")[-1].split(".json")[0]
+                                 for blob in existent_blobs]
+        
+        return FinalBookListResponse(
+            email_id=request.email_id, 
+            filename=request.filename, 
+            book_list=blob_names, 
+        ) 
 
 @app.post("/run_subprocess") 
 async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
