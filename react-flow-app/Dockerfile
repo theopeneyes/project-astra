@@ -7,6 +7,6 @@ RUN npm install -y
 
 EXPOSE 4173
 
-ENTRYPOINT npm run preview 
+ENTRYPOINT npm run preview --host 
 
 

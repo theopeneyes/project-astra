@@ -8,4 +8,4 @@ EXPOSE 8051
 
 RUN pip install -r requirements.txt 
 
-ENTRYPOINT streamlit run test_app.py  
+ENTRYPOINT streamlit run test_app.py --server.address=0.0.0.0 
