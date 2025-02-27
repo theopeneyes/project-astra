@@ -71,16 +71,16 @@ async def process_pdf(pdf_name: str, user_email: str, base_directory: str):
             form_data.add_field('pdf', pdf_file, filename=pdf_name, content_type='application/pdf')
 
             async with session.post(URL + "/upload_pdf", data=form_data) as response:
-                if response.status_code == 200: 
+                if response.status == 200: 
                     await response.json()
                 else: 
                     return 
 
-    async with session.post(URL + "/run_subprocess", json = {"email_id": pdf_name, "filename": pdf_name}) as response: 
-        if response.status_code == 200: 
-            await response.json()
-        else: 
-            return 
+        async with session.post(URL + "/run_subprocess", json = {"email_id": user_email, "filename": pdf_name}) as response: 
+            if response.status == 200: 
+                await response.json()
+            else: 
+                return 
 
 @st.fragment
 def generate_qna(filename: str, language: str): 
@@ -219,19 +219,21 @@ def run_main():
         request = requests.post(
             URL + "/get_all_processed_books", 
             json = {
-                "email_id": st.session_state.email_id,  
+                "email_id": st.session_state.email,  
             },  
 
         )
+
         if request.status_code == 200: 
             response_dict = request.json()
             blob_names = response_dict["book_list"]
-        
+            non_existent_pdfs = list(pdfs - set(blob_names))
 
-        non_existent_pdfs = list(pdfs - set(blob_names))
-
-        # documents that are ready... 
-        select_book(blob_names[1:], directory_path, non_existent_pdfs)
+            # documents that are ready... 
+            select_book(blob_names[1:], directory_path, non_existent_pdfs)
+        else: 
+            st.write("Could not process list out pdfs")
+            
 
 @st.fragment
 def password_reset():

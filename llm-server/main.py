@@ -2006,7 +2006,7 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
 async def processed_books_request(request: FinalBookListRequest) -> FinalBookListResponse: 
         existent_blobs = gcs_client.list_blobs(
             BUCKET_NAME, 
-            prefix=f"{request.email}/final_json/", 
+            prefix=f"{request.email_id}/final_json/", 
             delimiter="/"
         )
 
@@ -2015,7 +2015,6 @@ async def processed_books_request(request: FinalBookListRequest) -> FinalBookLis
         
         return FinalBookListResponse(
             email_id=request.email_id, 
-            filename=request.filename, 
             book_list=blob_names, 
         ) 
 
@@ -2023,13 +2022,13 @@ async def processed_books_request(request: FinalBookListRequest) -> FinalBookLis
 async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
     """
     Initiates the binary process asynchronously by executing:
-        ../websocket-service/project-astra --filename <filename> --emailId <email_id>
+        ../autopipeline/project-astra --filename <filename> --emailId <email_id>
     Instead of waiting for the process to complete, it schedules a background task
     to await its termination (using asyncio.create_task(process.wait())),
     ensuring that the process is properly reaped (avoiding zombie processes).
     """
     command = [
-        "../websocket-service/project-astra",
+        "../autopipeline/project-astra",
         "--filename", request.filename,
         "--emailId", request.email_id
     ]

@@ -193,10 +193,11 @@ class PdfPageCountResponseModel(AbsoluteBaseModel):
     time: float
     page_count : int 
 
-class FinalBookListRequest: 
+class FinalBookListRequest(BaseModel): 
     email_id: str
 
-class FinalBookListResponse(AbsoluteBaseModel): 
+class FinalBookListResponse(BaseModel): 
+    email_id: str
     book_list: list[str]
 
 class RunSubprocessRequest(RequestModel): 
