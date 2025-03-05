@@ -133,4 +133,9 @@ func main() {
 	if err != nil {
 		panic(err); 
 	} 
+
+	err = pm.SendEmailToClient(LlmServerURL); 
+	if err != nil {
+		panic(err)
+	} 
 } 

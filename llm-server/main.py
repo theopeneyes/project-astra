@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from fastapi import File 
 
 from models import RunSubprocessRequest 
+from models import EmailRequest
 from models import FinalBookListRequest
 from models import FinalBookListResponse
 from models import SubprocessInitiatedResponse
@@ -68,6 +69,7 @@ import json
 import time 
 import tiktoken 
 import urllib.error
+import requests 
 import datetime 
 import pymupdf
 import tempfile
@@ -2043,6 +2045,22 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
     asyncio.create_task(process.wait())
 
     return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
+
+@app.post("/send-email/")
+def send_email(request_data: EmailRequest):
+    payload = {
+        "request_key": "OpenEyes_1224EzZykXxo",
+        "email_key": "RequestComplated",
+        "request_emails": [request_data.email],
+        "dynamic_data": {"current_year": "2025"}
+    }
+    
+    try:
+        response = requests.post( "https://oeservices.uatbyopeneyes.com/api/v1/sendMailWithOpenEyesMT", json=payload)
+        response.raise_for_status()  # Raise an error for bad responses
+        return response.json()
+    except requests.RequestException as e:
+        raise HTTPException(status_code=500, detail=str(e))
     
         
 

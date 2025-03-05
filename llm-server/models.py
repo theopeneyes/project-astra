@@ -206,6 +206,9 @@ class RunSubprocessRequest(RequestModel):
 class SubprocessInitiatedResponse(AbsoluteBaseModel): 
     pass 
 
+class EmailRequest(BaseModel): 
+    email: str
+
 
 
 
