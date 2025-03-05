@@ -21,7 +21,7 @@ func (pm *ProcessMetadata) SendEmailToClient(url string) error {
 	} 
 
 	reqBody := bytes.NewReader(buf); 
-	request, err := http.NewRequest(http.MethodPost, url + "/", reqBody); 
+	request, err := http.NewRequest(http.MethodPost, url + "/send-email", reqBody); 
 	if err != nil {
 		return err
 	} 
