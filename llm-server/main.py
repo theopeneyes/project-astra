@@ -2046,7 +2046,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
 
     return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
 
-@app.post("/send-email/")
+@app.post("/send-email")
 def send_email(request_data: EmailRequest):
     payload = {
         "request_key": "OpenEyes_1224EzZykXxo",
