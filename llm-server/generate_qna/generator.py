@@ -31,7 +31,7 @@ def generate_qna_for_topic_sync(topic_name: str, texts: list[str], gpt4o, gpt4o_
         input_tokens = total_tokens
     
     prompt = f"""
-    I need you to generate 3 question-answer pairs based on the following text about {topic_name}. 
+    I need you to generate 3 questions based on the following text about {topic_name}. 
     The questions should:
     1. Cover key concepts, facts, and insights from the text
     2. Be clearly answerable from the content provided
@@ -44,16 +44,16 @@ def generate_qna_for_topic_sync(topic_name: str, texts: list[str], gpt4o, gpt4o_
     3. Use information exclusively from the provided text
     4. Be factually accurate
     
-    Please format your response as a JSON array of objects, where each object has a "question" field and an "answer" field.
+    Please format your response as a JSON array of objects, where each object has a "question" field.
     
     Here's the text:
     
     {text_for_processing}
     
-    Generate exactly 3 question-answer pairs in the following JSON format:
+    Generate exactly 3 questions in the following JSON format:
     [
-        {{"question": "What is...", "answer": "The text explains that..."}},
-        ...and so on for all 3 pairs
+        {{"question": "What is..." }},
+        ...and so on for all pairs
     ]
     
     Only return the JSON array without any additional text or explanations.
@@ -83,8 +83,10 @@ def generate_qna_for_topic_sync(topic_name: str, texts: list[str], gpt4o, gpt4o_
         for item in qna_data:
             item["topic"] = topic_name
             item["generated_at"] = datetime.datetime.now().isoformat()
-        
+
+        print(qna_data)  
         return (topic_name, qna_data, completion_tokens, prompt_tokens)
         
-    except Exception as e:
-        return (topic_name, [])
+    except Exception as err:
+        print("error occured in: ", str(err)) 
+        return (topic_name, [], "", "")

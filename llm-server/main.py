@@ -2047,13 +2047,18 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
     
     return statuses
 
-def start_process_topics(request: QNATopicWiseRequest):
-    subprocess.Popen(["python3", "subprocess_script.py", request.filename, request.email_id], close_fds=True)
+async def start_process_topics(request: QNATopicWiseRequest):
+    process = await asyncio.create_subprocess_exec(
+        "python3", "subprocess_script.py", request.filename, request.email_id,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    asyncio.create_task(process.wait())
 
 @app.post("/generate_excel")
 async def generate_qna_topic_wise(request: QNATopicWiseRequest):
-    start_process_topics(request)
-    return {"status": "processing", "message": "csv files are generating!"}
+    asyncio.create_task(start_process_topics(request))
+    return {"status": "processing", "message": "CSV files are being generated. Check the bucket for progress."}
+
 
 @app.post("/get_all_processed_books") 
 async def processed_books_request(request: FinalBookListRequest) -> FinalBookListResponse: 
@@ -2105,8 +2110,8 @@ def send_email(request_data: EmailRequest):
     }
     
     try:
-        response = requests.post( "https://oeservices.uatbyopeneyes.com/api/v1/sendMailWithOpenEyesMT", json=payload)
-        response.raise_for_status()  # Raise an error for bad responses
+        response = requests.post("https://oeservices.uatbyopeneyes.com/api/v1/sendMailWithOpenEyesMT", json=payload)
+        response.raise_for_status()  
         return response.json()
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
