@@ -1687,7 +1687,6 @@ async def generate_qna_topic_wise(request: QNATopicWiseRequest):
                     topic_df.to_excel(writer, sheet_name=topic_name[:31], index=False)  # Excel sheet names limited to 31 chars
             
             excel_blob.upload_from_string(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        
         return {"status": "success", "excel_path": output_path}
         
     except Exception as err:
