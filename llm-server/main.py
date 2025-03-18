@@ -2003,19 +2003,13 @@ async def generated_output(email_id: str, filename: str, question_type: str, cha
 async def get_status(request: StatusRequestModel) -> JSONResponse:
     uploaded_pdfs_blobs  = gcs_client.list_blobs(
         BUCKET_NAME, 
-        prefix = os.path.join(
-            request.email_id,
-            "uploaded_document"
-        ), 
+        prefix = f"{request.email_id}/uploaded_document/", 
         delimiter="/", 
     )  
 
     finished_pdf_blobs = gcs_client.list_blobs(
         BUCKET_NAME, 
-        prefix = os.path.join(
-            request.email_id, 
-            "final_json"
-        ), 
+        prefix =  f"{request.email_id}/final_json/", 
         delimiter="/" 
     )
 
@@ -2023,10 +2017,11 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
     finished_pdfs = [] 
     for uploaded_file_blob in uploaded_pdfs_blobs: 
         uploaded_pdfs.append(uploaded_file_blob.name) 
+
         
     for finished_pdf_blob in finished_pdf_blobs: 
         finished_pdfs.append(finished_pdf_blob.name)
-
+    
     statuses: list = []
     
     for uploaded_pdf in uploaded_pdfs:  
