@@ -7,6 +7,7 @@ from fastapi import UploadFile
 from fastapi import File 
 
 from models import RunSubprocessRequest 
+from models import QNATopicWiseRequest 
 from models import EmailRequest
 from models import FinalBookListRequest
 from models import FinalBookListResponse
@@ -65,6 +66,7 @@ from collections import defaultdict
 import PIL 
 import random 
 import os 
+import logging 
 import json
 import time 
 import tiktoken 
@@ -79,6 +81,7 @@ import pdf2image as p2i
 import asyncio 
 import pandas as pd 
 from openai import OpenAI 
+from generate_qna.generator import generate_qna_for_topic
 
 # custom defined libraries 
 from json_trees.generate import JSONParser 
@@ -128,6 +131,7 @@ from summarizer.exceptions import SummaryNotFoundException
 from chapter_broker.breakdown import segment_breakdown
 from chapter_loader.structure import structure_html
 from chapter_loader.loader import load_chapters 
+from io import BytesIO
 
 
 from font_chapter.extractcss import css_extractor 
@@ -144,6 +148,7 @@ question_type_map: Dict[str, str] = {
     "Computational Questions": "computationQuestion", 
     "Software Code Questions": "softwareCodeQuestion", 
 }
+logger = logging.getLogger(__name__)
 
 
 PROMPT_FILE_ID: str = os.environ.get("FILE_ID") 
@@ -1650,6 +1655,45 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         token_count=token_count, 
     )
 
+@app.post("/generate_excel")
+async def generate_qna_topic_wise(request: QNATopicWiseRequest):
+    try:
+        final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
+        with final_json_blob.open("r") as blb:
+            json_qna: list[str] = json.load(blb)
+        
+        df = pd.DataFrame(json_qna)
+        
+        tasks = []
+        
+        for topic_name, topic_df in df.groupby("topic"):
+            topic_texts = topic_df["text"].tolist()
+            task = generate_qna_for_topic(topic_name, topic_texts, gpt4o, gpt4o_encoder)
+            tasks.append(task)
+        
+        results = await asyncio.gather(*tasks)
+        
+        all_results = {}
+        for topic_name, topic_result in results:
+            all_results[topic_name] = topic_result
+        
+        output_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.xlsx"
+        excel_blob = bucket.blob(output_path)
+        
+        with BytesIO() as output:
+            with pd.ExcelWriter(output) as writer:
+                for topic_name, topic_data in all_results.items():
+                    topic_df = pd.DataFrame(topic_data)
+                    topic_df.to_excel(writer, sheet_name=topic_name[:31], index=False)  # Excel sheet names limited to 31 chars
+            
+            excel_blob.upload_from_string(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        
+        return {"status": "success", "excel_path": output_path}
+        
+    except Exception as err:
+        logger.error(f"Error generating Excel: {str(err)}")
+        return {"status": "error", "message": str(err)}
+    
 @app.post("/add_word_count") 
 async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEditResponseModel: 
     start_time = time.time()
