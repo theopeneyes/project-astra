@@ -1,7 +1,7 @@
 import datetime 
 import json 
 
-async def generate_qna_for_topic(topic_name: str, texts: list[str], gpt4o, gpt4o_encoder):
+def generate_qna_for_topic_sync(topic_name: str, texts: list[str], gpt4o, gpt4o_encoder):
     """
     Asynchronously generate question-answers for a given topic.
     
@@ -31,7 +31,7 @@ async def generate_qna_for_topic(topic_name: str, texts: list[str], gpt4o, gpt4o
         input_tokens = total_tokens
     
     prompt = f"""
-    I need you to generate 10 question-answer pairs based on the following text about {topic_name}. 
+    I need you to generate 3 question-answer pairs based on the following text about {topic_name}. 
     The questions should:
     1. Cover key concepts, facts, and insights from the text
     2. Be clearly answerable from the content provided
@@ -50,10 +50,10 @@ async def generate_qna_for_topic(topic_name: str, texts: list[str], gpt4o, gpt4o
     
     {text_for_processing}
     
-    Generate exactly 10 question-answer pairs in the following JSON format:
+    Generate exactly 3 question-answer pairs in the following JSON format:
     [
         {{"question": "What is...", "answer": "The text explains that..."}},
-        ...and so on for all 10 pairs
+        ...and so on for all 3 pairs
     ]
     
     Only return the JSON array without any additional text or explanations.
@@ -61,9 +61,9 @@ async def generate_qna_for_topic(topic_name: str, texts: list[str], gpt4o, gpt4o
     prompt_tokens = len(gpt4o_encoder.encode(prompt))
     
     try:
-        response = await gpt4o.chat.completions.create(
+        response = gpt4o.chat.completions.create(
             model="gpt-4o-mini",  
-            temperature=0.2, 
+            temperature=0.1, 
             messages=[
                 {"role": "system", "content": "You are an expert at generating educational question-answer pairs from text content."},
                 {"role": "user", "content": prompt}

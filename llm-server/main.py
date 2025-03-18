@@ -81,7 +81,7 @@ import pdf2image as p2i
 import asyncio 
 import pandas as pd 
 from openai import OpenAI 
-from generate_qna.generator import generate_qna_for_topic
+from generate_qna.generator import generate_qna_for_topic_sync
 
 # custom defined libraries 
 from json_trees.generate import JSONParser 
@@ -1655,43 +1655,43 @@ async def modify_branch(branch_data: ModificationInputModel) -> ModificationOutp
         token_count=token_count, 
     )
 
-@app.post("/generate_excel")
-async def generate_qna_topic_wise(request: QNATopicWiseRequest):
-    try:
-        final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
-        with final_json_blob.open("r") as blb:
-            json_qna: list[str] = json.load(blb)
+# @app.post("/generate_excel")
+# async def generate_qna_topic_wise(request: QNATopicWiseRequest):
+#     try:
+#         final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
+#         with final_json_blob.open("r") as blb:
+#             json_qna: list[str] = json.load(blb)
         
-        df = pd.DataFrame(json_qna)
+#         df = pd.DataFrame(json_qna)
         
-        tasks = []
+#         tasks = []
         
-        for topic_name, topic_df in df.groupby("topic"):
-            topic_texts = topic_df["text"].tolist()
-            task = generate_qna_for_topic(topic_name, topic_texts, gpt4o, gpt4o_encoder)
-            tasks.append(task)
+#         for topic_name, topic_df in df.groupby("topic"):
+#             topic_texts = topic_df["text"].tolist()
+#             task = generate_qna_for_topic(topic_name, topic_texts, gpt4o, gpt4o_encoder)
+#             tasks.append(task)
         
-        results = await asyncio.gather(*tasks)
+#         results = await asyncio.gather(*tasks)
         
-        all_results = {}
-        for topic_name, topic_result in results:
-            all_results[topic_name] = topic_result
+#         all_results = {}
+#         for topic_name, topic_result in results:
+#             all_results[topic_name] = topic_result
         
-        output_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.xlsx"
-        excel_blob = bucket.blob(output_path)
+#         output_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.xlsx"
+#         excel_blob = bucket.blob(output_path)
         
-        with BytesIO() as output:
-            with pd.ExcelWriter(output) as writer:
-                for topic_name, topic_data in all_results.items():
-                    topic_df = pd.DataFrame(topic_data)
-                    topic_df.to_excel(writer, sheet_name=topic_name[:31], index=False)  # Excel sheet names limited to 31 chars
+#         with BytesIO() as output:
+#             with pd.ExcelWriter(output) as writer:
+#                 for topic_name, topic_data in all_results.items():
+#                     topic_df = pd.DataFrame(topic_data)
+#                     topic_df.to_excel(writer, sheet_name=topic_name[:31], index=False)  # Excel sheet names limited to 31 chars
             
-            excel_blob.upload_from_string(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        return {"status": "success", "excel_path": output_path}
+#             excel_blob.upload_from_string(output.getvalue(), content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+#         return {"status": "success", "excel_path": output_path}
         
-    except Exception as err:
-        logger.error(f"Error generating Excel: {str(err)}")
-        return {"status": "error", "message": str(err)}
+#     except Exception as err:
+#         logger.error(f"Error generating Excel: {str(err)}")
+#         return {"status": "error", "message": str(err)}
     
 @app.post("/add_word_count") 
 async def add_word_count(edit_metadata_request: MetaDataEditModel) -> MetaDataEditResponseModel: 
@@ -2047,6 +2047,14 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
     
     return statuses
 
+def start_process_topics(request: QNATopicWiseRequest):
+    subprocess.Popen(["python3", "subprocess_script.py", request.filename, request.email_id], close_fds=True)
+
+@app.post("/generate_excel")
+async def generate_qna_topic_wise(request: QNATopicWiseRequest):
+    start_process_topics(request)
+    return {"status": "processing", "message": "csv files are generating!"}
+
 @app.post("/get_all_processed_books") 
 async def processed_books_request(request: FinalBookListRequest) -> FinalBookListResponse: 
         existent_blobs = gcs_client.list_blobs(
@@ -2084,9 +2092,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
         stderr=subprocess.PIPE
     )
     
-    # Schedule waiting for process termination in the background
     asyncio.create_task(process.wait())
-
     return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
 
 @app.post("/send-email")
