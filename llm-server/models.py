@@ -209,6 +209,9 @@ class SubprocessInitiatedResponse(AbsoluteBaseModel):
 class EmailRequest(BaseModel): 
     email: str
 
+class QNATopicWiseRequest(BaseModel): 
+    email_id: str 
+    filename: str 
 
 
 
