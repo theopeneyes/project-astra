@@ -53,6 +53,7 @@ from models import ReformRequestModel
 from models import ReformResponseModel
 from models import PDFUploadResponseModel
 from models import ResponseModel
+from models import GetExcelRequest
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -2125,5 +2126,4 @@ async def get_excel_json(request: GetExcelRequest) -> JSONResponse:
         raise HTTPException(status_code=500, detail=str(err))
 
     return df_json
-
         

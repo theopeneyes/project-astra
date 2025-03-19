@@ -141,7 +141,6 @@ func main() {
 		pm.handleEmailSending(err)
 	}
 
-
 	err = pm.GenerateQNA(LlmServerURL); 
 	if err != nil {
 		pm.handleEmailSending(err)
