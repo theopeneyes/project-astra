@@ -2065,7 +2065,7 @@ async def processed_books_request(request: FinalBookListRequest) -> FinalBookLis
 
         blob_names = [blob.name.split("/")[-1].split(".json")[0]
                                  for blob in existent_blobs]
-        
+
         return FinalBookListResponse(
             email_id=request.email_id, 
             book_list=blob_names, 
@@ -2110,6 +2110,3 @@ def send_email(request_data: EmailRequest):
         return response.json()
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-        
-

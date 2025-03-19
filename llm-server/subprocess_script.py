@@ -37,51 +37,51 @@ request.filename = filename
 request.email_id = email_id
 
 def process_topics(request):
-    # try:
-    final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
-    with final_json_blob.open("r") as blb:
-        json_qna: list[dict] = json.load(blb)
-    
-    df = pd.DataFrame(json_qna)
-    all_data = []
-    
-    status_blob = bucket.blob(f"{request.email_id}/status/{request.filename.split('.')[0]}_status.txt")
-    status_blob.upload_from_string("Processing started", content_type="text/plain")
-    
-    for topic_name, topic_df in df.groupby("topic"):
-        topic_texts = topic_df["text"].tolist()
-        topic_name, topic_result, _, _  = generate_qna_for_topic_sync(topic_name, topic_texts, gpt4o, gpt4o_encoder)
+    try:
+        final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
+        with final_json_blob.open("r") as blb:
+            json_qna: list[dict] = json.load(blb)
         
-        output_path = f"{request.email_id}/excel_output/{topic_name}_{request.filename.split('.')[0]}.csv"
-        csv_blob = bucket.blob(output_path)
+        df = pd.DataFrame(json_qna)
+        all_data = []
         
-        topic_df = pd.DataFrame(topic_result)
+        status_blob = bucket.blob(f"{request.email_id}/status/{request.filename.split('.')[0]}_status.txt")
+        status_blob.upload_from_string("Processing started", content_type="text/plain")
+        
+        for topic_name, topic_df in df.groupby("topic"):
+            topic_texts = topic_df["text"].tolist()
+            topic_name, topic_result, _, _  = generate_qna_for_topic_sync(topic_name, topic_texts, gpt4o, gpt4o_encoder)
+            
+            output_path = f"{request.email_id}/excel_output/{topic_name}_{request.filename.split('.')[0]}.csv"
+            csv_blob = bucket.blob(output_path)
+            
+            topic_df = pd.DataFrame(topic_result)
 
+            with BytesIO() as output:
+                topic_df.to_csv(output, index=False)
+                csv_blob.upload_from_string(output.getvalue(), content_type='text/csv')
+            
+            status_blob.upload_from_string(f"Completed: {topic_name}\n", content_type="text/plain")
+            print(f"Topic {topic_name} Done")
+            
+            for row in topic_result:
+                row["topic"] = topic_name
+                all_data.append(row)
+        
+        final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"
+        csv_blob = bucket.blob(final_csv_path)
+        final_df = pd.DataFrame(all_data)
+        
         with BytesIO() as output:
-            topic_df.to_csv(output, index=False)
+            final_df.to_csv(output, index=False)
             csv_blob.upload_from_string(output.getvalue(), content_type='text/csv')
         
-        status_blob.upload_from_string(f"Completed: {topic_name}\n", content_type="text/plain")
-        print(f"Topic {topic_name} Done")
+        send_email_notification(request.email_id)
+        status_blob.upload_from_string("Processing completed", content_type="text/plain")
         
-        for row in topic_result:
-            row["topic"] = topic_name
-            all_data.append(row)
-    
-    final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"
-    csv_blob = bucket.blob(final_csv_path)
-    final_df = pd.DataFrame(all_data)
-    
-    with BytesIO() as output:
-        final_df.to_csv(output, index=False)
-        csv_blob.upload_from_string(output.getvalue(), content_type='text/csv')
-    
-    send_email_notification(request.email_id)
-    status_blob.upload_from_string("Processing completed", content_type="text/plain")
-        
-    # except Exception as err:
-    #     logger.error(f"Error generating CSV: {str(err)}")
-    #     status_blob.upload_from_string(f"Error: {str(err)}", content_type="text/plain")
+    except Exception as err:
+        logger.error(f"Error generating CSV: {str(err)}")
+        status_blob.upload_from_string(f"Error: {str(err)}", content_type="text/plain")
 
 def send_email_notification(email: str):
     payload = {
