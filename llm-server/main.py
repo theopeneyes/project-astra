@@ -52,6 +52,7 @@ from models import ReformRequestModel
 from models import ReformResponseModel
 from models import PDFUploadResponseModel
 from models import ResponseModel
+from models import GetExcelRequest
 
 from dotenv import load_dotenv # for the purposes of loading hidden environment variables
 from typing import Dict, List 
@@ -2110,3 +2111,17 @@ def send_email(request_data: EmailRequest):
         return response.json()
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/get_excel_json") 
+async def get_excel_json(request: GetExcelRequest) -> JSONResponse: 
+    try: 
+        final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"
+        final_csv_blob = bucket.blob(final_csv_path) 
+        with final_csv_blob.open("r") as df_path: 
+            df = pd.DataFrame(df_path)  
+            df_json = df.to_json()
+        
+    except Exception as err: 
+        raise HTTPException(status_code=500, detail=str(err))
+
+    return df_json
