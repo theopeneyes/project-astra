@@ -20,6 +20,13 @@ func NewProcess() *ProcessMetadata {
 
 const LlmServerURL string = "http://34.16.121.9/astra"
 
+func (pm *ProcessMetadata) handleEmailSending(err error) {
+	errViaEmail := pm.SendEmailToClient(LlmServerURL)
+	if errViaEmail != nil {
+		panic(err)
+	}
+} 
+
 func main() {
 	// setting command line arguments to their respective variables.
 	pm := NewProcess()
@@ -41,11 +48,13 @@ func main() {
 
 	// fmt.Printf("the struct is as follows: %+v\n", pm);
 	if pm.FileName == "..." {
-		panic(fmt.Errorf("issue with parsing the file name you provided. Read the help and provide the inputs appropriately"))
+		err := fmt.Errorf("issue with parsing the file name you provided. Read the help and provide the inputs appropriately")
+		pm.handleEmailSending(err)
 	}
 
 	if pm.EmailId == "..." {
-		panic(fmt.Errorf("issue with parsing the email id you provided. Read the help and provide the inputs appropriately"))
+		err := fmt.Errorf("issue with parsing the email id you provided. Read the help and provide the inputs appropriately")
+		pm.handleEmailSending(err)
 	}
 
 	languageCode, err := pm.DataLoader()
@@ -117,23 +126,24 @@ func main() {
 
 	err = pm.Preprocess(LlmServerURL)
 	if err != nil {
-		panic(err)
+		pm.handleEmailSending(err)
 	}
 
 	err = pm.Segregate(LlmServerURL)
 	if err != nil {
-		panic(err)
+		pm.handleEmailSending(err)
 	}
 
 	pm.Modify(LlmServerURL)
 
 	err = pm.AddWordCount(LlmServerURL)
 	if err != nil {
-		panic(err)
+		pm.handleEmailSending(err)
 	}
 
-	err = pm.SendEmailToClient(LlmServerURL)
+
+	err = pm.GenerateQNA(LlmServerURL); 
 	if err != nil {
-		panic(err)
-	}
+		pm.handleEmailSending(err)
+	} 
 }
