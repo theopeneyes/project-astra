@@ -193,62 +193,74 @@ async def home() -> Dict[str, str]:
 
 @app.post("/upload_pdf") 
 async def upload_pdfs(
-    email_id: str = Form(...), 
-    filename: str = Form(...), 
-    pdf: UploadFile = File(...),  
-) -> PDFUploadResponseModel: 
-
-    start_time: int = time.time()
-
-
-    try:
-        content = await pdf.read()
-
-        if len(content) == 0:
-            raise EmptyPDFException()
+    email_id: str = Form(...),
+    files: List[UploadFile] = File(...),
+) -> List[PDFUploadResponseModel]:
+    responses = []
+    
+    for pdf in files:
+        file_start_time = time.time()
+        filename = pdf.filename
         
-        upload_pdf_blob = bucket.blob(os.path.join(
-            email_id, 
-            "uploaded_document", 
-            filename, 
-        ))
-
-        with upload_pdf_blob.open("wb", retry=retry) as fp: 
-            fp.write(content)
-
-    # Checking for empty PDF 
-    except EmptyPDFException as emptyPDF:
-        error_line: int = emptyPDF.__traceback__.tb_lineno 
-        error_name: str = type(emptyPDF).__name__
-        raise HTTPException(
-            status_code=404, 
-            detail=f"EmptyPDFException: {error_line} for file {filename}"
-        )
-
-    # Checking for connection error 
-    except urllib.error.URLError as e:
-        if isinstance(e.reason, ConnectionError):
-            error_line: int = e.__traceback__.tb_lineno 
-            error_name: str = type(e).__name__
-            raise HTTPException(
-                status_code=404, 
-                detail=f"NetworkError: {error_line} for file {filename}"
-            )
-    # Unexpected Exceptions
-    except Exception as err: 
-        error_line: int = err.__traceback__.tb_lineno 
-        error_name: str = type(err).__name__
-        raise HTTPException(
-            status_code=404, 
-            detail=f"Error {error_name} at line {error_line} for file {filename}"
-        )    
-
-        # Add successful upload to the response
-    return PDFUploadResponseModel(
-            email_id=email_id,
-            filename=filename,
-            time=time.time() - start_time,
-        )
+        try:
+            content = await pdf.read()
+            if len(content) == 0:
+                raise EmptyPDFException()
+            
+            upload_pdf_blob = bucket.blob(os.path.join(
+                email_id, 
+                "uploaded_document", 
+                filename,
+            ))
+            with upload_pdf_blob.open("wb", retry=retry) as fp:
+                fp.write(content)
+                
+            # Add successful upload to the responses
+            responses.append(PDFUploadResponseModel(
+                email_id=email_id,
+                filename=filename,
+                time=time.time() - file_start_time,
+                status="success"
+            ))
+            
+        # Checking for empty PDF
+        except EmptyPDFException as emptyPDF:
+            error_line = emptyPDF.__traceback__.tb_lineno
+            error_name = type(emptyPDF).__name__
+            responses.append(PDFUploadResponseModel(
+                email_id=email_id,
+                filename=filename,
+                time=time.time() - file_start_time,
+                status="error",
+                error=f"EmptyPDFException: {error_line} for file {filename}"
+            ))
+            
+        # Checking for connection error
+        except urllib.error.URLError as e:
+            if isinstance(e.reason, ConnectionError):
+                error_line = e.__traceback__.tb_lineno
+                error_name = type(e).__name__
+                responses.append(PDFUploadResponseModel(
+                    email_id=email_id,
+                    filename=filename,
+                    time=time.time() - file_start_time,
+                    status="error",
+                    error=f"NetworkError: {error_line} for file {filename}"
+                ))
+                
+        # Unexpected Exceptions
+        except Exception as err:
+            error_line = err.__traceback__.tb_lineno
+            error_name = type(err).__name__
+            responses.append(PDFUploadResponseModel(
+                email_id=email_id,
+                filename=filename,
+                time=time.time() - file_start_time,
+                status="error",
+                error=f"Error {error_name} at line {error_line} for file {filename}"
+            ))
+    
+    return responses
 
 # No LLM is used in this step. SO we are not charging tokens. 
 # we are however computing the amount of time this endpoint takes to run 
