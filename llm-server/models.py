@@ -201,10 +201,12 @@ class FinalBookListResponse(BaseModel):
     book_list: list[str]
 
 class RunSubprocessRequest(RequestModel): 
-    pass 
+    filenames: List[str]
+    email_id: str
 
 class SubprocessInitiatedResponse(AbsoluteBaseModel): 
-    pass 
+    filenames: List[str]
+    email_id: str 
 
 class EmailRequest(BaseModel): 
     email: str
