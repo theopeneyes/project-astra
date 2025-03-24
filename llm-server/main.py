@@ -2087,26 +2087,52 @@ async def processed_books_request(request: FinalBookListRequest) -> FinalBookLis
 @app.post("/run_subprocess") 
 async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
     """
-    Initiates the binary process asynchronously by executing:
+    Initiates the binary process asynchronously for a list of PDFs by executing:
         ../autopipeline/project-astra --filename <filename> --emailId <email_id>
-    Instead of waiting for the process to complete, it schedules a background task
-    to await its termination (using asyncio.create_task(process.wait())),
-    ensuring that the process is properly reaped (avoiding zombie processes).
+    It schedules background tasks for all files and ensures they are properly handled.
     """
-    command = [
-        "../autopipeline/project-astra",
-        "--filename", request.filename,
-        "--emailId", request.email_id
-    ]
+
+    tasks = []
+    for filename in request.filenames:
+        command = [
+            "../autopipeline/project-astra",
+            "--filename", filename,
+            "--emailId", request.email_id
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        tasks.append(process.wait())
+
+    # Returns all sub-processes concurrently 
+    await asyncio.gather(*tasks)
+    return SubprocessInitiatedResponse(file=request.file, email_id=request.email_id)
+
+
+# async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
+#     """
+#     Initiates the binary process asynchronously by executing:
+#         ../autopipeline/project-astra --filename <filename> --emailId <email_id>
+#     Instead of waiting for the process to complete, it schedules a background task
+#     to await its termination (using asyncio.create_task(process.wait())),
+#     ensuring that the process is properly reaped (avoiding zombie processes).
+#     """
+#     command = [
+#         "../autopipeline/project-astra",
+#         "--filename", request.filename,
+#         "--emailId", request.email_id
+#     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *command,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
+#     process = await asyncio.create_subprocess_exec(
+#         *command,
+#         stdout=subprocess.PIPE,
+#         stderr=subprocess.PIPE
+#     )
     
-    asyncio.create_task(process.wait())
-    return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
+#     asyncio.create_task(process.wait())
+#     return SubprocessInitiatedResponse(filename=request.filename, email_id=request.email_id)            
 
 @app.post("/send-email")
 def send_email(request_data: EmailRequest):

@@ -205,7 +205,8 @@ class RunSubprocessRequest(BaseModel):
     files: List[str] 
 
 class SubprocessInitiatedResponse(AbsoluteBaseModel): 
-    pass 
+    filenames: List[str]
+    email_id: str 
 
 class EmailRequest(BaseModel): 
     email: str
