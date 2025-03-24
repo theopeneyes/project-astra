@@ -83,7 +83,6 @@ import pdf2image as p2i
 import asyncio 
 import pandas as pd 
 from openai import OpenAI 
-from generate_qna.generator import generate_qna_for_topic_sync
 
 # custom defined libraries 
 from json_trees.generate import JSONParser 
