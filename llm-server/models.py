@@ -217,5 +217,7 @@ class QNATopicWiseRequest(BaseModel):
 
 class GetExcelRequest(BaseModel): 
     email_id: str 
-    filename: str
+    filename: str 
+
+
 
