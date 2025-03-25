@@ -2087,29 +2087,34 @@ async def processed_books_request(request: FinalBookListRequest) -> FinalBookLis
 @app.post("/run_subprocess") 
 async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
     """
-    Initiates the binary process asynchronously for a list of PDFs by executing:
-        ../autopipeline/project-astra --filename <filename> --emailId <email_id>
-    It schedules background tasks for all files and ensures they are properly handled.
+    Initiates the binary process asynchronously for a list of PDFs without waiting for completion.
+    Executes: ../autopipeline/project-astra --filename <filename> --emailId <email_id>
+    Immediately returns a 200 response after scheduling background tasks.
     """
 
-    tasks = []
-    for filename in request.files:
+    async def run_background_process(request, filename: str):
         command = [
-            "./project-astra",
-            "--filename", filename,
+            "./project-astra", 
+            "--filename", filename, 
             "--emailId", request.email_id
         ]
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+
+        _ = await asyncio.create_subprocess_exec(
+            *command, 
+            stdout=subprocess.DEVNULL,  
+            stderr=subprocess.DEVNULL,  
+            start_new_session=True  
         )
-        tasks.append(process.wait())
 
-    # Returns all sub-processes concurrently 
-    await asyncio.gather(*tasks)
-    return SubprocessInitiatedResponse(file=request.files, email_id=request.email_id)
+        return
 
+    for filename in request.files:
+        asyncio.create_task(run_background_process(filename))
+
+    return SubprocessInitiatedResponse(
+        files=request.files, 
+        email_id=request.email_id
+    )
 
 # async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
 #     """
