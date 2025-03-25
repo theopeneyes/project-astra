@@ -2095,7 +2095,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
     tasks = []
     for filename in request.files:
         command = [
-            "../autopipeline/project-astra",
+            "./project-astra",
             "--filename", filename,
             "--emailId", request.email_id
         ]
