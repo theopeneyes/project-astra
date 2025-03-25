@@ -2092,7 +2092,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
     Immediately returns a 200 response after scheduling background tasks.
     """
 
-    async def run_background_process(request, filename: str):
+    async def run_background_process(filename: str):
         command = [
             "./project-astra", 
             "--filename", filename, 
