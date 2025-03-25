@@ -2093,7 +2093,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
     """
 
     tasks = []
-    for filename in request.filenames:
+    for filename in request.files:
         command = [
             "../autopipeline/project-astra",
             "--filename", filename,
@@ -2108,7 +2108,7 @@ async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedRe
 
     # Returns all sub-processes concurrently 
     await asyncio.gather(*tasks)
-    return SubprocessInitiatedResponse(file=request.file, email_id=request.email_id)
+    return SubprocessInitiatedResponse(file=request.files, email_id=request.email_id)
 
 
 # async def run_subprocess(request: RunSubprocessRequest) -> SubprocessInitiatedResponse:
