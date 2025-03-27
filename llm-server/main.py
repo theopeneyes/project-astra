@@ -418,59 +418,59 @@ async def extract_font_indices(request: FontForChapterDetectionRequestModel) -> 
 @app.post("/extract_contents_page")
 async def extract_contents_page(contents_request: ContentsRequestModel) -> ContentsResponseModel: 
     start_time: float = time.time()
-    try: 
-        images_blob = bucket.blob(os.path.join(
-            contents_request.email_id, 
-            "processed_image", 
-            contents_request.filename.split('.pdf')[0] + ".json", 
-        ))
+    # try: 
+    images_blob = bucket.blob(os.path.join(
+        contents_request.email_id, 
+        "processed_image", 
+        contents_request.filename.split('.pdf')[0] + ".json", 
+    ))
 
-        with images_blob.open("r") as f: 
-            images: list = json.load(fp=f)  
-        
-        first_page, last_page, index_contents, token_count = parse_index(
-            images, 
-            contents_request.number_of_pages, 
-            contents_request.language_code, 
-            translator, 
-            gpt4o, gpt4o_encoder
-        )
+    with images_blob.open("r") as f: 
+        images: list = json.load(fp=f)  
+    
+    first_page, last_page, index_contents, token_count = parse_index(
+        images, 
+        contents_request.number_of_pages, 
+        contents_request.language_code, 
+        translator, 
+        gpt4o, gpt4o_encoder
+    )
 
-        df = pd.DataFrame(index_contents, columns=["sectionName", "title", "headingType", "pageNo"])
+    df = pd.DataFrame(index_contents, columns=["sectionName", "title", "headingType", "pageNo"])
 
-        contents_page_blob = bucket.blob(os.path.join(
-            contents_request.email_id, 
-            "contents_page", 
-            f"{contents_request.filename.split('.pdf')[0]}.csv", 
-        ))
+    contents_page_blob = bucket.blob(os.path.join(
+        contents_request.email_id, 
+        "contents_page", 
+        f"{contents_request.filename.split('.pdf')[0]}.csv", 
+    ))
 
 
-        with contents_page_blob.open("w", retry=retry) as fp: 
-            df.to_csv(fp, index=False)
+    with contents_page_blob.open("w", retry=retry) as fp: 
+        df.to_csv(fp, index=False)
 
-    except LLMTooDUMBException as tooDumb: 
-        error_name: str = type(tooDumb).__name__
-        error_line: int  = tooDumb.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
-        )
+    # except LLMTooDUMBException as tooDumb: 
+    #     error_name: str = type(tooDumb).__name__
+    #     error_line: int  = tooDumb.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}. Response: {tooDumb.response}"
+    #     )
 
-    except IndexPageNotFoundException as notFound: 
-        error_name: str = type(notFound).__name__
-        error_line: int  = notFound.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}. Number of pages: {notFound.number_of_pages}"
-        )
+    # except IndexPageNotFoundException as notFound: 
+    #     error_name: str = type(notFound).__name__
+    #     error_line: int  = notFound.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}. Number of pages: {notFound.number_of_pages}"
+    #     )
 
-    except Exception as err: 
-        error_name: str = type(err).__name__
-        error_line: int  = err.__traceback__.tb_lineno
-        raise HTTPException(
-            status_code=404, 
-            detail = f"Error :{error_name} at line {error_line}"
-        )
+    # except Exception as err: 
+    #     error_name: str = type(err).__name__
+    #     error_line: int  = err.__traceback__.tb_lineno
+    #     raise HTTPException(
+    #         status_code=404, 
+    #         detail = f"Error :{error_name} at line {error_line}"
+    #     )
     
     return ContentsResponseModel(
         email_id=contents_request.email_id, 

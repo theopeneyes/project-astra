@@ -27,7 +27,7 @@ func (pm *ProcessMetadata) GenerateQNA(url string) error {
 	readBuf := bytes.NewReader(buf)
 	request, err := http.NewRequest(
 		http.MethodPost, 
-		LlmServerURL, 
+		LlmServerURL + "/generate_excel", 
 		readBuf, 
 	)
 
