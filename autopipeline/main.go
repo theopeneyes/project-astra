@@ -145,4 +145,9 @@ func main() {
 	if err != nil {
 		pm.handleEmailSending(err)
 	} 
+
+	err = pm.SendEmailToClient(LlmServerURL); 
+	if err != nil {
+		panic(err) 
+	} 
 }
