@@ -18,7 +18,7 @@ func NewProcess() *ProcessMetadata {
 	return &ProcessMetadata{}
 }
 
-const LlmServerURL string = "http://localhost:8000"
+const LlmServerURL string = "http://34.16.121.9/astra"
 
 func (pm *ProcessMetadata) handleEmailSending(err error) {
 	errViaEmail := pm.SendEmailToClient(LlmServerURL)
