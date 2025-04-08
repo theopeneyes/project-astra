@@ -2029,13 +2029,15 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
     uploaded_pdfs = []
     finished_pdfs = [] 
     for uploaded_file_blob in uploaded_pdfs_blobs: 
-        uploaded_pdfs.append(uploaded_file_blob.name) 
+        uploaded_pdfs.append(uploaded_file_blob.name.split(".pdf")[0].split("/")[-1])  
 
         
     for finished_pdf_blob in finished_pdf_blobs: 
-        finished_pdfs.append(finished_pdf_blob.name)
+        finished_pdfs.append(finished_pdf_blob.name.split(".json")[0].split("/")[-1])
     
     statuses: list = []
+    print(uploaded_pdfs)
+    print(finished_pdfs) 
     
     for uploaded_pdf in uploaded_pdfs:  
         if uploaded_pdf in finished_pdfs: 
@@ -2048,7 +2050,7 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
         else: 
             statuses.append({
                 "file_name": uploaded_pdf.split("/")[-1], 
-                "status": "Pending", 
+                "status": "In Progress", 
                 "status_id": 1, 
                 "created_on": str(datetime.now()) 
             })
