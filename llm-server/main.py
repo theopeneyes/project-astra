@@ -2036,9 +2036,7 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
         finished_pdfs.append(finished_pdf_blob.name.split(".json")[0].split("/")[-1])
     
     statuses: list = []
-    print(uploaded_pdfs)
-    print(finished_pdfs) 
-    
+
     for uploaded_pdf in uploaded_pdfs:  
         if uploaded_pdf in finished_pdfs: 
             statuses.append({
