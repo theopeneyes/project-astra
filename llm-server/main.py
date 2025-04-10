@@ -106,7 +106,6 @@ from language_detection.detector import detect_language
 from data_loader.opeanai_formatters import text_message  
 
 from google.cloud import storage 
-from google.cloud import translate_v2
 from image_utils.encoder import encode_image 
 from datetime import datetime 
 
@@ -167,7 +166,6 @@ gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
-translator = translate_v2.Client.from_service_account_json(".secrets/translate_api.json")
 bucket = gcs_client.bucket(BUCKET_NAME)
 
 # testing phase therefore `debug=True`
