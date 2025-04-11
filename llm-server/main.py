@@ -430,7 +430,6 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
         images, 
         contents_request.number_of_pages, 
         contents_request.language_code, 
-        translator, 
         gpt4o, gpt4o_encoder
     )
 
@@ -971,7 +970,6 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
         encoded_image: str = image["img_b64"]
         confidence, language, token_count = detect_language(
             encoded_image, 
-            translator,
             gpt4o,   
             gpt4o_encoder, 
         )
@@ -2153,7 +2151,7 @@ def send_email(request_data: EmailRequest):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/get_excel_json") 
+@app.post("/get_excel_json") 
 async def get_excel_json(request: GetExcelRequest) -> JSONResponse: 
     try: 
         final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"

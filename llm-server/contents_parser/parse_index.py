@@ -6,7 +6,7 @@ from .exceptions import LLMTooDUMBException, IndexPageNotFoundException
 
 import re 
 
-def parse_index(images: list, number_of_pages: int, language_code: str, translator, gpt4o, gpt4o_encoder): 
+def parse_index(images: list, number_of_pages: int, language_code: str, gpt4o, gpt4o_encoder): 
     """
     Inputs: 
     images: list -> List of all images extracted from the book. 
@@ -21,8 +21,7 @@ def parse_index(images: list, number_of_pages: int, language_code: str, translat
     token_count: int = 0 
     index_contents: list = []
 
-    text: str = """Index, Table of contents, Table of texts, List of topics, topic list or subject-matter""".strip()
-    keywords: str = translator.translate(text, target_language=language_code).get("translatedText")
+    keywords: str = """Index, Table of contents, Table of texts, List of topics, topic list or subject-matter""".strip()
 
     for idx, image in enumerate(images[:number_of_pages]):
         
