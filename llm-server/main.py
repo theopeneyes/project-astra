@@ -106,7 +106,6 @@ from language_detection.detector import detect_language
 from data_loader.opeanai_formatters import text_message  
 
 from google.cloud import storage 
-from google.cloud import translate_v2
 from image_utils.encoder import encode_image 
 from datetime import datetime 
 
@@ -167,7 +166,6 @@ gpt4o_encoder = tiktoken.encoding_for_model("gpt-4o-mini")
 
 # initalizing the bucket client  
 gcs_client = storage.Client.from_service_account_json(".secrets/gcp_bucket.json")
-translator = translate_v2.Client.from_service_account_json(".secrets/translate_api.json")
 bucket = gcs_client.bucket(BUCKET_NAME)
 
 # testing phase therefore `debug=True`
@@ -432,7 +430,6 @@ async def extract_contents_page(contents_request: ContentsRequestModel) -> Conte
         images, 
         contents_request.number_of_pages, 
         contents_request.language_code, 
-        translator, 
         gpt4o, gpt4o_encoder
     )
 
@@ -973,7 +970,6 @@ async def detect_lang(request: RequestModel) -> DetectedLanguageResponseModel:
         encoded_image: str = image["img_b64"]
         confidence, language, token_count = detect_language(
             encoded_image, 
-            translator,
             gpt4o,   
             gpt4o_encoder, 
         )
@@ -2155,7 +2151,7 @@ def send_email(request_data: EmailRequest):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/get_excel_json") 
+@app.post("/get_excel_json") 
 async def get_excel_json(request: GetExcelRequest) -> JSONResponse: 
     try: 
         final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"

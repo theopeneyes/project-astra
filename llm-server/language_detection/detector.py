@@ -3,7 +3,6 @@ from .skeleton import messages
 from .prompts import text_extraction_prompt
 
 def detect_language(img_encoding: str, 
-                    translator, 
                     gpt4o, gpt4o_encoder) -> list[str, int]: 
 
     messages[1]["content"][0]["text"] = text_extraction_prompt 
@@ -27,6 +26,5 @@ def detect_language(img_encoding: str,
     else: 
         extracted_content = response_content  
     
-    language_response: str = translator.detect_language(extracted_content)
-    return language_response.get("confidence"), language_response.get("language"), token_count
+    return 1, "en", token_count
     
