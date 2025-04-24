@@ -78,6 +78,7 @@ import datetime
 import pymupdf
 import tempfile
 import subprocess 
+import hashlib
 
 import pdf2image as p2i 
 import asyncio 
@@ -2024,29 +2025,36 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
 
     uploaded_pdfs = []
     finished_pdfs = [] 
+
+    uploaded_blob_map: dict = {} 
     for uploaded_file_blob in uploaded_pdfs_blobs: 
         uploaded_pdfs.append(uploaded_file_blob.name.split(".pdf")[0].split("/")[-1])  
+        uploaded_blob_map[uploaded_file_blob.name.split(".pdf")[0].split("/")[-1]] = uploaded_file_blob 
 
         
     for finished_pdf_blob in finished_pdf_blobs: 
         finished_pdfs.append(finished_pdf_blob.name.split(".json")[0].split("/")[-1])
     
     statuses: list = []
-
+    
     for uploaded_pdf in uploaded_pdfs:  
+        uploaded_pdf_blob = uploaded_blob_map[uploaded_pdf] 
+        time_created: str = str(uploaded_pdf_blob.time_created.encode("utf-8")) 
         if uploaded_pdf in finished_pdfs: 
             statuses.append({
                 "file_name": uploaded_pdf.split("/")[-1], 
                 "status": "Completed", 
                 "status_id": 3, 
-                "created_on": str(datetime.now()) 
+                "created_on": time_created,  
+                "id": hashlib.sha1().update(time_created + uploaded_pdf.split("/")[-1])
             })
         else: 
             statuses.append({
                 "file_name": uploaded_pdf.split("/")[-1], 
                 "status": "In Progress", 
                 "status_id": 1, 
-                "created_on": str(datetime.now()) 
+                "created_on": time_created, 
+                "id": hashlib.sha1().update(time_created + uploaded_pdf.split("/")[-1])
             })
     
     return statuses
