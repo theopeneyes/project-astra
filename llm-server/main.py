@@ -2039,14 +2039,15 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
     
     for uploaded_pdf in uploaded_pdfs:  
         uploaded_pdf_blob = uploaded_blob_map[uploaded_pdf] 
-        time_created: str = str(uploaded_pdf_blob.time_created.encode("utf-8")) 
+        time_created: str = str(uploaded_pdf_blob.time_created).encode("utf-8") 
+        hashlib.sha1().update(time_created + uploaded_pdf.split("/")[-1].encode("utf-8"))
         if uploaded_pdf in finished_pdfs: 
             statuses.append({
                 "file_name": uploaded_pdf.split("/")[-1], 
                 "status": "Completed", 
                 "status_id": 3, 
                 "created_on": time_created,  
-                "id": hashlib.sha1().update(time_created + uploaded_pdf.split("/")[-1])
+                "id": hashlib.sha1().hexdigest() 
             })
         else: 
             statuses.append({
@@ -2054,7 +2055,7 @@ async def get_status(request: StatusRequestModel) -> JSONResponse:
                 "status": "In Progress", 
                 "status_id": 1, 
                 "created_on": time_created, 
-                "id": hashlib.sha1().update(time_created + uploaded_pdf.split("/")[-1])
+                "id": hashlib.sha1().hexdigest()
             })
     
     return statuses
