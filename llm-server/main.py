@@ -2160,17 +2160,32 @@ def send_email(request_data: EmailRequest):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/get_excel_json") 
-async def get_excel_json(request: GetExcelRequest) -> JSONResponse: 
-    try: 
-        final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"
-        final_csv_blob = bucket.blob(final_csv_path) 
-        with final_csv_blob.open("r") as df_path: 
-            df = pd.DataFrame(df_path)  
-            df_json = df.to_json()
+from fastapi.responses import JSONResponse
+import pandas as pd
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class GetExcelRequest(BaseModel):
+    email_id: str
+    filename: str
+
+@app.post("/get_excel_json")
+async def get_excel_json(request: GetExcelRequest) -> JSONResponse:
+    try:
+        final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.json"
+        final_csv_blob = bucket.blob(final_csv_path)
         
-    except Exception as err: 
+        with final_csv_blob.open("r") as df_path:
+            df = pd.read_json(df_path)  # Read directly into a dataframe from JSON
+            
+            for column in df.select_dtypes(include=['datetime']).columns:
+                df[column] = df[column].dt.strftime('%Y-%m-%dT%H:%M:%S')  # Convert to ISO format
+
+            df_json = df.to_dict(orient="records")  # Convert DataFrame to a list of dictionaries
+        
+    except Exception as err:
         raise HTTPException(status_code=500, detail=str(err))
 
-    return df_json
-        
+    return JSONResponse(content=df_json)

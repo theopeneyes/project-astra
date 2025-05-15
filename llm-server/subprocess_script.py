@@ -36,6 +36,21 @@ request = ProcessRequest()
 request.filename = filename 
 request.email_id = email_id
 
+def send_email_notification(email: str):
+    payload = {
+        "request_key": "OpenEyes_1224EzZykXxo",
+        "email_key": "RequestComplated",
+        "request_emails": [email],
+        "dynamic_data": {"current_year": "2025"}
+    }
+
+    try:
+        response = requests.post("https://oeservices.uatbyopeneyes.com/api/v1/sendMailWithOpenEyesMT", json=payload)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        logger.error(f"Error sending email: {str(e)}")
+
 def process_topics(request):
     try:
         final_json_blob = bucket.blob(f"{request.email_id}/final_json/{request.filename.split('.')[0]}.json")
@@ -50,16 +65,16 @@ def process_topics(request):
         
         for topic_name, topic_df in df.groupby("topic"):
             topic_texts = topic_df["text"].tolist()
-            topic_name, topic_result, _, _  = generate_qna_for_topic_sync(topic_name, topic_texts, gpt4o, gpt4o_encoder)
+            topic_name, topic_result, _, _ = generate_qna_for_topic_sync(topic_name, topic_texts, gpt4o, gpt4o_encoder)
             
-            output_path = f"{request.email_id}/excel_output/{topic_name}_{request.filename.split('.')[0]}.csv"
-            csv_blob = bucket.blob(output_path)
+            output_path = f"{request.email_id}/excel_output/{topic_name}_{request.filename.split('.')[0]}.json"
+            json_blob = bucket.blob(output_path)
             
-            topic_df = pd.DataFrame(topic_result)
-
-            with BytesIO() as output:
-                topic_df.to_csv(output, index=False)
-                csv_blob.upload_from_string(output.getvalue(), content_type='text/csv')
+            # Save topic-specific results as JSON
+            json_blob.upload_from_string(
+                json.dumps(topic_result, indent=2),
+                content_type='application/json'
+            )
             
             status_blob.upload_from_string(f"Completed: {topic_name}\n", content_type="text/plain")
             print(f"Topic {topic_name} Done")
@@ -68,34 +83,21 @@ def process_topics(request):
                 row["topic"] = topic_name
                 all_data.append(row)
         
-        final_csv_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.csv"
-        csv_blob = bucket.blob(final_csv_path)
-        final_df = pd.DataFrame(all_data)
+        final_json_path = f"{request.email_id}/excel_output/{request.filename.split('.')[0]}_qna.json"
+        final_json_blob = bucket.blob(final_json_path)
         
-        with BytesIO() as output:
-            final_df.to_csv(output, index=False)
-            csv_blob.upload_from_string(output.getvalue(), content_type='text/csv')
+        # Save all results as JSON
+        final_json_blob.upload_from_string(
+            json.dumps(all_data, indent=2),
+            content_type='application/json'
+        )
         
         send_email_notification(request.email_id)
         status_blob.upload_from_string("Processing completed", content_type="text/plain")
         
     except Exception as err:
-        logger.error(f"Error generating CSV: {str(err)}")
+        logger.error(f"Error generating JSON: {str(err)}")
+        status_blob = bucket.blob(f"{request.email_id}/status/{request.filename.split('.')[0]}_status.txt")
         status_blob.upload_from_string(f"Error: {str(err)}", content_type="text/plain")
-
-def send_email_notification(email: str):
-    payload = {
-        "request_key": "OpenEyes_1224EzZykXxo",
-        "email_key": "RequestComplated",
-        "request_emails": [email],
-        "dynamic_data": {"current_year": "2025"}
-    }
-    
-    try:
-        response = requests.post("https://oeservices.uatbyopeneyes.com/api/v1/sendMailWithOpenEyesMT", json=payload)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
-        logger.error(f"Error sending email: {str(e)}")
         
 process_topics(request)
