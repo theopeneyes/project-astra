@@ -2160,16 +2160,10 @@ def send_email(request_data: EmailRequest):
     except requests.RequestException as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-from fastapi.responses import JSONResponse
-import pandas as pd
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 
-app = FastAPI()
-
-class GetExcelRequest(BaseModel):
-    email_id: str
-    filename: str
+# class GetExcelRequest(BaseModel):
+#     email_id: str
+#     filename: str
 
 @app.post("/get_excel_json")
 async def get_excel_json(request: GetExcelRequest) -> JSONResponse:
